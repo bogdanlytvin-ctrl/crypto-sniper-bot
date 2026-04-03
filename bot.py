@@ -1,5 +1,7 @@
 import os
 import logging
+import time
+from collections import defaultdict
 from dotenv import load_dotenv
 from telegram import Update, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -16,12 +18,18 @@ logger = logging.getLogger(__name__)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+anthropic_client: anthropic.AsyncAnthropic | None = None
 
 # conversation_history stores per-user message history: {user_id: [{"role": ..., "content": ...}]}
 conversation_history: dict[int, list] = {}
 
 MAX_HISTORY = 20  # max messages per user to keep in context
+MAX_MESSAGE_LENGTH = 4000  # max characters per user message
+RATE_LIMIT_MESSAGES = 5   # max messages per window
+RATE_LIMIT_WINDOW = 60    # window size in seconds
+
+# rate_limit_tracker: {user_id: [timestamp, ...]}
+rate_limit_tracker: dict[int, list[float]] = defaultdict(list)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -56,6 +64,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id
     user_text = update.message.text
 
+    if len(user_text) > MAX_MESSAGE_LENGTH:
+        await update.message.reply_text(
+            f"Повідомлення занадто довге. Максимум {MAX_MESSAGE_LENGTH} символів."
+        )
+        return
+
+    now = time.time()
+    timestamps = rate_limit_tracker[user_id]
+    rate_limit_tracker[user_id] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(rate_limit_tracker[user_id]) >= RATE_LIMIT_MESSAGES:
+        await update.message.reply_text(
+            f"Забагато запитів. Зачекайте {RATE_LIMIT_WINDOW} секунд і спробуйте знову."
+        )
+        return
+    rate_limit_tracker[user_id].append(now)
+
     if user_id not in conversation_history:
         conversation_history[user_id] = []
 
@@ -68,7 +92,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
-        response = anthropic_client.messages.create(
+        response = await anthropic_client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,
             system=(
@@ -79,6 +103,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             messages=conversation_history[user_id],
         )
 
+        if not response.content or not hasattr(response.content[0], "text"):
+            raise ValueError("Unexpected empty response from Anthropic API")
         assistant_reply = response.content[0].text
         conversation_history[user_id].append({"role": "assistant", "content": assistant_reply})
 
@@ -106,10 +132,14 @@ async def post_init(app: Application) -> None:
 
 
 def main() -> None:
+    global anthropic_client
+
     if not TELEGRAM_TOKEN:
         raise ValueError("TELEGRAM_TOKEN is not set in .env")
     if not ANTHROPIC_API_KEY:
         raise ValueError("ANTHROPIC_API_KEY is not set in .env")
+
+    anthropic_client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
 
     app = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
 
