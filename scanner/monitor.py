@@ -102,6 +102,8 @@ async def _dex_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> N
                 "rugcheck_score":     safety.get("rugcheck_score"),
                 "top10_holders_pct":  safety.get("top10_holders_pct"),
                 "holders":            safety.get("holders"),
+                "pair_created_at":    pair_data.get("pair_created_at"),
+                "pair_url":           pair_data.get("pair_url"),
             }
             signal_id = db.save_signal(signal_data)
             if signal_id is None:
@@ -125,16 +127,12 @@ async def _dispatch_dex_signals(
 
     for signal_id, signal_type, score, pair_data, signal_result in signals:
         for user in users:
-            tier        = user["tier"]
             user_id     = user["id"]
             telegram_id = user["telegram_id"]
             user_lang   = user["lang"] or "ua"
 
-            if tier == "free"  and score < 85: continue
-            if tier == "basic" and score < 70: continue
-            if tier == "free"  and db.count_signals_sent_today(user_id) >= 3:  continue
-            if tier == "basic" and db.count_signals_sent_today(user_id) >= 20: continue
-            if db.was_signal_sent(user_id, signal_id): continue
+            if db.was_signal_sent(user_id, signal_id):
+                continue
 
             message = format_signal_message(pair_data, signal_result, lang=user_lang)
             try:

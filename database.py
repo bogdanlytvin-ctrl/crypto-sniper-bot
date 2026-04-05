@@ -59,6 +59,8 @@ def init_db() -> None:
                 honeypot         INTEGER DEFAULT 0,
                 rugcheck_score   INTEGER,
                 top10_holders_pct REAL,
+                pair_created_at  INTEGER,
+                pair_url         TEXT,
                 extra_json       TEXT,
                 created_at       TEXT NOT NULL DEFAULT (datetime('now')),
                 signal_date      TEXT NOT NULL DEFAULT (date('now')),
@@ -139,8 +141,10 @@ def init_db() -> None:
 
         # Migrations for existing DBs
         for col, ddl in [
-            ("lang",       "ALTER TABLE users ADD COLUMN lang TEXT NOT NULL DEFAULT 'ua'"),
-            ("registered", "ALTER TABLE users ADD COLUMN registered INTEGER NOT NULL DEFAULT 0"),
+            ("lang",            "ALTER TABLE users ADD COLUMN lang TEXT NOT NULL DEFAULT 'ua'"),
+            ("registered",      "ALTER TABLE users ADD COLUMN registered INTEGER NOT NULL DEFAULT 0"),
+            ("pair_created_at", "ALTER TABLE signals ADD COLUMN pair_created_at INTEGER"),
+            ("pair_url",        "ALTER TABLE signals ADD COLUMN pair_url TEXT"),
         ]:
             try:
                 conn.execute(ddl)
@@ -202,7 +206,8 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
                    COALESCE(us.auto_min_score, 80) as auto_min_score,
                    COALESCE(us.auto_max_buy_sol, 0.1) as auto_max_buy_sol,
                    COALESCE(us.auto_max_buy_bnb, 0.01) as auto_max_buy_bnb,
-                   COALESCE(us.auto_stop_loss, 20) as auto_stop_loss
+                   COALESCE(us.auto_stop_loss, 20) as auto_stop_loss,
+                   COALESCE(us.notify_all_tokens, 0) as notify_all_tokens
             FROM users u
             LEFT JOIN subscriptions s ON s.user_id=u.id
             LEFT JOIN user_settings us ON us.user_id=u.id
@@ -255,8 +260,9 @@ def save_signal(data: dict) -> int | None:
                     price_usd, liquidity_usd, volume_1h, volume_24h,
                     price_change_1h, price_change_24h, market_cap,
                     holders, liq_locked, contract_renounced, honeypot,
-                    rugcheck_score, top10_holders_pct, extra_json, signal_date
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,date('now'))
+                    rugcheck_score, top10_holders_pct,
+                    pair_created_at, pair_url, extra_json, signal_date
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,date('now'))
             """, (
                 data.get("chain"), data.get("token_address"), data.get("token_name"),
                 data.get("token_symbol"), data.get("pair_address"), data.get("dex"),
@@ -269,6 +275,7 @@ def save_signal(data: dict) -> int | None:
                 int(data.get("contract_renounced", False)),
                 int(data.get("honeypot", False)),
                 data.get("rugcheck_score"), data.get("top10_holders_pct"),
+                data.get("pair_created_at"), data.get("pair_url"),
                 data.get("extra_json"),
             ))
             return cur.lastrowid

@@ -222,6 +222,7 @@ def _blocked(reason: str) -> dict:
 
 def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua") -> str:
     """Format a Telegram signal message in the given language."""
+    import time as _time
     st    = signal_result["signal_type"]
     score = signal_result["score"]
     chain = pair_data.get("chain", "").upper()
@@ -233,26 +234,46 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
     }
     header = emoji_map.get(st, "")
 
-    name     = pair_data.get("token_name",    "?")
-    symbol   = pair_data.get("token_symbol",  "?")
-    address  = pair_data.get("token_address", "")
-    price    = pair_data.get("price_usd",         0) or 0
-    liq      = pair_data.get("liquidity_usd",     0) or 0
-    vol_1h   = pair_data.get("volume_1h",         0) or 0
-    chg_1h   = pair_data.get("price_change_1h",   0) or 0
-    mcap     = pair_data.get("market_cap",        0) or 0
-    dex      = (pair_data.get("dex") or "").capitalize()
-    url      = pair_data.get("pair_url", "")
-    chg_sign = "+" if chg_1h >= 0 else ""
+    name        = pair_data.get("token_name",    "?")
+    symbol      = pair_data.get("token_symbol",  "?")
+    address     = pair_data.get("token_address", "")
+    price       = pair_data.get("price_usd",         0) or 0
+    liq         = pair_data.get("liquidity_usd",     0) or 0
+    vol_1h      = pair_data.get("volume_1h",         0) or 0
+    chg_1h      = pair_data.get("price_change_1h",   0) or 0
+    mcap        = pair_data.get("market_cap",        0) or 0
+    dex         = (pair_data.get("dex") or "").capitalize()
+    url         = pair_data.get("pair_url", "")
+    created_ms  = pair_data.get("pair_created_at")
+    chg_sign    = "+" if chg_1h >= 0 else ""
 
-    chain_emoji  = "◎" if chain == "SOLANA" else "🔶"
-    price_fmt    = f"${price:.8f}" if price < 0.0001 else f"${price:.6f}"
+    chain_emoji = "◎" if chain == "SOLANA" else "🔶"
+    price_fmt   = f"${price:.8f}" if price < 0.0001 else f"${price:.6f}"
+
+    # Token age / creation time
+    age_str = ""
+    created_str = ""
+    if created_ms:
+        age_min = (_time.time() * 1000 - created_ms) / 60_000
+        if age_min < 60:
+            age_str = f"{int(age_min)}хв"
+        else:
+            age_str = f"{age_min/60:.1f}г"
+        import datetime as _dt
+        created_dt = _dt.datetime.utcfromtimestamp(created_ms / 1000)
+        created_str = created_dt.strftime("%d.%m.%Y %H:%M UTC")
 
     lines = [
         f"{header}  |  Score: {score}/100",
         "",
         f"{chain_emoji} {chain}  •  {dex}",
         f"🪙 <b>{name}</b> (${symbol})",
+    ]
+
+    if created_str:
+        lines.append(f"🕐 Створено: {created_str}  ({age_str} тому)")
+
+    lines += [
         "",
         f"💵 {_t(lang,'sig_price')}:  {price_fmt}",
         f"💧 {_t(lang,'sig_liq')}:  ${liq:,.0f}",
@@ -281,12 +302,14 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
         f"  {_t(lang,'sig_tp3')}",
         f"  {_t(lang,'sig_sl')}",
         "",
+        "📋 <b>Контракт:</b>",
     ]
 
     if address:
         lines.append(f"<code>{address}</code>")
+
     if url:
-        lines.append(f'<a href="{url}">📊 DexScreener</a>')
+        lines.append(f'🔗 <a href="{url}">Переглянути на DexScreener</a>')
 
     lines += ["", _t(lang, 'sig_disc')]
 

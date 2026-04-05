@@ -24,7 +24,17 @@
 <div class="card">
   <table class="table table-hover mb-0">
     <thead>
-      <tr><th>Ланцюг</th><th>Токен</th><th>Score</th><th>Тип</th><th>Ліквідність</th><th>Зміна 1h</th><th>Час</th></tr>
+      <tr>
+        <th>Ланцюг</th>
+        <th>Токен / Адреса</th>
+        <th>Score</th>
+        <th>Тип</th>
+        <th>Ліквідність</th>
+        <th>Зміна 1h</th>
+        <th>Створено (токен)</th>
+        <th>Час сигналу</th>
+        <th>Посилання</th>
+      </tr>
     </thead>
     <tbody>
     {% for s in signals %}
@@ -32,7 +42,11 @@
       <td>{% if s.chain=='solana' %}◎ SOL{% else %}🔶 BSC{% endif %}</td>
       <td>
         <b>{{ s.token_symbol or '?' }}</b> {{ s.token_name or '' }}<br>
-        <code class="small">{{ s.token_address[:16] if s.token_address else '—' }}...</code>
+        {% if s.token_address %}
+          <code class="small" style="font-size:.75rem;cursor:pointer"
+                onclick="navigator.clipboard.writeText('{{ s.token_address }}');this.textContent='✓ Скопійовано!';setTimeout(()=>this.textContent='{{ s.token_address }}',1500)"
+                title="Натисни щоб скопіювати">{{ s.token_address }}</code>
+        {% else %}—{% endif %}
       </td>
       <td>
         <div class="d-flex align-items-center gap-2">
@@ -59,10 +73,32 @@
           {% endif %}
         {% else %}—{% endif %}
       </td>
-      <td class="text-muted small">{{ s.created_at[11:16] }}</td>
+      <td class="small text-muted">
+        {% if s.pair_created_at %}
+          {{ (s.pair_created_at // 1000)|int|format_ts if s.pair_created_at else '—' }}
+          {% set age_min = ((now_ts - s.pair_created_at / 1000) / 60)|int %}
+          {% if age_min < 60 %}
+            <br><span class="text-warning">{{ age_min }}хв тому</span>
+          {% else %}
+            <br><span class="text-muted">{{ (age_min // 60) }}г тому</span>
+          {% endif %}
+        {% else %}—{% endif %}
+      </td>
+      <td class="text-muted small">{{ s.created_at[:16] }}</td>
+      <td>
+        {% if s.pair_url %}
+          <a href="{{ s.pair_url }}" target="_blank" class="btn btn-outline-info btn-sm py-0">DEX</a>
+        {% elif s.token_address %}
+          {% if s.chain == 'solana' %}
+            <a href="https://solscan.io/token/{{ s.token_address }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0">Solscan</a>
+          {% else %}
+            <a href="https://bscscan.com/token/{{ s.token_address }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0">BSCScan</a>
+          {% endif %}
+        {% else %}—{% endif %}
+      </td>
     </tr>
     {% else %}
-    <tr><td colspan="7" class="text-center text-muted py-4">Сигналів немає</td></tr>
+    <tr><td colspan="9" class="text-center text-muted py-4">Сигналів немає</td></tr>
     {% endfor %}
     </tbody>
   </table>

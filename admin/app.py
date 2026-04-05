@@ -16,6 +16,20 @@ import database as db
 app = Flask(__name__)
 app.secret_key = os.getenv("ADMIN_SECRET_KEY", secrets.token_hex(32))
 
+import datetime as _dt
+
+@app.template_filter("format_ts")
+def format_ts(ts: int) -> str:
+    """Unix timestamp → readable date string."""
+    try:
+        return _dt.datetime.utcfromtimestamp(int(ts)).strftime("%d.%m.%Y %H:%M")
+    except Exception:
+        return "—"
+
+@app.context_processor
+def inject_now():
+    return {"now_ts": time.time()}
+
 ADMIN_USER     = os.getenv("ADMIN_USER",     "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "changeme")
 
