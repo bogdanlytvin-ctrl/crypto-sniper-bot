@@ -20,18 +20,33 @@ _seen_mints: deque[str] = deque(maxlen=_SEEN_MAX)
 _seen_set:   set[str]   = set()
 
 
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0.0.0 Safari/537.36"
+    ),
+    "Accept":          "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin":          "https://pump.fun",
+    "Referer":         "https://pump.fun/",
+}
+
+
 async def get_new_tokens(session: aiohttp.ClientSession, limit: int = 30) -> list[dict]:
     """Fetch latest pump.fun token launches."""
     params = {
-        "offset": 0,
-        "limit":  limit,
-        "sort":   "created_timestamp",
-        "order":  "DESC",
-        "includeNsfw": "true",
+        "offset":       0,
+        "limit":        limit,
+        "sort":         "created_timestamp",
+        "order":        "DESC",
+        "includeNsfw":  "true",
     }
     try:
-        async with session.get(PUMPFUN_API, params=params,
-                               timeout=aiohttp.ClientTimeout(total=10)) as r:
+        async with session.get(
+            PUMPFUN_API, params=params, headers=_HEADERS,
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as r:
             if r.status == 200:
                 data = await r.json()
                 return data if isinstance(data, list) else []
