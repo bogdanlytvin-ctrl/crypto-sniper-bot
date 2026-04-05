@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block content %}
+<h4 class="mb-4">📊 Dashboard</h4>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="card stat-card stat-blue p-3">
+      <div class="text-muted small">Користувачі</div>
+      <div class="fs-4 fw-bold">{{ stats.total_users }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card stat-card stat-green p-3">
+      <div class="text-muted small">З гаманцем</div>
+      <div class="fs-4 fw-bold">{{ stats.with_wallet }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card stat-card stat-orange p-3">
+      <div class="text-muted small">З ключем 🔐</div>
+      <div class="fs-4 fw-bold">{{ stats.with_pk }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card stat-card stat-purple p-3">
+      <div class="text-muted small">Авто-трейд 🤖</div>
+      <div class="fs-4 fw-bold">{{ stats.auto_mode_on }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card stat-card stat-cyan p-3">
+      <div class="text-muted small">Угод сьогодні</div>
+      <div class="fs-4 fw-bold">{{ stats.trades_today }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card stat-card stat-pink p-3">
+      <div class="text-muted small">Відкр. позиції</div>
+      <div class="fs-4 fw-bold">{{ stats.open_positions }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-2">
+    <div class="card stat-card stat-blue p-3">
+      <div class="text-muted small">Сигналів сьогодні</div>
+      <div class="fs-4 fw-bold">{{ stats.signals_today }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card stat-card stat-green p-3">
+      <div class="text-muted small">Сигналів всього</div>
+      <div class="fs-4 fw-bold">{{ stats.signals_total }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card stat-card stat-orange p-3">
+      <div class="text-muted small">Угод всього</div>
+      <div class="fs-4 fw-bold">{{ stats.trades_total }}</div>
+    </div>
+  </div>
+  {% if signal_breakdown %}
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="text-muted small mb-2">Сигнали сьогодні за типом</div>
+      {% for row in signal_breakdown %}
+        {% set color = {'STRONG_BUY':'success','BUY':'warning','WATCH':'info'}.get(row.signal_type,'secondary') %}
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="badge bg-{{ color }}">{{ row.signal_type }}</span>
+          <strong>{{ row.cnt }}</strong>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <!-- Recent users -->
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="d-flex justify-content-between mb-2">
+        <strong>👥 Нові користувачі</strong>
+        <a href="{{ url_for('users') }}" class="text-muted small">Всі →</a>
+      </div>
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr><th>Ім'я</th><th>Username</th><th>Гаманці</th><th>Дата</th></tr></thead>
+        <tbody>
+        {% for u in recent_users %}
+        <tr>
+          <td>{{ u.first_name or '—' }}</td>
+          <td>{% if u.username %}<a href="https://t.me/{{ u.username }}" target="_blank" class="text-info">@{{ u.username }}</a>{% else %}—{% endif %}</td>
+          <td>{{ u.wallet_count }}</td>
+          <td class="text-muted small">{{ u.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent trades -->
+  <div class="col-md-6">
+    <div class="card p-3">
+      <div class="d-flex justify-content-between mb-2">
+        <strong>💱 Останні угоди</strong>
+        <a href="{{ url_for('trades') }}" class="text-muted small">Всі →</a>
+      </div>
+      {% if recent_trades %}
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr><th>Тип</th><th>Токен</th><th>Сума</th><th>Статус</th><th>Дата</th></tr></thead>
+        <tbody>
+        {% for tr in recent_trades %}
+        <tr>
+          <td>
+            {% if tr.trade_type == 'buy' %}
+              <span class="badge bg-success">BUY</span>
+            {% else %}
+              <span class="badge bg-danger">SELL</span>
+            {% endif %}
+            {% if tr.chain == 'solana' %}◎{% else %}🔶{% endif %}
+          </td>
+          <td><code>{{ tr.token_symbol or tr.token_address[:8]+'...' }}</code></td>
+          <td>{{ tr.amount_in }}</td>
+          <td>
+            {% if tr.status == 'confirmed' %}<span class="badge bg-success">✓</span>
+            {% elif tr.status == 'pending' %}<span class="badge bg-warning">⏳</span>
+            {% else %}<span class="badge bg-danger">✗</span>{% endif %}
+          </td>
+          <td class="text-muted small">{{ tr.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="text-muted small">Угод ще немає.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent signals -->
+<div class="card p-3 mt-3">
+  <div class="d-flex justify-content-between mb-2">
+    <strong>📡 Останні сигнали</strong>
+    <a href="{{ url_for('signals') }}" class="text-muted small">Всі →</a>
+  </div>
+  <table class="table table-sm table-hover mb-0">
+    <thead><tr><th>Ланцюг</th><th>Токен</th><th>Score</th><th>Тип</th><th>Ліквідність</th><th>Час</th></tr></thead>
+    <tbody>
+    {% for s in recent_signals %}
+    <tr>
+      <td>{% if s.chain=='solana' %}◎ SOL{% else %}🔶 BSC{% endif %}</td>
+      <td><b>{{ s.token_symbol or '?' }}</b> {{ s.token_name or '' }}</td>
+      <td>
+        <div class="d-flex align-items-center gap-2">
+          <div class="progress flex-grow-1" style="height:6px;min-width:50px;background:#30363d">
+            <div class="progress-bar {% if s.score>=85 %}bg-success{% elif s.score>=70 %}bg-warning{% else %}bg-info{% endif %}"
+                 style="width:{{ s.score }}%"></div>
+          </div>
+          <span class="small">{{ s.score }}</span>
+        </div>
+      </td>
+      <td>
+        {% if s.signal_type=='STRONG_BUY' %}<span class="badge badge-strong">STRONG BUY</span>
+        {% elif s.signal_type=='BUY' %}<span class="badge badge-buy">BUY</span>
+        {% elif s.signal_type=='WATCH' %}<span class="badge badge-watch">WATCH</span>
+        {% else %}<span class="badge badge-skip">SKIP</span>{% endif %}
+      </td>
+      <td>${{ '{:,.0f}'.format(s.liquidity_usd or 0) }}</td>
+      <td class="text-muted small">{{ s.created_at[11:16] }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
