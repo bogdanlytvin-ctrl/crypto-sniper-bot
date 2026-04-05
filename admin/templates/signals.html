@@ -43,8 +43,8 @@
       <td>
         <b>{{ s.token_symbol or '?' }}</b> {{ s.token_name or '' }}<br>
         {% if s.token_address %}
-          <code class="small" style="font-size:.75rem;cursor:pointer"
-                onclick="navigator.clipboard.writeText('{{ s.token_address }}');this.textContent='✓ Скопійовано!';setTimeout(()=>this.textContent='{{ s.token_address }}',1500)"
+          <code class="small" style="font-size:.72rem;cursor:pointer;user-select:all"
+                data-copy="{{ s.token_address }}"
                 title="Натисни щоб скопіювати">{{ s.token_address }}</code>
         {% else %}—{% endif %}
       </td>
