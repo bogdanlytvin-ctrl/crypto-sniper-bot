@@ -38,11 +38,11 @@ async def _get(session: aiohttp.ClientSession, url: str,
         ) as r:
             if r.status == 200:
                 return await r.json()
-            logger.debug("GeckoTerminal %s → %s", url, r.status)
+            logger.warning("GeckoTerminal %s → %s", url, r.status)
     except asyncio.TimeoutError:
-        logger.debug("GeckoTerminal timeout: %s", url)
+        logger.warning("GeckoTerminal timeout: %s", url)
     except Exception as e:
-        logger.debug("GeckoTerminal error: %s", e)
+        logger.warning("GeckoTerminal error: %s", e)
     return None
 
 
