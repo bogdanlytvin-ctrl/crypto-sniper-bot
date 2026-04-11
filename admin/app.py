@@ -657,5 +657,5 @@ def api_stats():
 
 if __name__ == "__main__":
     db.init_db()
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True, use_reloader=False)

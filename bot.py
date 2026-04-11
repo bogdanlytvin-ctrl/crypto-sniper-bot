@@ -981,12 +981,18 @@ def main() -> None:
     db.init_db()
     logger.info("Database initialized.")
 
-    port = int(os.getenv("PORT", "5000"))
+    port = int(os.getenv("PORT", "8080"))
     try:
         from admin.app import app as admin_app
         import threading
         threading.Thread(
-            target=lambda: admin_app.run(host="0.0.0.0", port=port, debug=False),
+            target=lambda: admin_app.run(
+                host="0.0.0.0",
+                port=port,
+                debug=False,
+                threaded=True,
+                use_reloader=False,
+            ),
             daemon=True,
         ).start()
         logger.info("Admin panel started on port %d", port)
