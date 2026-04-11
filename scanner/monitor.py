@@ -32,7 +32,7 @@ GECKO_INTERVAL     = int(os.getenv("GECKO_INTERVAL_SEC",   "45"))
 PUMPFUN_INTERVAL   = int(os.getenv("PUMPFUN_INTERVAL_SEC", "30"))
 MIN_SIGNAL_SCORE   = int(os.getenv("MIN_SIGNAL_SCORE",     "40"))
 
-SendCallback = Callable[[int, str, dict | None], Awaitable[None]]
+SendCallback = Callable[[int, str, dict | None, dict | None], Awaitable[None]]
 
 _SEEN_MAX = 10_000
 _seen_pairs:     deque[str] = deque(maxlen=_SEEN_MAX)
@@ -157,8 +157,14 @@ async def _dispatch_signals(
                 continue
 
             message = format_signal_message(pair_data, signal_result, lang=user_lang)
+            signal_meta = {
+                "signal_id":   signal_id,
+                "score":       score,
+                "signal_type": signal_type,
+                "price_usd":   pair_data.get("price_usd", 0),
+            }
             try:
-                await send_fn(telegram_id, message, pair_data)
+                await send_fn(telegram_id, message, pair_data, signal_meta)
                 db.mark_signal_sent(user_id, signal_id)
             except Exception as e:
                 logger.warning("Failed to send signal to %d: %s", telegram_id, e)
@@ -269,6 +275,6 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
             lang = user["lang"] or "ua"
             msg  = format_token_message(token, lang)
             try:
-                await send_fn(user["telegram_id"], msg, pair_data)
+                await send_fn(user["telegram_id"], msg, pair_data, None)
             except Exception as e:
                 logger.warning("pump.fun send error %d: %s", user["telegram_id"], e)

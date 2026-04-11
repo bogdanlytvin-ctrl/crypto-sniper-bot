@@ -122,6 +122,8 @@ def init_db() -> None:
                 buy_price_usd    REAL,
                 buy_amount_native REAL,
                 stop_loss_pct    REAL DEFAULT 20,
+                take_profit_pct  REAL DEFAULT 0,
+                exit_reason      TEXT,
                 status           TEXT NOT NULL DEFAULT 'open',
                 opened_at        TEXT NOT NULL DEFAULT (datetime('now')),
                 closed_at        TEXT,
@@ -135,6 +137,7 @@ def init_db() -> None:
                 auto_max_buy_sol  REAL DEFAULT 0.1,
                 auto_max_buy_bnb  REAL DEFAULT 0.01,
                 auto_stop_loss    REAL DEFAULT 20,
+                auto_take_profit  REAL DEFAULT 0,
                 notify_all_tokens INTEGER DEFAULT 0,
                 updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -197,7 +200,11 @@ def init_db() -> None:
             # subscriptions columns added in v2
             ("expires_at",      "ALTER TABLE subscriptions ADD COLUMN expires_at TEXT"),
             ("updated_at",      "ALTER TABLE subscriptions ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))"),
-            # payments table may not exist on old DBs — handled by CREATE TABLE IF NOT EXISTS above
+            # user_settings columns added in v3
+            ("auto_take_profit", "ALTER TABLE user_settings ADD COLUMN auto_take_profit REAL DEFAULT 0"),
+            # positions columns added in v3
+            ("take_profit_pct", "ALTER TABLE positions ADD COLUMN take_profit_pct REAL DEFAULT 0"),
+            ("exit_reason",     "ALTER TABLE positions ADD COLUMN exit_reason TEXT"),
         ]:
             try:
                 conn.execute(ddl)
@@ -508,7 +515,8 @@ def update_trade_status(trade_id: int, status: str, tx_hash: str | None = None) 
 
 def upsert_position(user_id: int, chain: str, token_address: str, token_symbol: str,
                     token_name: str, amount: float, buy_price_usd: float,
-                    buy_amount_native: float, stop_loss_pct: float = 20) -> None:
+                    buy_amount_native: float, stop_loss_pct: float = 20,
+                    take_profit_pct: float = 0) -> None:
     with get_conn() as conn:
         existing = conn.execute(
             "SELECT id, amount FROM positions WHERE user_id=? AND chain=? AND token_address=? AND status='open'",
@@ -520,10 +528,12 @@ def upsert_position(user_id: int, chain: str, token_address: str, token_symbol: 
         else:
             conn.execute("""
                 INSERT INTO positions (user_id, chain, token_address, token_symbol, token_name,
-                                       amount, buy_price_usd, buy_amount_native, stop_loss_pct)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                                       amount, buy_price_usd, buy_amount_native,
+                                       stop_loss_pct, take_profit_pct)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
             """, (user_id, chain, token_address, token_symbol, token_name,
-                  amount, buy_price_usd, buy_amount_native, stop_loss_pct))
+                  amount, buy_price_usd, buy_amount_native,
+                  stop_loss_pct, take_profit_pct))
 
 
 def get_open_positions(user_id: int) -> list[sqlite3.Row]:
@@ -533,11 +543,42 @@ def get_open_positions(user_id: int) -> list[sqlite3.Row]:
             (user_id,)).fetchall()
 
 
+def get_all_open_positions_with_users() -> list[sqlite3.Row]:
+    """Return all open positions joined with user info + settings — used by position monitor."""
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT p.*,
+                   u.telegram_id,
+                   COALESCE(u.lang, 'ua')        AS lang,
+                   COALESCE(s.tier, 'free')      AS tier,
+                   COALESCE(us.auto_stop_loss, 20)   AS eff_sl,
+                   COALESCE(us.auto_take_profit, 0)  AS eff_tp,
+                   COALESCE(us.auto_mode, 0)         AS auto_mode,
+                   w.encrypted_pk,
+                   w.address AS wallet_address
+            FROM positions p
+            JOIN users u ON u.id = p.user_id
+            LEFT JOIN subscriptions  s  ON s.user_id  = p.user_id
+            LEFT JOIN user_settings  us ON us.user_id = p.user_id
+            LEFT JOIN wallets        w  ON w.user_id  = p.user_id AND w.chain = p.chain
+            WHERE p.status = 'open'
+              AND p.buy_price_usd > 0
+              AND u.banned = 0
+        """).fetchall()
+
+
 def close_position(position_id: int) -> None:
     with get_conn() as conn:
         conn.execute(
             "UPDATE positions SET status='closed', closed_at=datetime('now') WHERE id=?",
             (position_id,))
+
+
+def close_position_with_reason(position_id: int, reason: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE positions SET status='closed', exit_reason=?, closed_at=datetime('now') WHERE id=?",
+            (reason, position_id))
 
 
 # ── User Settings ──────────────────────────────────────────────────────────────
@@ -555,7 +596,8 @@ def get_user_settings(user_id: int) -> sqlite3.Row | None:
 
 def update_user_settings(user_id: int, **kwargs) -> None:
     allowed = {"auto_mode", "auto_min_score", "auto_max_buy_sol",
-               "auto_max_buy_bnb", "auto_stop_loss", "notify_all_tokens"}
+               "auto_max_buy_bnb", "auto_stop_loss", "auto_take_profit",
+               "notify_all_tokens"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
