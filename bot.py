@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 import time
 from collections import defaultdict
 
@@ -954,6 +955,10 @@ async def post_init(app: Application) -> None:
     global _app
     _app = app
 
+    # Remove any active webhook so polling doesn't conflict
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook deleted, pending updates dropped.")
+
     await app.bot.set_my_commands([
         BotCommand("start",    "Головне меню / Main menu"),
         BotCommand("status",   "Статус і гаманці / Status & wallets"),
@@ -1023,8 +1028,20 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_plans_buy, pattern=r"^plans_buy:"))
     app.add_handler(CallbackQueryHandler(cb_pay_check, pattern=r"^pay_check:"))
 
+    # Graceful shutdown on SIGTERM/SIGINT (Railway sends SIGTERM on redeploy)
+    def _handle_stop(signum, frame):
+        logger.info("Received signal %s — stopping bot...", signum)
+        app.stop_running()
+
+    signal.signal(signal.SIGTERM, _handle_stop)
+    signal.signal(signal.SIGINT,  _handle_stop)
+
     logger.info("Crypto Sniper Bot is running...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True,
+        close_loop=False,
+    )
 
 
 if __name__ == "__main__":
