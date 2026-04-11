@@ -23,6 +23,7 @@ def init_db() -> None:
                 username    TEXT,
                 lang        TEXT NOT NULL DEFAULT 'ua',
                 registered  INTEGER NOT NULL DEFAULT 0,
+                banned      INTEGER NOT NULL DEFAULT 0,
                 created_at  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -131,23 +132,85 @@ def init_db() -> None:
                 updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS payments (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id),
+                tier        TEXT NOT NULL,
+                amount_usd  REAL NOT NULL,
+                invoice_id  TEXT UNIQUE,
+                invoice_url TEXT,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                paid_at     TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key        TEXT PRIMARY KEY,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS broadcasts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_user  TEXT NOT NULL,
+                message     TEXT NOT NULL,
+                tier_filter TEXT,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                sent_count  INTEGER DEFAULT 0,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+                sent_at     TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_user TEXT NOT NULL,
+                action     TEXT NOT NULL,
+                details    TEXT,
+                ip         TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE INDEX IF NOT EXISTS idx_signals_created   ON signals(created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_signals_score     ON signals(score DESC);
             CREATE INDEX IF NOT EXISTS idx_signals_chain     ON signals(chain);
             CREATE INDEX IF NOT EXISTS idx_signal_sends_user ON signal_sends(user_id);
             CREATE INDEX IF NOT EXISTS idx_trades_user       ON trades(user_id);
             CREATE INDEX IF NOT EXISTS idx_positions_user    ON positions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_payments_user     ON payments(user_id);
+            CREATE INDEX IF NOT EXISTS idx_payments_status   ON payments(status);
         """)
 
         # Migrations for existing DBs
         for col, ddl in [
             ("lang",            "ALTER TABLE users ADD COLUMN lang TEXT NOT NULL DEFAULT 'ua'"),
             ("registered",      "ALTER TABLE users ADD COLUMN registered INTEGER NOT NULL DEFAULT 0"),
+            ("banned",          "ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0"),
             ("pair_created_at", "ALTER TABLE signals ADD COLUMN pair_created_at INTEGER"),
             ("pair_url",        "ALTER TABLE signals ADD COLUMN pair_url TEXT"),
         ]:
             try:
                 conn.execute(ddl)
+            except Exception:
+                pass
+
+        # Default bot settings
+        defaults = {
+            "min_signal_score":    "40",
+            "free_daily_signals":  "3",
+            "basic_daily_signals": "20",
+            "pro_daily_signals":   "0",
+            "basic_price_usd":     "29",
+            "pro_price_usd":       "79",
+            "basic_duration_days": "30",
+            "pro_duration_days":   "30",
+            "maintenance_mode":    "0",
+        }
+        for key, val in defaults.items():
+            try:
+                conn.execute(
+                    "INSERT OR IGNORE INTO bot_settings (key, value) VALUES (?, ?)",
+                    (key, val)
+                )
             except Exception:
                 pass
 
@@ -177,6 +240,11 @@ def get_user_by_telegram_id(telegram_id: int) -> sqlite3.Row | None:
         return conn.execute("SELECT * FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
 
 
+def get_user_by_id(user_id: int) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+
+
 def get_user_lang(user_id: int) -> str:
     with get_conn() as conn:
         row = conn.execute("SELECT lang FROM users WHERE id=?", (user_id,)).fetchone()
@@ -195,6 +263,22 @@ def set_user_registered(user_id: int) -> None:
         conn.execute("UPDATE users SET registered=1 WHERE id=?", (user_id,))
 
 
+def is_banned(telegram_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT banned FROM users WHERE telegram_id=?", (telegram_id,)).fetchone()
+    return bool(row and row["banned"])
+
+
+def ban_user(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET banned=1 WHERE id=?", (user_id,))
+
+
+def unban_user(user_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET banned=0 WHERE id=?", (user_id,))
+
+
 def get_all_active_users_with_tier() -> list[sqlite3.Row]:
     with get_conn() as conn:
         return conn.execute("""
@@ -211,7 +295,8 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
             FROM users u
             LEFT JOIN subscriptions s ON s.user_id=u.id
             LEFT JOIN user_settings us ON us.user_id=u.id
-            WHERE s.status='active' OR s.tier='free'
+            WHERE (s.status='active' OR s.tier='free')
+              AND u.banned=0
         """).fetchall()
 
 
@@ -246,6 +331,15 @@ def set_user_tier(user_id: int, tier: str) -> None:
             UPDATE subscriptions SET tier=?, status='active', updated_at=datetime('now')
             WHERE user_id=?
         """, (tier, user_id))
+
+
+def set_user_tier_with_expiry(user_id: int, tier: str, expires_at: str) -> None:
+    with get_conn() as conn:
+        conn.execute("""
+            UPDATE subscriptions
+            SET tier=?, status='active', expires_at=?, updated_at=datetime('now')
+            WHERE user_id=?
+        """, (tier, expires_at, user_id))
 
 
 # ── Signals ────────────────────────────────────────────────────────────────────
@@ -442,3 +536,136 @@ def update_user_settings(user_id: int, **kwargs) -> None:
     vals = list(fields.values()) + [user_id]
     with get_conn() as conn:
         conn.execute(f"UPDATE user_settings SET {sets}, updated_at=datetime('now') WHERE user_id=?", vals)
+
+
+# ── Payments ───────────────────────────────────────────────────────────────────
+
+def save_payment(user_id: int, tier: str, amount_usd: float,
+                 invoice_id: str, invoice_url: str) -> int:
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO payments (user_id, tier, amount_usd, invoice_id, invoice_url)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, tier, amount_usd, invoice_id, invoice_url))
+        return cur.lastrowid
+
+
+def get_payment_by_invoice(invoice_id: str) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM payments WHERE invoice_id=?", (invoice_id,)).fetchone()
+
+
+def get_pending_payments() -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT p.*, u.telegram_id, u.first_name, u.lang
+            FROM payments p JOIN users u ON u.id=p.user_id
+            WHERE p.status='pending'
+            ORDER BY p.created_at DESC
+        """).fetchall()
+
+
+def update_payment_status(payment_id: int, status: str,
+                           paid_at: str | None = None) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE payments SET status=?, paid_at=COALESCE(?,paid_at) WHERE id=?",
+            (status, paid_at, payment_id)
+        )
+
+
+def get_user_payments(user_id: int, limit: int = 20) -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM payments WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit)).fetchall()
+
+
+def get_all_payments(limit: int = 50, offset: int = 0) -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT p.*, u.first_name, u.username, u.telegram_id
+            FROM payments p JOIN users u ON u.id=p.user_id
+            ORDER BY p.created_at DESC LIMIT ? OFFSET ?
+        """, (limit, offset)).fetchall()
+
+
+def count_payments() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0]
+
+
+# ── Bot Settings ───────────────────────────────────────────────────────────────
+
+def get_bot_setting(key: str, default: str | None = None) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM bot_settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_bot_setting(key: str, value: str) -> None:
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO bot_settings (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')
+        """, (key, value))
+
+
+def get_all_bot_settings() -> dict[str, str]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT key, value FROM bot_settings").fetchall()
+    return {r["key"]: r["value"] for r in rows}
+
+
+# ── Broadcasts ─────────────────────────────────────────────────────────────────
+
+def create_broadcast(admin_user: str, message: str,
+                     tier_filter: str | None = None) -> int:
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO broadcasts (admin_user, message, tier_filter)
+            VALUES (?, ?, ?)
+        """, (admin_user, message, tier_filter))
+        return cur.lastrowid
+
+
+def get_pending_broadcasts() -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM broadcasts WHERE status='pending' ORDER BY created_at ASC"
+        ).fetchall()
+
+
+def update_broadcast_status(broadcast_id: int, status: str,
+                             sent_count: int = 0) -> None:
+    with get_conn() as conn:
+        conn.execute("""
+            UPDATE broadcasts SET status=?, sent_count=?, sent_at=datetime('now')
+            WHERE id=?
+        """, (status, sent_count, broadcast_id))
+
+
+def get_all_broadcasts(limit: int = 30) -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM broadcasts ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+
+
+# ── Audit Log ──────────────────────────────────────────────────────────────────
+
+def add_audit_log(admin_user: str, action: str,
+                  details: str | None = None, ip: str | None = None) -> None:
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO audit_log (admin_user, action, details, ip)
+            VALUES (?, ?, ?, ?)
+        """, (admin_user, action, details, ip))
+
+
+def get_audit_log(limit: int = 100) -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()

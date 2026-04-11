@@ -113,18 +113,47 @@ async def _process_pair(
     )
 
 
+def _daily_limit(tier: str) -> int:
+    """Returns daily signal limit for tier. 0 = unlimited."""
+    key = f"{tier}_daily_signals"
+    val = db.get_bot_setting(key, "0")
+    try:
+        return int(val)
+    except ValueError:
+        return 0
+
+
+def _tier_min_score(tier: str) -> int:
+    return {"free": 85, "basic": 70, "pro": 55}.get(tier, 85)
+
+
 async def _dispatch_signals(
     signals: list[tuple[int, str, int, dict, dict]],
     send_fn: SendCallback,
 ) -> None:
+    # Stop all signals in maintenance mode
+    if db.get_bot_setting("maintenance_mode", "0") == "1":
+        logger.info("Maintenance mode — signals not dispatched.")
+        return
+
     users = db.get_all_active_users_with_tier()
     for signal_id, signal_type, score, pair_data, signal_result in signals:
         for user in users:
             user_id     = user["id"]
             telegram_id = user["telegram_id"]
             user_lang   = user["lang"] or "ua"
+            tier        = user["tier"] or "free"
+
+            # Score too low for this tier
+            if score < _tier_min_score(tier):
+                continue
 
             if db.was_signal_sent(user_id, signal_id):
+                continue
+
+            # Daily limit check
+            limit = _daily_limit(tier)
+            if limit > 0 and db.count_signals_sent_today(user_id) >= limit:
                 continue
 
             message = format_signal_message(pair_data, signal_result, lang=user_lang)

@@ -24,6 +24,7 @@ from trader.wallet import (
     encrypt_pk, decrypt_pk, can_trade,
     is_valid_solana_address, is_valid_evm_address,
 )
+import payments as pay
 
 load_dotenv()
 
@@ -86,6 +87,26 @@ def _buy_keyboard(chain: str, token_address: str) -> InlineKeyboardMarkup | None
     return InlineKeyboardMarkup([buttons, [InlineKeyboardButton("❌ Skip", callback_data="skip")]])
 
 
+def _plans_keyboard(lang: str, current_tier: str) -> InlineKeyboardMarkup:
+    buttons = []
+    if current_tier != "basic":
+        price = db.get_bot_setting("basic_price_usd", "29")
+        buttons.append(InlineKeyboardButton(
+            f"💳 Basic ${price}/міс", callback_data="plans_buy:basic"
+        ))
+    if current_tier != "pro":
+        price = db.get_bot_setting("pro_price_usd", "79")
+        buttons.append(InlineKeyboardButton(
+            f"🚀 Pro ${price}/міс", callback_data="plans_buy:pro"
+        ))
+    rows = [buttons] if buttons else []
+    if current_tier in ("basic", "pro"):
+        rows.append([InlineKeyboardButton(
+            t(lang, 'plan_my_payments'), callback_data="plans_buy:history"
+        )])
+    return InlineKeyboardMarkup(rows)
+
+
 # ── Monitor send callback ──────────────────────────────────────────────────────
 
 async def _send_signal(telegram_id: int, message: str, pair_data: dict | None = None) -> None:
@@ -106,10 +127,20 @@ async def _send_signal(telegram_id: int, message: str, pair_data: dict | None = 
     )
 
 
+# ── Ban guard ──────────────────────────────────────────────────────────────────
+
+def _check_banned(telegram_id: int) -> bool:
+    return db.is_banned(telegram_id)
+
+
 # ── /start ─────────────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user    = update.effective_user
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
+    if _rate_limited(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await update.message.reply_text(
@@ -122,7 +153,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # ── /help ──────────────────────────────────────────────────────────────────────
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user    = update.effective_user
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await update.message.reply_text(t(lang, 'help'), parse_mode=ParseMode.HTML)
@@ -131,13 +164,18 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # ── /status ────────────────────────────────────────────────────────────────────
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user    = update.effective_user
-    user_id = db.upsert_user(user.id, user.first_name, user.username)
-    lang    = db.get_user_lang(user_id)
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
+    if _rate_limited(user.id):
+        return
+    user_id   = db.upsert_user(user.id, user.first_name, user.username)
+    lang      = db.get_user_lang(user_id)
     wallets   = db.get_all_wallets(user_id)
     settings  = db.get_user_settings(user_id)
     positions = db.get_open_positions(user_id)
     sent_today = db.count_signals_sent_today(user_id)
+    tier      = db.get_user_tier(user_id)
 
     wallet_lines = []
     for w in wallets:
@@ -147,13 +185,16 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     wallets_text = "\n".join(wallet_lines) if wallet_lines else t(lang, 'status_no_wallet')
     auto_text    = t(lang, 'auto_on') if (settings and settings["auto_mode"]) else t(lang, 'auto_off')
+    tier_labels  = {"free": "🆓 Free", "basic": "💳 Basic", "pro": "🚀 Pro"}
+    tier_text    = tier_labels.get(tier, tier.upper())
 
     await update.message.reply_text(
         t(lang, 'status_full',
           wallets=wallets_text,
           signals_today=sent_today,
           positions=len(positions),
-          auto=auto_text),
+          auto=auto_text,
+          tier=tier_text),
         parse_mode=ParseMode.HTML,
         reply_markup=_main_keyboard(lang),
     )
@@ -162,19 +203,45 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 # ── /plans ─────────────────────────────────────────────────────────────────────
 
 async def cmd_plans(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user    = update.effective_user
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
-    await update.message.reply_text(
-        t(lang, 'plans') + t(lang, 'plans_coming_soon'),
-        parse_mode=ParseMode.HTML,
-    )
+    tier    = db.get_user_tier(user_id)
+    _show_plans(update, lang, tier, user_id)
+    await _send_plans(update, lang, tier, user_id)
+
+
+async def _send_plans(update_or_query, lang: str, tier: str, user_id: int) -> None:
+    basic_price = db.get_bot_setting("basic_price_usd", "29")
+    pro_price   = db.get_bot_setting("pro_price_usd", "79")
+    basic_days  = db.get_bot_setting("basic_duration_days", "30")
+    pro_days    = db.get_bot_setting("pro_duration_days", "30")
+
+    tier_labels = {"free": "🆓 Free", "basic": "💳 Basic", "pro": "🚀 Pro"}
+    current_label = tier_labels.get(tier, tier.upper())
+
+    text = t(lang, 'plans',
+             basic_price=basic_price, pro_price=pro_price,
+             basic_days=basic_days,   pro_days=pro_days,
+             current_tier=current_label)
+
+    kb = _plans_keyboard(lang, tier)
+    msg = update_or_query.message if hasattr(update_or_query, "message") else update_or_query
+    await msg.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=kb)
+
+
+def _show_plans(update, lang, tier, user_id):
+    pass  # placeholder kept for clarity
 
 
 # ── /language ──────────────────────────────────────────────────────────────────
 
 async def cmd_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user    = update.effective_user
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     keyboard = InlineKeyboardMarkup([[
@@ -187,6 +254,8 @@ async def cmd_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def cb_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query    = update.callback_query
     user     = query.from_user
+    if _check_banned(user.id):
+        return
     user_id  = db.upsert_user(user.id, user.first_name, user.username)
     new_lang = query.data.split(":")[1]
     db.set_user_lang(user_id, new_lang)
@@ -200,6 +269,11 @@ async def cb_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def cb_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
     user    = query.from_user
+    if _check_banned(user.id):
+        return
+    if _rate_limited(user.id):
+        await query.answer(t("ua", "rate_limit"))
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     action  = query.data.split(":")[1]
@@ -382,17 +456,150 @@ async def _menu_trades(query, user_id: int, lang: str) -> None:
     await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
+# ── Plans / Payment callbacks ──────────────────────────────────────────────────
+
+async def cb_plans_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query   = update.callback_query
+    user    = query.from_user
+    if _check_banned(user.id):
+        return
+    user_id = db.upsert_user(user.id, user.first_name, user.username)
+    lang    = db.get_user_lang(user_id)
+    await query.answer()
+
+    action = query.data.split(":")[1]   # basic | pro | history | check:<invoice_id>
+
+    if action == "history":
+        payments = db.get_user_payments(user_id, limit=5)
+        if not payments:
+            await query.edit_message_text(t(lang, 'pay_no_history'))
+            return
+        lines = [t(lang, 'pay_history_header')]
+        status_icons = {"paid": "✅", "pending": "⏳", "expired": "❌"}
+        for p in payments:
+            icon = status_icons.get(p["status"], "❓")
+            lines.append(
+                f"{icon} <b>{p['tier'].upper()}</b> ${p['amount_usd']:.0f} — "
+                f"{p['status']} — {p['created_at'][:10]}"
+            )
+        await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
+        return
+
+    tier = action  # basic or pro
+    if tier not in ("basic", "pro"):
+        return
+
+    # Check if payments are enabled
+    if not pay.is_enabled():
+        await query.edit_message_text(t(lang, 'pay_not_configured'))
+        return
+
+    # Check maintenance mode
+    if db.get_bot_setting("maintenance_mode", "0") == "1":
+        await query.edit_message_text(t(lang, 'pay_maintenance'))
+        return
+
+    await query.edit_message_text(t(lang, 'pay_creating'))
+
+    result = await pay.create_invoice(tier, user_id)
+    if not result:
+        await query.edit_message_text(t(lang, 'pay_error'))
+        return
+
+    price   = result["amount_usd"]
+    pay_url = result["pay_url"]
+    inv_id  = result["invoice_id"]
+    days    = db.get_bot_setting(f"{tier}_duration_days", "30")
+
+    tier_labels = {"basic": "💳 Basic", "pro": "🚀 Pro"}
+    label = tier_labels.get(tier, tier.upper())
+
+    text = t(lang, 'pay_invoice',
+             tier=label, price=f"{price:.0f}", days=days, inv_id=inv_id)
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(t(lang, 'pay_btn_pay'), url=pay_url)],
+        [InlineKeyboardButton(
+            t(lang, 'pay_btn_check'),
+            callback_data=f"pay_check:{inv_id}"
+        )],
+    ])
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML,
+                                  reply_markup=keyboard,
+                                  disable_web_page_preview=True)
+
+
+async def cb_pay_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """User manually checks if their payment went through."""
+    query   = update.callback_query
+    user    = query.from_user
+    if _check_banned(user.id):
+        return
+    user_id = db.upsert_user(user.id, user.first_name, user.username)
+    lang    = db.get_user_lang(user_id)
+    await query.answer()
+
+    inv_id  = query.data.split(":", 1)[1]
+    payment = db.get_payment_by_invoice(inv_id)
+
+    if not payment or payment["user_id"] != user_id:
+        await query.edit_message_text(t(lang, 'pay_not_found'))
+        return
+
+    if payment["status"] == "paid":
+        tier = payment["tier"]
+        sub  = db.get_subscription(user_id)
+        exp  = sub["expires_at"][:10] if sub and sub["expires_at"] else "—"
+        await query.edit_message_text(
+            t(lang, 'pay_already_paid', tier=tier.upper(), expires=exp),
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    if payment["status"] == "expired":
+        await query.edit_message_text(t(lang, 'pay_expired'))
+        return
+
+    # Check live
+    status = await pay.check_invoice(inv_id)
+
+    if status == "paid":
+        pay._activate_subscription(payment)
+        tier = payment["tier"]
+        days = int(db.get_bot_setting(f"{tier}_duration_days", "30"))
+        from datetime import datetime, timezone, timedelta
+        expires = (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%d.%m.%Y")
+        await query.edit_message_text(
+            t(lang, 'pay_confirmed', tier=tier.upper(), expires=expires),
+            parse_mode=ParseMode.HTML
+        )
+    elif status == "expired" or status is None:
+        db.update_payment_status(payment["id"], "expired")
+        await query.edit_message_text(t(lang, 'pay_expired'))
+    else:
+        # Still active (not paid yet)
+        await query.edit_message_text(
+            t(lang, 'pay_pending'),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(t(lang, 'pay_btn_check'),
+                                     callback_data=f"pay_check:{inv_id}")
+            ]])
+        )
+
+
 # ── Wallet conversation ────────────────────────────────────────────────────────
 
 async def cb_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query   = update.callback_query
     user    = query.from_user
+    if _check_banned(user.id):
+        return ConversationHandler.END
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await query.answer()
 
-    parts = query.data.split(":")   # wallet:add:solana | wallet:del:bsc | wallet:addkey | ...
-
+    parts  = query.data.split(":")
     action = parts[1]
 
     if action == "add":
@@ -445,6 +652,8 @@ async def cb_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def _recv_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user    = update.effective_user
+    if _check_banned(user.id):
+        return ConversationHandler.END
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     address = update.message.text.strip()
@@ -465,12 +674,13 @@ async def _recv_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def _recv_pk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user    = update.effective_user
+    if _check_banned(user.id):
+        return ConversationHandler.END
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     pk      = update.message.text.strip()
     chain   = context.user_data.get("wallet_chain", "solana")
 
-    # Delete message with private key immediately for safety
     try:
         await update.message.delete()
     except Exception:
@@ -494,16 +704,17 @@ async def conv_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     return ConversationHandler.END
 
 
-# ── Buy callback (signal buy buttons) ─────────────────────────────────────────
+# ── Buy callback ───────────────────────────────────────────────────────────────
 
 async def cb_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
     user    = query.from_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await query.answer()
 
-    # buy:chain:token_address:amount
     parts = query.data.split(":", 3)
     if len(parts) < 4:
         await query.message.reply_text("❌ Invalid callback data.")
@@ -546,8 +757,13 @@ async def cb_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         result = execute_buy(token_address, amount, pk)
 
     if result["success"]:
-        db.save_trade(user_id, chain, token_address, "?", "buy",
-                      amount, 0, 0, result["tx_hash"], "pending")
+        trade_id = db.save_trade(user_id, chain, token_address, "?", "buy",
+                                 amount, 0, 0, result["tx_hash"], "pending")
+        # Create position record
+        settings = db.get_user_settings(user_id)
+        sl_pct = settings["auto_stop_loss"] if settings else 20
+        db.upsert_position(user_id, chain, token_address, "?", "?",
+                           amount, 0, amount, sl_pct)
         await query.message.reply_text(
             t(lang, 'buy_success', tx=result["tx_hash"]),
             parse_mode=ParseMode.HTML,
@@ -572,6 +788,8 @@ async def cb_skip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cb_pos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
     user    = query.from_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await query.answer()
@@ -583,16 +801,17 @@ async def cb_pos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sell a position: sell:<position_id>:<pct>"""
     query   = update.callback_query
     user    = query.from_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await query.answer()
 
-    parts      = query.data.split(":")   # sell:pos_id:pct
-    pos_id     = int(parts[1])
-    sell_pct   = int(parts[2])
+    parts    = query.data.split(":")
+    pos_id   = int(parts[1])
+    sell_pct = int(parts[2])
 
     positions = db.get_open_positions(user_id)
     pos = next((p for p in positions if p["id"] == pos_id), None)
@@ -600,8 +819,8 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.edit_message_text("❌ Позицію не знайдено.")
         return
 
-    chain   = pos["chain"]
-    wallet  = db.get_wallet(user_id, chain)
+    chain  = pos["chain"]
+    wallet = db.get_wallet(user_id, chain)
     if not wallet or not wallet["encrypted_pk"]:
         await query.edit_message_text(t(lang, 'buy_no_pk'))
         return
@@ -618,9 +837,8 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
     if chain == "solana":
-        # Get token decimals and convert to raw amount
-        tokens = await get_sol_token_balances(wallet["address"])
-        tok = next((t for t in tokens if t["mint"] == pos["token_address"]), None)
+        tokens   = await get_sol_token_balances(wallet["address"])
+        tok      = next((tk for tk in tokens if tk["mint"] == pos["token_address"]), None)
         decimals = tok["decimals"] if tok else 6
         amount_raw = int(sell_amount * (10 ** decimals))
 
@@ -633,8 +851,8 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             result = await execute_swap(session, quote, wallet["address"], pk)
     else:
         from trader.bsc import execute_sell
-        # BSC: get token balance in raw
-        amount_raw = int(sell_amount)
+        # BSC: sell_amount is in token units, convert with decimals (assume 18)
+        amount_raw = int(sell_amount * (10 ** 18))
         result = execute_sell(pos["token_address"], amount_raw, pk)
 
     if result["success"]:
@@ -644,12 +862,11 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if sell_pct == 100:
             db.close_position(pos_id)
         else:
-            # Reduce position amount
             with db.get_conn() as conn:
                 conn.execute("UPDATE positions SET amount=amount*? WHERE id=?",
                              ((100 - sell_pct) / 100, pos_id))
         await query.edit_message_text(
-            t(lang, 'buy_success', tx=result["tx_hash"]).replace("Покупка", "Продаж").replace("Buy", "Sell"),
+            t(lang, 'sell_success', tx=result["tx_hash"]),
             parse_mode=ParseMode.HTML,
         )
     else:
@@ -662,6 +879,8 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
     user    = query.from_user
+    if _check_banned(user.id):
+        return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
     await query.answer()
@@ -685,6 +904,50 @@ async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.edit_message_text("🟣 pump.fun сповіщення <b>увімкнено</b>!\n\nБот надсилатиме кожен новий токен з pump.fun.", parse_mode=ParseMode.HTML)
 
 
+# ── Background: broadcast task ─────────────────────────────────────────────────
+
+async def _broadcast_loop() -> None:
+    """Check for pending admin broadcasts every 30s and send them."""
+    logger.info("Broadcast loop started.")
+    while True:
+        await asyncio.sleep(30)
+        try:
+            await _process_broadcasts()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Broadcast loop error: %s", e)
+
+
+async def _process_broadcasts() -> None:
+    if _app is None:
+        return
+    pending = db.get_pending_broadcasts()
+    for bcast in pending:
+        db.update_broadcast_status(bcast["id"], "sending")
+        users = db.get_all_active_users_with_tier()
+        tier_filter = bcast["tier_filter"]
+        if tier_filter:
+            users = [u for u in users if u["tier"] == tier_filter]
+
+        sent = 0
+        for user in users:
+            try:
+                await _app.bot.send_message(
+                    chat_id=user["telegram_id"],
+                    text=bcast["message"],
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True,
+                )
+                sent += 1
+                await asyncio.sleep(0.05)   # ~20 msg/sec (Telegram limit: 30/sec)
+            except Exception as e:
+                logger.warning("Broadcast send error to %d: %s", user["telegram_id"], e)
+
+        db.update_broadcast_status(bcast["id"], "sent", sent_count=sent)
+        logger.info("Broadcast #%d sent to %d users.", bcast["id"], sent)
+
+
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
 async def post_init(app: Application) -> None:
@@ -699,8 +962,11 @@ async def post_init(app: Application) -> None:
         BotCommand("language", "Мова / Language 🇺🇦🇬🇧"),
     ])
 
-    asyncio.get_event_loop().create_task(run_monitor(_send_signal))
-    logger.info("Monitor task started.")
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_monitor(_send_signal))
+    loop.create_task(pay.payment_check_loop(_send_signal))
+    loop.create_task(_broadcast_loop())
+    logger.info("All background tasks started.")
 
 
 def main() -> None:
@@ -710,7 +976,6 @@ def main() -> None:
     db.init_db()
     logger.info("Database initialized.")
 
-    # Start admin panel in background thread
     port = int(os.getenv("PORT", "5000"))
     try:
         from admin.app import app as admin_app
@@ -727,7 +992,6 @@ def main() -> None:
     global _app
     _app = app
 
-    # Wallet conversation handler
     wallet_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(cb_wallet, pattern=r"^wallet:")],
         states={
@@ -749,13 +1013,15 @@ def main() -> None:
     app.add_handler(CommandHandler("plans",    cmd_plans))
     app.add_handler(CommandHandler("language", cmd_language))
     app.add_handler(wallet_conv)
-    app.add_handler(CallbackQueryHandler(cb_menu,     pattern=r"^menu:"))
-    app.add_handler(CallbackQueryHandler(cb_language, pattern=r"^lang:"))
-    app.add_handler(CallbackQueryHandler(cb_buy,      pattern=r"^buy:"))
-    app.add_handler(CallbackQueryHandler(cb_skip,     pattern=r"^skip$"))
-    app.add_handler(CallbackQueryHandler(cb_auto,     pattern=r"^auto:"))
-    app.add_handler(CallbackQueryHandler(cb_pos,      pattern=r"^pos:"))
-    app.add_handler(CallbackQueryHandler(cb_sell,     pattern=r"^sell:"))
+    app.add_handler(CallbackQueryHandler(cb_menu,      pattern=r"^menu:"))
+    app.add_handler(CallbackQueryHandler(cb_language,  pattern=r"^lang:"))
+    app.add_handler(CallbackQueryHandler(cb_buy,       pattern=r"^buy:"))
+    app.add_handler(CallbackQueryHandler(cb_skip,      pattern=r"^skip$"))
+    app.add_handler(CallbackQueryHandler(cb_auto,      pattern=r"^auto:"))
+    app.add_handler(CallbackQueryHandler(cb_pos,       pattern=r"^pos:"))
+    app.add_handler(CallbackQueryHandler(cb_sell,      pattern=r"^sell:"))
+    app.add_handler(CallbackQueryHandler(cb_plans_buy, pattern=r"^plans_buy:"))
+    app.add_handler(CallbackQueryHandler(cb_pay_check, pattern=r"^pay_check:"))
 
     logger.info("Crypto Sniper Bot is running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

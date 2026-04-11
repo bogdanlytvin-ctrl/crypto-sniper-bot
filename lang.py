@@ -82,14 +82,16 @@ _T: dict[str, dict[str, str]] = {
             "<b>Гаманці:</b>\n{wallets}\n\n"
             "📨 Сигналів сьогодні: <b>{signals_today}</b>\n"
             "📦 Відкритих позицій: <b>{positions}</b>\n"
-            "🤖 Авто-трейд: <b>{auto}</b>"
+            "🤖 Авто-трейд: <b>{auto}</b>\n"
+            "💎 Тариф: <b>{tier}</b>"
         ),
         EN: (
             "📊 <b>Your status</b>\n\n"
             "<b>Wallets:</b>\n{wallets}\n\n"
             "📨 Signals today: <b>{signals_today}</b>\n"
             "📦 Open positions: <b>{positions}</b>\n"
-            "🤖 Auto-trade: <b>{auto}</b>"
+            "🤖 Auto-trade: <b>{auto}</b>\n"
+            "💎 Plan: <b>{tier}</b>"
         ),
     },
     'status_no_wallet': {UA: '  (немає гаманців)', EN: '  (no wallets)'},
@@ -101,31 +103,114 @@ _T: dict[str, dict[str, str]] = {
             "🆓 <b>Free</b> — безкоштовно\n"
             "  • Тільки STRONG BUY (score 85+)\n"
             "  • Максимум 3 сигнали/день\n\n"
-            "💳 <b>Basic</b> — $29/місяць\n"
+            "💳 <b>Basic</b> — ${basic_price}/{basic_days}д\n"
             "  • STRONG BUY + BUY (score 70+)\n"
             "  • 20 сигналів/день\n\n"
-            "🚀 <b>Pro</b> — $79/місяць\n"
+            "🚀 <b>Pro</b> — ${pro_price}/{pro_days}д\n"
             "  • Всі сигнали (score 55+)\n"
             "  • Необмежено сигналів\n"
-            "  • Пріоритетна доставка\n"
+            "  • Пріоритетна доставка\n\n"
+            "📌 Ваш тариф: <b>{current_tier}</b>\n\n"
+            "💰 Приймаємо: USDT, TON, BTC, ETH"
         ),
         EN: (
             "<b>Crypto Sniper Bot Plans</b>\n\n"
             "🆓 <b>Free</b> — free forever\n"
             "  • STRONG BUY only (score 85+)\n"
             "  • Max 3 signals/day\n\n"
-            "💳 <b>Basic</b> — $29/month\n"
+            "💳 <b>Basic</b> — ${basic_price}/{basic_days}d\n"
             "  • STRONG BUY + BUY (score 70+)\n"
             "  • 20 signals/day\n\n"
-            "🚀 <b>Pro</b> — $79/month\n"
+            "🚀 <b>Pro</b> — ${pro_price}/{pro_days}d\n"
             "  • All signals (score 55+)\n"
             "  • Unlimited signals\n"
-            "  • Priority delivery\n"
+            "  • Priority delivery\n\n"
+            "📌 Your plan: <b>{current_tier}</b>\n\n"
+            "💰 Accepted: USDT, TON, BTC, ETH"
         ),
     },
     'plans_coming_soon': {
-        UA: '\n💬 <i>Оплата буде доступна найближчим часом.</i>',
-        EN: '\n💬 <i>Payment coming soon. Stay tuned!</i>',
+        UA: '',
+        EN: '',
+    },
+    'plan_my_payments': {UA: '📋 Мої платежі', EN: '📋 My payments'},
+
+    # ── Payments ──────────────────────────────────────────────────────────────
+    'pay_creating': {
+        UA: '⏳ Створюю рахунок для оплати...',
+        EN: '⏳ Creating payment invoice...',
+    },
+    'pay_error': {
+        UA: '❌ Помилка створення рахунку. Спробуй пізніше або зверніться до підтримки.',
+        EN: '❌ Failed to create invoice. Try later or contact support.',
+    },
+    'pay_not_configured': {
+        UA: '❌ Оплата тимчасово недоступна. Зверніться до адміністратора.',
+        EN: '❌ Payments temporarily unavailable. Contact admin.',
+    },
+    'pay_maintenance': {
+        UA: '🔧 Бот на технічному обслуговуванні. Спробуй пізніше.',
+        EN: '🔧 Bot is under maintenance. Try later.',
+    },
+    'pay_invoice': {
+        UA: (
+            "💳 <b>Рахунок для оплати</b>\n\n"
+            "Тариф: <b>{tier}</b>\n"
+            "Сума: <b>${price} USDT</b>\n"
+            "Дійсний: <b>{days} днів</b>\n\n"
+            "📋 ID рахунку: <code>{inv_id}</code>\n\n"
+            "⚡ Натисни <b>Оплатити</b> для переходу до CryptoBot.\n"
+            "Рахунок дійсний <b>24 години</b>.\n"
+            "Після оплати підписка активується <b>автоматично</b>."
+        ),
+        EN: (
+            "💳 <b>Payment Invoice</b>\n\n"
+            "Plan: <b>{tier}</b>\n"
+            "Amount: <b>${price} USDT</b>\n"
+            "Duration: <b>{days} days</b>\n\n"
+            "📋 Invoice ID: <code>{inv_id}</code>\n\n"
+            "⚡ Tap <b>Pay</b> to go to CryptoBot.\n"
+            "Invoice valid for <b>24 hours</b>.\n"
+            "Subscription activates <b>automatically</b> after payment."
+        ),
+    },
+    'pay_btn_pay':   {UA: '💰 Оплатити через CryptoBot', EN: '💰 Pay via CryptoBot'},
+    'pay_btn_check': {UA: '🔄 Перевірити оплату',        EN: '🔄 Check payment'},
+    'pay_pending': {
+        UA: (
+            "⏳ <b>Очікуємо оплату...</b>\n\n"
+            "Якщо ти вже оплатив — натисни <b>Перевірити</b>.\n"
+            "Зазвичай підтверджується за 1-2 хвилини."
+        ),
+        EN: (
+            "⏳ <b>Waiting for payment...</b>\n\n"
+            "If you already paid — tap <b>Check</b>.\n"
+            "Usually confirms within 1-2 minutes."
+        ),
+    },
+    'pay_confirmed': {
+        UA: '✅ <b>Оплата підтверджена!</b>\n\nТариф <b>{tier}</b> активний до <b>{expires}</b>. 🚀',
+        EN: '✅ <b>Payment confirmed!</b>\n\nPlan <b>{tier}</b> active until <b>{expires}</b>. 🚀',
+    },
+    'pay_already_paid': {
+        UA: '✅ Цей рахунок вже оплачено.\nТариф <b>{tier}</b> активний до <b>{expires}</b>.',
+        EN: '✅ This invoice is already paid.\nPlan <b>{tier}</b> active until <b>{expires}</b>.',
+    },
+    'pay_expired': {
+        UA: '❌ Рахунок протермінований або не знайдений. Створи новий через /plans.',
+        EN: '❌ Invoice expired or not found. Create a new one via /plans.',
+    },
+    'pay_not_found': {
+        UA: '❌ Рахунок не знайдено.',
+        EN: '❌ Invoice not found.',
+    },
+    'pay_no_history': {
+        UA: '📋 Платежів ще немає.',
+        EN: '📋 No payments yet.',
+    },
+    'pay_history_header': {
+        UA: '📋 <b>Твої платежі:</b>',
+        EN: '📋 <b>Your payments:</b>',
     },
 
     # ── Main menu buttons ────────────────────────────────────────────────────
@@ -311,6 +396,10 @@ _T: dict[str, dict[str, str]] = {
     'buy_failed': {
         UA: '❌ <b>Помилка покупки:</b>\n<code>{error}</code>',
         EN: '❌ <b>Buy failed:</b>\n<code>{error}</code>',
+    },
+    'sell_success': {
+        UA: '✅ <b>Продаж успішний!</b>\n\n🔗 Tx: <code>{tx}</code>',
+        EN: '✅ <b>Sell successful!</b>\n\n🔗 Tx: <code>{tx}</code>',
     },
     'trading_no_enc_key': {
         UA: '❌ Торгівля недоступна: ENCRYPTION_KEY не налаштовано на сервері.',

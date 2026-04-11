@@ -6,3 +6,4 @@ cryptography==42.0.8
 solders==0.21.0
 base58==2.1.1
 web3==6.20.3
+pyotp==2.9.0
