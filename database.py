@@ -311,7 +311,8 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
                    COALESCE(us.auto_min_score, 80) as auto_min_score,
                    COALESCE(us.auto_max_buy_sol, 0.1) as auto_max_buy_sol,
                    COALESCE(us.auto_max_buy_bnb, 0.01) as auto_max_buy_bnb,
-                   COALESCE(us.auto_stop_loss, 20) as auto_stop_loss,
+                   COALESCE(us.auto_stop_loss, 20)   as auto_stop_loss,
+                   COALESCE(us.auto_take_profit, 0)  as auto_take_profit,
                    COALESCE(us.notify_all_tokens, 0) as notify_all_tokens
             FROM users u
             LEFT JOIN subscriptions s ON s.user_id=u.id

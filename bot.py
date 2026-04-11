@@ -115,24 +115,19 @@ async def _send_signal(telegram_id: int, message: str,
                        signal_meta: dict | None = None) -> None:
     if _app is None:
         return
-    # Manual buy buttons only if user does NOT have auto_mode enabled
+
+    # Use user data pre-loaded by _dispatch_signals (zero extra DB queries)
+    auto_on = False
+    if signal_meta:
+        auto_on = bool(signal_meta.get("auto_mode")) and signal_meta.get("user_tier") in ("basic", "pro")
+
     keyboard = None
-    if pair_data:
-        user = db.get_user_by_telegram_id(telegram_id)
-        if user:
-            settings = db.get_user_settings(user["id"])
-            tier = db.get_user_tier(user["id"])
-            auto_on = bool(settings and settings["auto_mode"]) and tier in ("basic", "pro")
-            if not auto_on:
-                keyboard = _buy_keyboard(
-                    pair_data.get("chain", ""),
-                    pair_data.get("token_address", ""),
-                )
-        else:
-            keyboard = _buy_keyboard(
-                pair_data.get("chain", ""),
-                pair_data.get("token_address", ""),
-            )
+    if pair_data and not auto_on:
+        keyboard = _buy_keyboard(
+            pair_data.get("chain", ""),
+            pair_data.get("token_address", ""),
+        )
+
     await _app.bot.send_message(
         chat_id=telegram_id,
         text=message,
@@ -140,32 +135,32 @@ async def _send_signal(telegram_id: int, message: str,
         disable_web_page_preview=True,
         reply_markup=keyboard,
     )
-    # Trigger auto-buy if applicable
-    if pair_data and signal_meta:
+    # Throttle: Telegram allows ~30 msg/sec globally
+    await asyncio.sleep(0.04)
+
+    # Trigger auto-buy if applicable (uses pre-loaded data from signal_meta)
+    if pair_data and signal_meta and auto_on:
         await _maybe_auto_buy(telegram_id, pair_data, signal_meta)
 
 
 async def _maybe_auto_buy(telegram_id: int, pair_data: dict, signal_meta: dict) -> None:
-    """Execute automatic buy if user has auto_mode=1, correct tier, wallet+pk, and score threshold met."""
+    """Execute automatic buy. All user data must be pre-loaded in signal_meta
+    by _dispatch_signals to avoid N×M DB queries."""
     if _app is None:
         return
-    user = db.get_user_by_telegram_id(telegram_id)
-    if not user:
-        return
-    user_id = user["id"]
-    lang    = user["lang"] or "ua"
 
-    # Tier check — only basic/pro can auto-trade
-    tier = db.get_user_tier(user_id)
-    if tier not in ("basic", "pro"):
-        return
+    user_id  = signal_meta.get("user_id")
+    lang     = signal_meta.get("lang", "ua")
+    tier     = signal_meta.get("user_tier", "free")
+    settings = signal_meta.get("user_settings")
 
-    settings = db.get_user_settings(user_id)
-    if not settings or not settings["auto_mode"]:
+    if not user_id or tier not in ("basic", "pro"):
+        return
+    if not settings or not settings.get("auto_mode"):
         return
 
     score = signal_meta.get("score", 0)
-    if score < (settings["auto_min_score"] or 80):
+    if score < (settings.get("auto_min_score") or 80):
         return
 
     chain         = pair_data.get("chain", "")
@@ -203,9 +198,9 @@ async def _maybe_auto_buy(telegram_id: int, pair_data: dict, signal_meta: dict) 
     if not pk:
         return
 
-    amount = settings["auto_max_buy_sol"] if chain == "solana" else settings["auto_max_buy_bnb"]
-    sl_pct = settings["auto_stop_loss"] or 20
-    tp_pct = settings["auto_take_profit"] or 0
+    amount = settings.get("auto_max_buy_sol", 0.1) if chain == "solana" else settings.get("auto_max_buy_bnb", 0.01)
+    sl_pct = settings.get("auto_stop_loss") or 20
+    tp_pct = settings.get("auto_take_profit") or 0
     chain_label = "SOL" if chain == "solana" else "BNB"
 
     # Notify user that auto-buy is starting
@@ -1165,31 +1160,33 @@ async def _check_positions_for_exit() -> None:
     if not positions:
         return
 
+    # Deduplicate price fetches: fetch price once per unique chain+token
+    # (multiple users may hold the same token — no need to call DexScreener N times)
+    price_cache: dict[str, float] = {}
+
     async with aiohttp.ClientSession() as session:
         for pos in positions:
             try:
-                await _evaluate_position(session, pos, get_pairs_by_token)
+                cache_key = f"{pos['chain']}:{pos['token_address']}"
+                if cache_key not in price_cache:
+                    pairs = await get_pairs_by_token(session, pos["chain"], pos["token_address"])
+                    price = float(pairs[0].get("priceUsd") or 0) if pairs else 0.0
+                    price_cache[cache_key] = price
+                    await asyncio.sleep(0.2)   # rate-limit only on cache miss
+                await _evaluate_position(session, pos, price_cache[cache_key])
             except Exception as e:
                 logger.warning("Position eval error (id=%d): %s", pos["id"], e)
-            await asyncio.sleep(0.3)   # gentle rate-limit
 
 
-async def _evaluate_position(session, pos, get_price_fn) -> None:
-    """Check one open position and execute auto-sell if SL/TP triggered."""
+async def _evaluate_position(session, pos, current_price: float) -> None:
+    """Check one open position and execute auto-sell if SL/TP triggered.
+    current_price is pre-fetched and cached by _check_positions_for_exit."""
     buy_price = pos["buy_price_usd"]
-    if not buy_price or buy_price <= 0:
+    if not buy_price or buy_price <= 0 or current_price <= 0:
         return
 
     sl_pct = pos["stop_loss_pct"] if pos["stop_loss_pct"] is not None else (pos["eff_sl"] or 20)
     tp_pct = pos["take_profit_pct"] if pos["take_profit_pct"] is not None else pos["eff_tp"]
-
-    # Fetch current price
-    pairs = await get_price_fn(session, pos["chain"], pos["token_address"])
-    if not pairs:
-        return
-    current_price = float(pairs[0].get("priceUsd") or 0)
-    if current_price <= 0:
-        return
 
     pnl_pct = (current_price - buy_price) / buy_price * 100
 

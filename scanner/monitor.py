@@ -175,11 +175,26 @@ async def _dispatch_signals(
                 continue
 
             message = format_signal_message(pair_data, signal_result, lang=user_lang)
+            # Pass pre-loaded user data so _send_signal / _maybe_auto_buy
+            # need zero extra DB queries per user (critical for 100+ users)
             signal_meta = {
-                "signal_id":   signal_id,
-                "score":       score,
-                "signal_type": signal_type,
-                "price_usd":   pair_data.get("price_usd", 0),
+                "signal_id":    signal_id,
+                "score":        score,
+                "signal_type":  signal_type,
+                "price_usd":    pair_data.get("price_usd", 0),
+                # user context (avoids N×M DB calls in send callback)
+                "user_id":      user_id,
+                "lang":         user_lang,
+                "user_tier":    tier,
+                "auto_mode":    user.get("auto_mode", 0),
+                "user_settings": {
+                    "auto_mode":        user.get("auto_mode", 0),
+                    "auto_min_score":   user.get("auto_min_score", 80),
+                    "auto_max_buy_sol": user.get("auto_max_buy_sol", 0.1),
+                    "auto_max_buy_bnb": user.get("auto_max_buy_bnb", 0.01),
+                    "auto_stop_loss":   user.get("auto_stop_loss", 20),
+                    "auto_take_profit": user.get("auto_take_profit", 0),
+                },
             }
             try:
                 await send_fn(telegram_id, message, pair_data, signal_meta)

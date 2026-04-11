@@ -525,17 +525,17 @@ def payments():
 # ── Bot Settings ───────────────────────────────────────────────────────────────
 
 _SETTINGS_META = {
-    "free_min_score":      ("🆓 Free: мін. score сигналу",           "int",   "0–100, дефолт 85"),
-    "basic_min_score":     ("💳 Basic: мін. score сигналу",          "int",   "0–100, дефолт 70"),
-    "pro_min_score":       ("🚀 Pro: мін. score сигналу",            "int",   "0–100, дефолт 55"),
-    "free_daily_signals":  ("🆓 Free: сигналів/день",                "int",   "0 = без ліміту"),
-    "basic_daily_signals": ("💳 Basic: сигналів/день",               "int",   "0 = без ліміту"),
-    "pro_daily_signals":   ("🚀 Pro: сигналів/день",                 "int",   "0 = без ліміту"),
-    "basic_price_usd":     ("Ціна Basic ($)",                        "float", "USD"),
-    "pro_price_usd":       ("Ціна Pro ($)",                          "float", "USD"),
-    "basic_duration_days": ("Basic: тривалість (днів)",              "int",   ""),
-    "pro_duration_days":   ("Pro: тривалість (днів)",                "int",   ""),
-    "maintenance_mode":    ("Режим обслуговування (0/1)",            "int",   "1 = вимкнути сигнали"),
+    "free_min_score":      ("🆓 Free: мін. score",    "int",   "0–100"),
+    "basic_min_score":     ("💳 Basic: мін. score",   "int",   "0–100"),
+    "pro_min_score":       ("🚀 Pro: мін. score",     "int",   "0–100"),
+    "free_daily_signals":  ("🆓 Free: сигналів/день", "int",   "0=∞"),
+    "basic_daily_signals": ("💳 Basic: сигналів/день","int",   "0=∞"),
+    "pro_daily_signals":   ("🚀 Pro: сигналів/день",  "int",   "0=∞"),
+    "basic_price_usd":     ("Basic ціна ($)",          "float", ""),
+    "pro_price_usd":       ("Pro ціна ($)",            "float", ""),
+    "basic_duration_days": ("Basic тривалість (днів)", "int",   ""),
+    "pro_duration_days":   ("Pro тривалість (днів)",   "int",   ""),
+    "maintenance_mode":    ("Maintenance mode (0/1)",  "int",   "1=стоп"),
 }
 
 
