@@ -194,6 +194,10 @@ def init_db() -> None:
             ("banned",          "ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0"),
             ("pair_created_at", "ALTER TABLE signals ADD COLUMN pair_created_at INTEGER"),
             ("pair_url",        "ALTER TABLE signals ADD COLUMN pair_url TEXT"),
+            # subscriptions columns added in v2
+            ("expires_at",      "ALTER TABLE subscriptions ADD COLUMN expires_at TEXT"),
+            ("updated_at",      "ALTER TABLE subscriptions ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))"),
+            # payments table may not exist on old DBs — handled by CREATE TABLE IF NOT EXISTS above
         ]:
             try:
                 conn.execute(ddl)
@@ -338,6 +342,22 @@ def set_user_tier(user_id: int, tier: str) -> None:
             UPDATE subscriptions SET tier=?, status='active', updated_at=datetime('now')
             WHERE user_id=?
         """, (tier, user_id))
+
+
+def get_expiring_subscriptions(days: int = 3) -> list[sqlite3.Row]:
+    """Return active paid subscriptions expiring within `days` days."""
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT s.user_id, s.tier, s.expires_at,
+                   u.telegram_id, u.first_name, COALESCE(u.lang, 'ua') as lang
+            FROM subscriptions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.status = 'active'
+              AND s.tier != 'free'
+              AND s.expires_at IS NOT NULL
+              AND date(s.expires_at) BETWEEN date('now') AND date('now', ? || ' days')
+              AND u.banned = 0
+        """, (f"+{days}",)).fetchall()
 
 
 def set_user_tier_with_expiry(user_id: int, tier: str, expires_at: str) -> None:

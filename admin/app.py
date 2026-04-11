@@ -51,8 +51,10 @@ def format_ts(ts) -> str:
 
 @app.context_processor
 def inject_globals():
+    today = _dt.date.today().isoformat()   # "2026-04-11" — for date comparisons in templates
     return {
         "now_ts": time.time(),
+        "today": today,
         "totp_enabled": bool(ADMIN_TOTP_SECRET),
     }
 

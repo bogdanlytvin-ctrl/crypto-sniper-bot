@@ -905,6 +905,51 @@ async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.edit_message_text("🟣 pump.fun сповіщення <b>увімкнено</b>!\n\nБот надсилатиме кожен новий токен з pump.fun.", parse_mode=ParseMode.HTML)
 
 
+# ── Background: subscription expiry reminders ─────────────────────────────────
+
+async def _subscription_reminder_loop() -> None:
+    """Once per day check for subscriptions expiring in ~3 days and notify users."""
+    logger.info("Subscription reminder loop started.")
+    await asyncio.sleep(60)   # wait 1 min after startup before first check
+    while True:
+        try:
+            await _send_expiry_reminders()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Subscription reminder loop error: %s", e)
+        await asyncio.sleep(86400)   # run once every 24 hours
+
+
+async def _send_expiry_reminders() -> None:
+    if _app is None:
+        return
+    from datetime import datetime, timezone
+    expiring = db.get_expiring_subscriptions(days=3)
+    for row in expiring:
+        try:
+            lang = row["lang"] or "ua"
+            expires_dt = datetime.fromisoformat(row["expires_at"])
+            days_left  = (expires_dt.replace(tzinfo=timezone.utc) -
+                          datetime.now(timezone.utc)).days
+            days_left  = max(0, days_left)
+            text = t("sub_expiry_reminder", lang).format(
+                tier    = row["tier"].upper(),
+                expires = row["expires_at"][:10],
+                days    = days_left,
+            )
+            await _app.bot.send_message(
+                chat_id    = row["telegram_id"],
+                text       = text,
+                parse_mode = ParseMode.HTML,
+            )
+            logger.info("Expiry reminder sent to user %d (tier=%s, expires=%s)",
+                        row["telegram_id"], row["tier"], row["expires_at"][:10])
+            await asyncio.sleep(0.05)
+        except Exception as e:
+            logger.warning("Expiry reminder send error to %d: %s", row["telegram_id"], e)
+
+
 # ── Background: broadcast task ─────────────────────────────────────────────────
 
 async def _broadcast_loop() -> None:
@@ -971,6 +1016,7 @@ async def post_init(app: Application) -> None:
     loop.create_task(run_monitor(_send_signal))
     loop.create_task(pay.payment_check_loop(_send_signal))
     loop.create_task(_broadcast_loop())
+    loop.create_task(_subscription_reminder_loop())
     logger.info("All background tasks started.")
 
 

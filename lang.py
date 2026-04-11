@@ -212,6 +212,20 @@ _T: dict[str, dict[str, str]] = {
         UA: '📋 <b>Твої платежі:</b>',
         EN: '📋 <b>Your payments:</b>',
     },
+    'sub_expiry_reminder': {
+        UA: (
+            '⚠️ <b>Нагадування про підписку</b>\n\n'
+            'Твій тариф <b>{tier}</b> закінчується <b>{expires}</b> '
+            '(через {days} дн.).\n\n'
+            'Щоб продовжити підписку — /plans 🚀'
+        ),
+        EN: (
+            '⚠️ <b>Subscription reminder</b>\n\n'
+            'Your <b>{tier}</b> plan expires on <b>{expires}</b> '
+            '({days} days left).\n\n'
+            'To renew — /plans 🚀'
+        ),
+    },
 
     # ── Main menu buttons ────────────────────────────────────────────────────
     'menu_wallet':    {UA: '👛 Гаманець',    EN: '👛 Wallet'},
