@@ -2,7 +2,9 @@ import sqlite3
 import os
 from datetime import datetime, timezone
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+# On Railway: set DB_PATH=/data/data.db and mount a Volume at /data
+_default = os.path.join(os.path.dirname(__file__), "data.db")
+DB_PATH  = os.getenv("DB_PATH", _default)
 
 
 def get_conn() -> sqlite3.Connection:
