@@ -147,15 +147,22 @@ async def _dispatch_signals(
         return
 
     users = db.get_all_active_users_with_tier()
+    logger.info("Dispatching %d signal(s) to %d active user(s)", len(signals), len(users))
+
     for signal_id, signal_type, score, pair_data, signal_result in signals:
+        symbol = pair_data.get("token_symbol", "?")
+        sent_count = 0
         for user in users:
             user_id     = user["id"]
             telegram_id = user["telegram_id"]
             user_lang   = user["lang"] or "ua"
             tier        = user["tier"] or "free"
+            min_score   = _tier_min_score(tier)
 
             # Score too low for this tier
-            if score < _tier_min_score(tier):
+            if score < min_score:
+                logger.debug("Signal %d (%s score=%d) skipped uid=%d tier=%s (need %d)",
+                             signal_id, symbol, score, user_id, tier, min_score)
                 continue
 
             if db.was_signal_sent(user_id, signal_id):
@@ -164,6 +171,7 @@ async def _dispatch_signals(
             # Daily limit check
             limit = _daily_limit(tier)
             if limit > 0 and db.count_signals_sent_today(user_id) >= limit:
+                logger.debug("Signal %d skipped uid=%d: daily limit %d reached", signal_id, user_id, limit)
                 continue
 
             message = format_signal_message(pair_data, signal_result, lang=user_lang)
@@ -176,8 +184,14 @@ async def _dispatch_signals(
             try:
                 await send_fn(telegram_id, message, pair_data, signal_meta)
                 db.mark_signal_sent(user_id, signal_id)
+                sent_count += 1
             except Exception as e:
                 logger.warning("Failed to send signal to %d: %s", telegram_id, e)
+
+        if sent_count > 0:
+            logger.info("Signal %d (%s score=%d) sent to %d user(s)", signal_id, symbol, score, sent_count)
+        else:
+            logger.warning("Signal %d (%s score=%d) — sent to 0 users (check tier score thresholds and user count)", signal_id, symbol, score)
 
 
 # ── DexScreener loop ──────────────────────────────────────────────────────────

@@ -154,8 +154,14 @@ async def _process_pending(send_fn) -> None:
             continue
 
         # Auto-expire after 25 hours (invoice lifetime is 24h)
-        created = datetime.fromisoformat(payment["created_at"])
-        if (datetime.utcnow() - created) > timedelta(hours=25):
+        try:
+            created = datetime.fromisoformat(payment["created_at"])
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            age = datetime.now(timezone.utc) - created
+        except (ValueError, TypeError):
+            age = timedelta(0)
+        if age > timedelta(hours=25):
             db.update_payment_status(payment["id"], "expired")
             continue
 
@@ -214,6 +220,6 @@ async def _notify_paid(send_fn, payment: dict) -> None:
     try:
         user = db.get_user_by_id(user_id)
         if user:
-            await send_fn(user["telegram_id"], msg, None)
+            await send_fn(user["telegram_id"], msg, None, None)
     except Exception as e:
         logger.error("Failed to notify user %s of payment: %s", user_id, e)

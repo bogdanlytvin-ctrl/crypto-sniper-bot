@@ -1180,8 +1180,8 @@ async def _evaluate_position(session, pos, get_price_fn) -> None:
     if not buy_price or buy_price <= 0:
         return
 
-    sl_pct = pos["stop_loss_pct"] or pos["eff_sl"] or 20
-    tp_pct = pos["take_profit_pct"] if pos["take_profit_pct"] else pos["eff_tp"]
+    sl_pct = pos["stop_loss_pct"] if pos["stop_loss_pct"] is not None else (pos["eff_sl"] or 20)
+    tp_pct = pos["take_profit_pct"] if pos["take_profit_pct"] is not None else pos["eff_tp"]
 
     # Fetch current price
     pairs = await get_price_fn(session, pos["chain"], pos["token_address"])
@@ -1300,7 +1300,7 @@ async def _send_expiry_reminders() -> None:
             days_left  = (expires_dt.replace(tzinfo=timezone.utc) -
                           datetime.now(timezone.utc)).days
             days_left  = max(0, days_left)
-            text = t("sub_expiry_reminder", lang).format(
+            text = t(lang, "sub_expiry_reminder").format(
                 tier    = row["tier"].upper(),
                 expires = row["expires_at"][:10],
                 days    = days_left,

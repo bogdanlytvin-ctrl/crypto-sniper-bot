@@ -316,7 +316,7 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
             FROM users u
             LEFT JOIN subscriptions s ON s.user_id=u.id
             LEFT JOIN user_settings us ON us.user_id=u.id
-            WHERE (s.status='active' OR s.tier='free')
+            WHERE (COALESCE(s.status,'active')='active' OR COALESCE(s.tier,'free')='free')
               AND u.banned=0
         """).fetchall()
 
