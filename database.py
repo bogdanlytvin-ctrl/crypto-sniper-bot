@@ -6,6 +6,11 @@ from datetime import datetime, timezone
 _default = os.path.join(os.path.dirname(__file__), "data.db")
 DB_PATH  = os.getenv("DB_PATH", _default)
 
+# Ensure the parent directory exists (needed when Volume is mounted at /data)
+_db_dir = os.path.dirname(DB_PATH)
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
+
 
 def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
