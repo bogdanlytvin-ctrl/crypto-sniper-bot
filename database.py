@@ -213,7 +213,10 @@ def init_db() -> None:
 
         # Default bot settings
         defaults = {
-            "min_signal_score":    "40",
+            "min_signal_score":    "40",   # global floor (save to DB only)
+            "free_min_score":      "85",   # min score to dispatch to free users
+            "basic_min_score":     "70",   # min score to dispatch to basic users
+            "pro_min_score":       "55",   # min score to dispatch to pro users
             "free_daily_signals":  "3",
             "basic_daily_signals": "20",
             "pro_daily_signals":   "0",

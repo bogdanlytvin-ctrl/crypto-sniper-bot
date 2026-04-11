@@ -525,10 +525,12 @@ def payments():
 # ── Bot Settings ───────────────────────────────────────────────────────────────
 
 _SETTINGS_META = {
-    "min_signal_score":    ("Мін. score для надсилання сигналів",    "int",   "0–100"),
-    "free_daily_signals":  ("Free: сигналів/день",                   "int",   "0 = без ліміту"),
-    "basic_daily_signals": ("Basic: сигналів/день",                  "int",   "0 = без ліміту"),
-    "pro_daily_signals":   ("Pro: сигналів/день",                    "int",   "0 = без ліміту"),
+    "free_min_score":      ("🆓 Free: мін. score сигналу",           "int",   "0–100, дефолт 85"),
+    "basic_min_score":     ("💳 Basic: мін. score сигналу",          "int",   "0–100, дефолт 70"),
+    "pro_min_score":       ("🚀 Pro: мін. score сигналу",            "int",   "0–100, дефолт 55"),
+    "free_daily_signals":  ("🆓 Free: сигналів/день",                "int",   "0 = без ліміту"),
+    "basic_daily_signals": ("💳 Basic: сигналів/день",               "int",   "0 = без ліміту"),
+    "pro_daily_signals":   ("🚀 Pro: сигналів/день",                 "int",   "0 = без ліміту"),
     "basic_price_usd":     ("Ціна Basic ($)",                        "float", "USD"),
     "pro_price_usd":       ("Ціна Pro ($)",                          "float", "USD"),
     "basic_duration_days": ("Basic: тривалість (днів)",              "int",   ""),

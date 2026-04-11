@@ -124,7 +124,17 @@ def _daily_limit(tier: str) -> int:
 
 
 def _tier_min_score(tier: str) -> int:
-    return {"free": 85, "basic": 70, "pro": 55}.get(tier, 85)
+    """Min score to dispatch a signal to a user of this tier.
+    Reads from bot_settings (free_min_score / basic_min_score / pro_min_score)
+    so admin can tune live without redeploying."""
+    defaults = {"free": 85, "basic": 70, "pro": 55}
+    fallback = defaults.get(tier, 85)
+    key = f"{tier}_min_score"
+    try:
+        val = db.get_bot_setting(key)
+        return int(val) if val is not None else fallback
+    except (ValueError, TypeError):
+        return fallback
 
 
 async def _dispatch_signals(
