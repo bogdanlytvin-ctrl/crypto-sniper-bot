@@ -111,6 +111,37 @@ def test_lp_locked_pct_none_gives_no_points():
     assert result["blocked"] is False  # no crash
 
 
+# ── has_data=False: API unavailable should not penalize ───────────────────────
+
+def test_rugcheck_no_data_no_penalty():
+    """When rugcheck API is down (has_data=False), score should NOT get -5 penalty."""
+    s_no_data = dict(_safety(rugcheck_score=0), has_data=False)
+    s_bad_score = dict(_safety(rugcheck_score=0), has_data=True)
+    result_no_data  = score_token(_pair(), s_no_data)
+    result_bad      = score_token(_pair(), s_bad_score)
+    # no-data should score HIGHER than confirmed bad score
+    assert result_no_data["score"] >= result_bad["score"]
+
+
+def test_bsc_no_tax_data_no_bonus():
+    """When honeypot.is is down (sell_tax=None, buy_tax=None), no +10 tax bonus."""
+    pair = _pair(chain="bsc", liq=10_000)
+    s_no_data = dict(_safety(chain="bsc"), sell_tax=None, buy_tax=None, has_data=False)
+    s_low_tax = dict(_safety(chain="bsc"), sell_tax=2.0, buy_tax=2.0, has_data=True)
+    r_no_data = score_token(pair, s_no_data)
+    r_low_tax = score_token(pair, s_low_tax)
+    # confirmed low tax should score higher than unknown tax
+    assert r_low_tax["score"] > r_no_data["score"]
+
+
+def test_bsc_no_data_risk_flag():
+    """When safety check unavailable, risk flag should be added."""
+    pair = _pair(chain="bsc", liq=10_000)
+    s_no_data = dict(_safety(chain="bsc"), sell_tax=None, buy_tax=None, has_data=False)
+    result = score_token(pair, s_no_data)
+    assert any("unavailable" in r.lower() or "safety" in r.lower() for r in result["risks"])
+
+
 # ── Scoring tier tests ─────────────────────────────────────────────────────────
 
 def test_strong_buy_high_quality():

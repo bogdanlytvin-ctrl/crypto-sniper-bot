@@ -84,9 +84,14 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
             score += 3
         # locked_pct == 0 → liq_locked flag set but 0% locked → no points
 
+    has_data = safety_data.get("has_data", True)  # True = backward compat
+
     if chain == "solana":
         rc_score = safety_data.get("rugcheck_score") or 0
-        if rc_score >= 800:
+        if not has_data:
+            # API unavailable for brand-new token — neutral, no penalty
+            risks.append("RugCheck: no data yet (new token)")
+        elif rc_score >= 800:
             score += 20
             reasons.append(f"RugCheck: {rc_score}/1000 ✅")
         elif rc_score >= 600:
@@ -99,16 +104,22 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
             risks.append(f"RugCheck low: {rc_score}/1000")
 
     if chain == "bsc":
-        if safety_data.get("is_open_source"):
-            score += 10
-            reasons.append("Contract verified (open source) ✅")
+        if not has_data:
+            # Honeypot.is unavailable — neutral, flag as unverified
+            risks.append("Safety check unavailable")
         else:
-            score -= 5
-            risks.append("Contract not verified")
+            if safety_data.get("is_open_source"):
+                score += 10
+                reasons.append("Contract verified (open source) ✅")
+            else:
+                score -= 5
+                risks.append("Contract not verified")
 
-        sell_tax = safety_data.get("sell_tax") or 0
-        buy_tax  = safety_data.get("buy_tax")  or 0
-        if sell_tax <= 5 and buy_tax <= 5:
+        sell_tax = safety_data.get("sell_tax")  # None = unknown
+        buy_tax  = safety_data.get("buy_tax")
+        if sell_tax is None or buy_tax is None:
+            pass  # no tax data — skip, don't award or penalize
+        elif sell_tax <= 5 and buy_tax <= 5:
             score += 10
             reasons.append(f"Low tax: buy {buy_tax}% / sell {sell_tax}% ✅")
         elif sell_tax <= 10:

@@ -9,7 +9,7 @@ Sources:
 import asyncio
 import logging
 import os
-from collections import deque
+import time as _time
 from typing import Callable, Awaitable
 
 import aiohttp
@@ -34,31 +34,41 @@ SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "60"))
 GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "45"))
 GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "120"))  # BSC needs slower rate
 PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
-MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",          "40"))
+MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",  "35"))  # lowered: new tokens score lower
 
 # pump.fun circuit breaker — suspend after this many consecutive all-endpoint failures
 _PUMP_MAX_FAILS   = 5
 _PUMP_SUSPEND_SEC = 3_600  # 1 hour
 
+# seen-pairs TTL: allow re-evaluation after 4 hours (DexScreener promoted tokens
+# stay live for 24h, so without TTL DexScreener becomes useless after cycle 1)
+_SEEN_TTL = 4 * 3600  # 4 hours
+
 # 4-arg callback: (telegram_id, message, pair_data, signal_meta)
 # signal_meta carries pre-loaded user context so send callback needs 0 extra DB queries
 SendCallback = Callable[[int, str, dict | None, dict | None], Awaitable[None]]
 
-_SEEN_MAX = 10_000
-_seen_pairs:     deque[str] = deque(maxlen=_SEEN_MAX)
-_seen_pairs_set: set[str]   = set()
+_seen_pairs: dict[str, float] = {}  # addr → timestamp first seen
 
 
 def _mark_seen(addr: str) -> bool:
-    """Returns True if NEW (not seen before), marks as seen."""
-    if not addr or addr in _seen_pairs_set:
+    """Returns True if NEW or TTL expired (re-evaluate). Updates seen timestamp."""
+    if not addr:
         return False
-    if len(_seen_pairs) == _SEEN_MAX:
-        evicted = _seen_pairs[0]
-        _seen_pairs_set.discard(evicted)
-    _seen_pairs.append(addr)
-    _seen_pairs_set.add(addr)
+    now = _time.time()
+    last = _seen_pairs.get(addr)
+    if last is not None and now - last < _SEEN_TTL:
+        return False  # seen recently
+    _seen_pairs[addr] = now
     return True
+
+
+def _cleanup_seen() -> None:
+    """Remove expired entries to prevent unbounded memory growth."""
+    cutoff = _time.time() - _SEEN_TTL
+    expired = [k for k, v in _seen_pairs.items() if v < cutoff]
+    for k in expired:
+        del _seen_pairs[k]
 
 
 async def run_monitor(send_fn: SendCallback) -> None:
@@ -246,7 +256,8 @@ async def _dex_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> No
     while True:
         try:
             await _dex_cycle(session, send_fn)
-            _cache_evict()  # prune stale price/safety cache entries each cycle
+            _cache_evict()    # prune stale price/safety cache entries
+            _cleanup_seen()   # prune expired seen-pairs entries
         except asyncio.CancelledError:
             break
         except Exception as e:

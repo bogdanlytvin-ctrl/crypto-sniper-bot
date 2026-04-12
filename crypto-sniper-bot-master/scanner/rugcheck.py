@@ -87,10 +87,12 @@ async def check_solana_token(session: aiohttp.ClientSession, token_address: str)
         "holders":            total_holders,
         "risks":              risk_names,
         "is_honeypot":        False,
+        "has_data":           True,
     }
 
 
 def _empty() -> dict:
+    """Returned when API is unavailable. has_data=False prevents false scoring."""
     return {
         "rugcheck_score":     0,
         "mint_authority":     False,
@@ -102,4 +104,5 @@ def _empty() -> dict:
         "holders":            None,
         "risks":              [],
         "is_honeypot":        False,
+        "has_data":           False,
     }

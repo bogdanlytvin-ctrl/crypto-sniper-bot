@@ -85,14 +85,16 @@ async def check_bnb_token(session: aiohttp.ClientSession, token_address: str) ->
         "rugcheck_score":     0,
         "mint_authority":     False,
         "freeze_authority":   False,
+        "has_data":           True,
     }
 
 
 def _empty() -> dict:
+    """Returned when API is unavailable. has_data=False prevents false scoring."""
     return {
         "is_honeypot":        False,
-        "buy_tax":            0.0,
-        "sell_tax":           0.0,
+        "buy_tax":            None,   # None = unknown, NOT 0% (avoids false +10 pts)
+        "sell_tax":           None,
         "is_open_source":     False,
         "contract_renounced": False,
         "liq_locked":         False,
@@ -103,4 +105,5 @@ def _empty() -> dict:
         "rugcheck_score":     0,
         "mint_authority":     False,
         "freeze_authority":   False,
+        "has_data":           False,
     }

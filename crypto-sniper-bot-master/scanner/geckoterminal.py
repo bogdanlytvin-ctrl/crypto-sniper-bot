@@ -23,8 +23,8 @@ _HEADERS = {
     "Accept": "application/json;version=20230302",
 }
 
-MIN_LIQ_USD     = 3_000
-MIN_VOL_1H_USD  = 300
+MIN_LIQ_USD     = 5_000   # raised: pools < $5k rarely score above threshold
+MIN_VOL_1H_USD  = 200
 MAX_AGE_H       = 48
 MIN_AGE_MIN     = 3
 
@@ -64,7 +64,7 @@ async def get_new_pools(session: aiohttp.ClientSession, chain: str) -> list[dict
         return []
 
     all_pools: list[dict] = []
-    for page in (1, 2):
+    for page in (1, 2, 3):
         data = await _get(
             session,
             f"{BASE}/networks/{gecko_chain}/new_pools",

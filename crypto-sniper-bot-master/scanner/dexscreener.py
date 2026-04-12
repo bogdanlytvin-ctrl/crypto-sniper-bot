@@ -80,13 +80,15 @@ async def get_pairs_batch(session: aiohttp.ClientSession,
 
 async def search_new_pairs(session: aiohttp.ClientSession, chain: str) -> list[dict]:
     """
-    Find candidate pairs using two strategies:
-      1. Token profiles + boosts  — batch lookup (2 HTTP calls total, not 30+)
-      2. Trending search          — /latest/dex/search?q=new
+    Find candidate pairs from DexScreener:
+      - Token profiles (newest token meta entries)
+      - Boosted tokens (paid promotions — slow to change but worth monitoring)
+    Both are batch-fetched in 2 HTTP requests total.
+    Note: GeckoTerminal is the primary new-pool discovery source.
+    DexScreener here catches tokens that appear in profiles/boosts but not gecko.
     """
     all_pairs: list[dict] = []
 
-    # ── Strategy 1: latest profiles + boosts — single batch request ───────────
     profiles = await get_latest_token_profiles(session)
     boosted  = await get_latest_boosted_tokens(session)
 
@@ -102,17 +104,6 @@ async def search_new_pairs(session: aiohttp.ClientSession, chain: str) -> list[d
         if len(addresses) > 30:
             batch2 = await get_pairs_batch(session, chain, addresses[30:60])
             all_pairs.extend(batch2)
-
-    # ── Strategy 2: search for recently active pairs ───────────────────────────
-    search_data = await _get(
-        session,
-        f"{BASE}/latest/dex/search",
-        params={"q": "new"},
-    )
-    if search_data and "pairs" in search_data:
-        for p in (search_data["pairs"] or []):
-            if p.get("chainId") == chain:
-                all_pairs.append(p)
 
     # Deduplicate by pairAddress
     seen: set[str] = set()
