@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 SCAN_INTERVAL      = int(os.getenv("SCAN_INTERVAL_SEC",    "60"))
 GECKO_INTERVAL     = int(os.getenv("GECKO_INTERVAL_SEC",   "45"))
 PUMPFUN_INTERVAL   = int(os.getenv("PUMPFUN_INTERVAL_SEC", "30"))
-MIN_SIGNAL_SCORE   = int(os.getenv("MIN_SIGNAL_SCORE",     "40"))
+MIN_SIGNAL_SCORE   = int(os.getenv("MIN_SIGNAL_SCORE",     "35"))
 
 SendCallback = Callable[[int, str, dict | None, dict | None], Awaitable[None]]
 

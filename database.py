@@ -373,10 +373,15 @@ def get_user_tier(user_id: int) -> str:
 
 def set_user_tier(user_id: int, tier: str) -> None:
     with get_conn() as conn:
-        conn.execute("""
-            UPDATE subscriptions SET tier=?, status='active', updated_at=datetime('now')
-            WHERE user_id=?
-        """, (tier, user_id))
+        exists = conn.execute("SELECT id FROM subscriptions WHERE user_id=?", (user_id,)).fetchone()
+        if exists:
+            conn.execute(
+                "UPDATE subscriptions SET tier=?, status='active', updated_at=datetime('now') WHERE user_id=?",
+                (tier, user_id))
+        else:
+            conn.execute(
+                "INSERT INTO subscriptions (user_id, tier, status) VALUES (?, ?, 'active')",
+                (user_id, tier))
 
 
 def get_expiring_subscriptions(days: int = 3) -> list[sqlite3.Row]:
@@ -397,11 +402,15 @@ def get_expiring_subscriptions(days: int = 3) -> list[sqlite3.Row]:
 
 def set_user_tier_with_expiry(user_id: int, tier: str, expires_at: str) -> None:
     with get_conn() as conn:
-        conn.execute("""
-            UPDATE subscriptions
-            SET tier=?, status='active', expires_at=?, updated_at=datetime('now')
-            WHERE user_id=?
-        """, (tier, expires_at, user_id))
+        exists = conn.execute("SELECT id FROM subscriptions WHERE user_id=?", (user_id,)).fetchone()
+        if exists:
+            conn.execute(
+                "UPDATE subscriptions SET tier=?, status='active', expires_at=?, updated_at=datetime('now') WHERE user_id=?",
+                (tier, expires_at, user_id))
+        else:
+            conn.execute(
+                "INSERT INTO subscriptions (user_id, tier, status, expires_at) VALUES (?, ?, 'active', ?)",
+                (user_id, tier, expires_at))
 
 
 # ── Signals ────────────────────────────────────────────────────────────────────
