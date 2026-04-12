@@ -85,9 +85,11 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
             reasons.append(f"RugCheck: {rc_score}/1000 ⚠️")
         elif rc_score >= 400:
             score += 5
-        else:
+        elif rc_score > 0:
+            # Real bad score — penalize
             score -= 5
             risks.append(f"RugCheck low: {rc_score}/1000")
+        # rc_score == 0 means API timeout / unavailable — neutral, no penalty
 
     if chain == "bsc":
         if safety_data.get("is_open_source"):
@@ -256,9 +258,9 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
     if created_ms:
         age_min = (_time.time() * 1000 - created_ms) / 60_000
         if age_min < 60:
-            age_str = f"{int(age_min)}хв"
+            age_str = f"{int(age_min)}{'хв' if lang == 'ua' else 'min'}"
         else:
-            age_str = f"{age_min/60:.1f}г"
+            age_str = f"{age_min/60:.1f}{'г' if lang == 'ua' else 'h'}"
         import datetime as _dt
         created_dt = _dt.datetime.utcfromtimestamp(created_ms / 1000)
         created_str = created_dt.strftime("%d.%m.%Y %H:%M UTC")
@@ -271,7 +273,7 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
     ]
 
     if created_str:
-        lines.append(f"🕐 Створено: {created_str}  ({age_str} тому)")
+        lines.append(f"🕐 {_t(lang,'sig_created')}: {created_str}  ({age_str} {_t(lang,'sig_ago')})")
 
     lines += [
         "",
@@ -302,14 +304,14 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
         f"  {_t(lang,'sig_tp3')}",
         f"  {_t(lang,'sig_sl')}",
         "",
-        "📋 <b>Контракт:</b>",
+        _t(lang, 'sig_contract'),
     ]
 
     if address:
         lines.append(f"<code>{address}</code>")
 
     if url:
-        lines.append(f'🔗 <a href="{url}">Переглянути на DexScreener</a>')
+        lines.append(f'🔗 <a href="{url}">{_t(lang, "sig_dex_link")}</a>')
 
     lines += ["", _t(lang, 'sig_disc')]
 

@@ -593,6 +593,10 @@ _T: dict[str, dict[str, str]] = {
         UA: '⚠️ <i>Не є фінансовою порадою. DYOR.</i>',
         EN: '⚠️ <i>Not financial advice. DYOR.</i>',
     },
+    'sig_contract': {UA: '📋 <b>Контракт:</b>', EN: '📋 <b>Contract:</b>'},
+    'sig_dex_link': {UA: 'Переглянути на DexScreener', EN: 'View on DexScreener'},
+    'sig_created':  {UA: 'Створено', EN: 'Created'},
+    'sig_ago':      {UA: 'тому',     EN: 'ago'},
 }
 
 

@@ -212,6 +212,19 @@ async def _dispatch_signals(
 # ── DexScreener loop ──────────────────────────────────────────────────────────
 
 async def _dex_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    # ── Startup seed: mark all current pairs as seen WITHOUT dispatching ──────
+    # Without this, every restart would flood users with 50-100 "new" signals
+    # from tokens that were already known before restart.
+    logger.info("DexScreener: seeding initial pairs (no dispatch)...")
+    for chain in CHAINS.values():
+        try:
+            pairs = await search_new_pairs(session, chain)
+            for p in pairs:
+                _mark_seen(p.get("pairAddress", ""))
+            logger.info("DexScreener seed %s: %d pairs marked seen", chain, len(pairs))
+        except Exception as e:
+            logger.warning("DexScreener seed error (%s): %s", chain, e)
+
     while True:
         try:
             await _dex_cycle(session, send_fn)
@@ -241,6 +254,24 @@ async def _dex_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> N
 async def _gecko_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
     # Small offset so it doesn't fire at exact same time as DexScreener
     await asyncio.sleep(15)
+
+    # ── Startup seed: mark all current GeckoTerminal pools as seen ────────────
+    logger.info("GeckoTerminal: seeding initial pools (no dispatch)...")
+    for chain in CHAINS.values():
+        try:
+            pools = await get_new_pools(session, chain)
+            for p in pools:
+                _mark_seen(p.get("pair_address", ""))
+            await asyncio.sleep(2)
+            trending = await get_trending_pools(session, chain)
+            for p in trending:
+                _mark_seen(p.get("pair_address", ""))
+            await asyncio.sleep(2)
+            logger.info("GeckoTerminal seed %s: %d+%d pools marked seen",
+                        chain, len(pools), len(trending))
+        except Exception as e:
+            logger.warning("GeckoTerminal seed error (%s): %s", chain, e)
+
     while True:
         try:
             await _gecko_cycle(session, send_fn)
