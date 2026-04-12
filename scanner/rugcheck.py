@@ -34,14 +34,14 @@ async def check_solana_token(session: aiohttp.ClientSession, token_address: str)
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
-                logger.debug("RugCheck %s → %s", token_address[:8], r.status)
+                logger.warning("RugCheck %s → %s", token_address[:8], r.status)
                 return _empty()
             data = await r.json()
     except asyncio.TimeoutError:
-        logger.debug("RugCheck timeout: %s", token_address[:8])
+        logger.warning("RugCheck timeout: %s", token_address[:8])
         return _empty()
     except Exception as e:
-        logger.debug("RugCheck error: %s", e)
+        logger.warning("RugCheck error: %s", e)
         return _empty()
 
     risks_raw = data.get("risks") or []

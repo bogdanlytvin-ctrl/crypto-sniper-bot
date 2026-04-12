@@ -82,10 +82,10 @@ async def _process_pair(
     result = score_token(pair_data, safety)
 
     if result["blocked"]:
-        logger.debug("Blocked %s: %s", pair_data.get("token_symbol"), result["block_reason"])
+        logger.info("Blocked %s: %s", pair_data.get("token_symbol"), result["block_reason"])
         return
     if result["score"] < MIN_SIGNAL_SCORE:
-        logger.debug("Score too low %s: %d", pair_data.get("token_symbol"), result["score"])
+        logger.info("Score too low %s: %d (min=%d)", pair_data.get("token_symbol"), result["score"], MIN_SIGNAL_SCORE)
         return
 
     signal_data = {
@@ -127,8 +127,8 @@ def _tier_min_score(tier: str) -> int:
     """Min score to dispatch a signal to a user of this tier.
     Reads from bot_settings (free_min_score / basic_min_score / pro_min_score)
     so admin can tune live without redeploying."""
-    defaults = {"free": 85, "basic": 70, "pro": 55}
-    fallback = defaults.get(tier, 85)
+    defaults = {"free": 35, "basic": 30, "pro": 25}
+    fallback = defaults.get(tier, 35)
     key = f"{tier}_min_score"
     try:
         val = db.get_bot_setting(key)
@@ -261,12 +261,16 @@ async def _gecko_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) ->
         for pair_data in new_pairs:
             await _process_pair(session, pair_data, new_signals)
 
+        await asyncio.sleep(3)  # avoid 429 between chain requests
+
         # Trending pools (secondary source)
         trending = await get_trending_pools(session, chain)
         new_trending = [p for p in trending if _mark_seen(p.get("pair_address", ""))]
         logger.info("GeckoTerminal %s trending: %d (%d new)", chain, len(trending), len(new_trending))
         for pair_data in new_trending:
             await _process_pair(session, pair_data, new_signals)
+
+        await asyncio.sleep(3)  # space out per-chain requests
 
     if new_signals:
         await _dispatch_signals(new_signals, send_fn)

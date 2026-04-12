@@ -61,38 +61,62 @@ async def get_pairs_by_token(session: aiohttp.ClientSession,
     if not data or "pairs" not in data:
         return []
     pairs = data["pairs"] or []
-    # Filter by chain since the endpoint returns all chains
     return [p for p in pairs if p.get("chainId") == chain]
 
 
+async def get_pairs_batch(session: aiohttp.ClientSession,
+                           chain: str, addresses: list[str]) -> list[dict]:
+    """Batch lookup — up to 30 token addresses in a single request."""
+    if not addresses:
+        return []
+    # API accepts comma-separated addresses, max 30
+    chunk = ",".join(addresses[:30])
+    data = await _get(session, f"{BASE}/latest/dex/tokens/{chunk}")
+    if not data or "pairs" not in data:
+        return []
+    return [p for p in (data["pairs"] or []) if p.get("chainId") == chain]
+
+
 async def search_new_pairs(session: aiohttp.ClientSession, chain: str) -> list[dict]:
+    """
+    Find candidate pairs using two strategies:
+      1. Token profiles + boosts  — batch lookup (2 API calls total)
+      2. Direct trending search   — volume-sorted pairs for the chain
+    """
     all_pairs: list[dict] = []
 
-    # Strategy 1: Latest token profiles
+    # ── Strategy 1: latest profiles + boosts (batch, 2 HTTP calls) ────────────
+    profiles, boosted = [], []
     profiles = await get_latest_token_profiles(session)
-    token_addresses = [
+    boosted  = await get_latest_boosted_tokens(session)
+
+    addresses = list({
         p.get("tokenAddress", "")
-        for p in profiles
+        for p in (profiles + boosted)
         if p.get("chainId") == chain and p.get("tokenAddress")
-    ]
-    for addr in token_addresses[:20]:
-        pairs = await get_pairs_by_token(session, chain, addr)
-        all_pairs.extend(pairs)
-        if len(all_pairs) >= 100:
-            break
+    })
 
-    # Strategy 2: Boosted tokens
-    boosted = await get_latest_boosted_tokens(session)
-    boosted_addresses = [
-        b.get("tokenAddress", "")
-        for b in boosted
-        if b.get("chainId") == chain and b.get("tokenAddress")
-    ]
-    for addr in boosted_addresses[:10]:
-        pairs = await get_pairs_by_token(session, chain, addr)
-        all_pairs.extend(pairs)
+    if addresses:
+        # Single batch request instead of 20+ sequential calls
+        batch_pairs = await get_pairs_batch(session, chain, addresses[:30])
+        all_pairs.extend(batch_pairs)
+        # If > 30 addresses, fetch the rest in a second batch
+        if len(addresses) > 30:
+            batch_pairs2 = await get_pairs_batch(session, chain, addresses[30:60])
+            all_pairs.extend(batch_pairs2)
 
-    # Deduplicate
+    # ── Strategy 2: trending search — tokens with recent volume spikes ─────────
+    trending_data = await _get(
+        session,
+        f"{BASE}/latest/dex/search",
+        params={"q": "new"},
+    )
+    if trending_data and "pairs" in trending_data:
+        for p in (trending_data["pairs"] or []):
+            if p.get("chainId") == chain:
+                all_pairs.append(p)
+
+    # Deduplicate by pairAddress
     seen: set[str] = set()
     unique: list[dict] = []
     for p in all_pairs:

@@ -213,12 +213,12 @@ def init_db() -> None:
 
         # Default bot settings
         defaults = {
-            "min_signal_score":    "40",   # global floor (save to DB only)
-            "free_min_score":      "85",   # min score to dispatch to free users
-            "basic_min_score":     "70",   # min score to dispatch to basic users
-            "pro_min_score":       "55",   # min score to dispatch to pro users
-            "free_daily_signals":  "3",
-            "basic_daily_signals": "20",
+            "min_signal_score":    "35",   # global floor (save to DB only)
+            "free_min_score":      "35",   # min score to dispatch to free users
+            "basic_min_score":     "30",   # min score to dispatch to basic users
+            "pro_min_score":       "25",   # min score to dispatch to pro users
+            "free_daily_signals":  "10",
+            "basic_daily_signals": "50",
             "pro_daily_signals":   "0",
             "basic_price_usd":     "29",
             "pro_price_usd":       "79",
@@ -232,6 +232,30 @@ def init_db() -> None:
                     "INSERT OR IGNORE INTO bot_settings (key, value) VALUES (?, ?)",
                     (key, val)
                 )
+            except Exception:
+                pass
+
+        # Migration v1: reset overly-strict thresholds (85/70/55 → 35/30/25)
+        # Migration v2: reset too-high thresholds (40/40/40 → 35/30/25)
+        _migrations = {
+            "free_min_score":  [("85", "35"), ("40", "35")],
+            "basic_min_score": [("70", "30"), ("40", "30")],
+            "pro_min_score":   [("55", "25"), ("40", "25")],
+            "min_signal_score":[("40", "35")],
+            "free_daily_signals": [("3", "10")],
+            "basic_daily_signals": [("20", "50")],
+        }
+        for key, steps in _migrations.items():
+            try:
+                row = conn.execute("SELECT value FROM bot_settings WHERE key=?", (key,)).fetchone()
+                if row:
+                    for old_val, new_val in steps:
+                        if row["value"] == old_val:
+                            conn.execute(
+                                "UPDATE bot_settings SET value=?, updated_at=datetime('now') WHERE key=?",
+                                (new_val, key)
+                            )
+                            break
             except Exception:
                 pass
 

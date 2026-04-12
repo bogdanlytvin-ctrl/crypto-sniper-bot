@@ -32,19 +32,19 @@ async def check_bnb_token(session: aiohttp.ClientSession, token_address: str) ->
         return _empty()
 
     url = f"{BASE}/IsHoneypot"
-    params = {"address": token_address, "chainID": "1"}  # BSC = chain 1 on honeypot.is BSC
+    params = {"address": token_address, "chainID": "56"}  # BSC mainnet = chain 56
     try:
         async with session.get(url, params=params,
                                timeout=aiohttp.ClientTimeout(total=10)) as r:
             if r.status != 200:
-                logger.debug("Honeypot.is %s → %s", token_address[:8], r.status)
+                logger.warning("Honeypot.is %s → %s", token_address[:8], r.status)
                 return _empty()
             data = await r.json()
     except asyncio.TimeoutError:
-        logger.debug("Honeypot.is timeout: %s", token_address[:8])
+        logger.warning("Honeypot.is timeout: %s", token_address[:8])
         return _empty()
     except Exception as e:
-        logger.debug("Honeypot.is error: %s", e)
+        logger.warning("Honeypot.is error: %s", e)
         return _empty()
 
     honeypot_result = data.get("honeypotResult") or {}

@@ -31,18 +31,26 @@ MIN_AGE_MIN     = 3
 
 async def _get(session: aiohttp.ClientSession, url: str,
                params: dict | None = None) -> dict | None:
-    try:
-        async with session.get(
-            url, params=params, headers=_HEADERS,
-            timeout=aiohttp.ClientTimeout(total=12),
-        ) as r:
-            if r.status == 200:
-                return await r.json()
-            logger.warning("GeckoTerminal %s → %s", url, r.status)
-    except asyncio.TimeoutError:
-        logger.warning("GeckoTerminal timeout: %s", url)
-    except Exception as e:
-        logger.warning("GeckoTerminal error: %s", e)
+    for attempt in range(3):
+        try:
+            async with session.get(
+                url, params=params, headers=_HEADERS,
+                timeout=aiohttp.ClientTimeout(total=12),
+            ) as r:
+                if r.status == 200:
+                    return await r.json()
+                if r.status == 429:
+                    wait = 10 * (attempt + 1)
+                    logger.warning("GeckoTerminal %s → 429, retry in %ds (attempt %d/3)", url, wait, attempt + 1)
+                    await asyncio.sleep(wait)
+                    continue
+                logger.warning("GeckoTerminal %s → %s", url, r.status)
+                return None
+        except asyncio.TimeoutError:
+            logger.warning("GeckoTerminal timeout: %s", url)
+        except Exception as e:
+            logger.warning("GeckoTerminal error: %s", e)
+        return None
     return None
 
 
