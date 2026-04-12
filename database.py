@@ -217,8 +217,8 @@ def init_db() -> None:
             "free_min_score":      "35",   # min score to dispatch to free users
             "basic_min_score":     "35",   # same quality, more per day
             "pro_min_score":       "35",   # same quality, unlimited
-            "free_daily_signals":  "3",
-            "basic_daily_signals": "20",
+            "free_daily_signals":  "10",
+            "basic_daily_signals": "0",
             "pro_daily_signals":   "0",
             "basic_price_usd":     "29",
             "pro_price_usd":       "79",
@@ -237,13 +237,14 @@ def init_db() -> None:
 
         # Migration v1: reset overly-strict thresholds (85/70/55 → 35/30/25)
         # Migration v2: reset too-high thresholds (40/40/40 → 35/30/25)
+        # Migration v3: raise daily limits (3→10 free, 20→0 basic=unlimited)
         _migrations = {
             "free_min_score":    [("85", "35"), ("40", "35"), ("30", "35"), ("25", "35")],
             "basic_min_score":   [("70", "35"), ("40", "35"), ("30", "35")],
             "pro_min_score":     [("55", "35"), ("40", "35"), ("25", "35")],
             "min_signal_score":  [("40", "35")],
-            "free_daily_signals":  [("10", "3")],
-            "basic_daily_signals": [("50", "20")],
+            "free_daily_signals":  [("10", "10"), ("3", "10")],
+            "basic_daily_signals": [("50", "0"), ("20", "0")],
         }
         for key, steps in _migrations.items():
             try:
