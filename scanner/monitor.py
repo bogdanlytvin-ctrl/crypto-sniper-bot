@@ -500,16 +500,49 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
     for token in new_tokens:
         mint = token.get("mint", "")
         pair_data = {
-            "chain":         "solana",
-            "token_address": mint,
-            "token_name":    token.get("name", "?"),
-            "token_symbol":  token.get("symbol", "?"),
+            "chain":            "solana",
+            "token_address":    mint,
+            "token_name":       token.get("name", "?"),
+            "token_symbol":     token.get("symbol", "?"),
+            "dex":              "pump.fun",
+            "pair_address":     mint,
+            "price_usd":        float(token.get("usd_market_cap") or 0) / max(float(token.get("total_supply") or 1), 1),
+            "liquidity_usd":    float(token.get("virtual_sol_reserves") or 0) * 150,
+            "volume_1h":        0.0,
+            "volume_24h":       0.0,
+            "price_change_1h":  0.0,
+            "price_change_24h": 0.0,
+            "market_cap":       float(token.get("usd_market_cap") or 0),
+            "pair_created_at":  None,
+            "pair_url":         f"https://pump.fun/{mint}",
         }
+
+        # Save to signals table so admin panel shows it (LAUNCH type, score=0)
+        signal_id = db.save_signal({
+            **pair_data,
+            "score":              0,
+            "signal_type":        "LAUNCH",
+            "liq_locked":         False,
+            "contract_renounced": False,
+            "honeypot":           False,
+        })
+        if signal_id is None:
+            continue  # already dispatched today
+
+        sent_count = 0
         for user in pump_users:
+            user_id = user["id"]
+            if db.was_signal_sent(user_id, signal_id):
+                continue
             lang = user["lang"] or "ua"
             msg  = format_token_message(token, lang)
             try:
                 await send_fn(user["telegram_id"], msg, pair_data, None)
+                db.mark_signal_sent(user_id, signal_id)
+                sent_count += 1
                 await asyncio.sleep(0.04)
             except Exception as e:
                 logger.warning("pump.fun send error %d: %s", user["telegram_id"], e)
+
+        if sent_count:
+            logger.info("pump.fun LAUNCH %s sent to %d users", token.get("symbol","?"), sent_count)

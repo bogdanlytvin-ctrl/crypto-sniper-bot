@@ -16,6 +16,7 @@
     <option value="STRONG_BUY" {{ 'selected' if sig_type=='STRONG_BUY' }}>🟢 STRONG BUY</option>
     <option value="BUY"        {{ 'selected' if sig_type=='BUY' }}>🟡 BUY</option>
     <option value="WATCH"      {{ 'selected' if sig_type=='WATCH' }}>👀 WATCH</option>
+    <option value="LAUNCH"     {{ 'selected' if sig_type=='LAUNCH' }}>🚀 LAUNCH (pump.fun)</option>
   </select>
   <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'Фільтр' if lang=='ua' else 'Filter' }}</button>
   <a href="{{ url_for('signals') }}" class="btn btn-sm btn-outline-danger">✕</a>
@@ -61,7 +62,8 @@
         {% if s.signal_type=='STRONG_BUY' %}<span class="badge badge-strong">STRONG BUY</span>
         {% elif s.signal_type=='BUY' %}<span class="badge badge-buy">BUY</span>
         {% elif s.signal_type=='WATCH' %}<span class="badge badge-watch">WATCH</span>
-        {% else %}<span class="badge badge-skip">SKIP</span>{% endif %}
+        {% elif s.signal_type=='LAUNCH' %}<span class="badge" style="background:#9b59b6;color:#fff">🚀 LAUNCH</span>
+        {% else %}<span class="badge badge-skip">{{ s.signal_type or 'SKIP' }}</span>{% endif %}
       </td>
       <td>${{ '{:,.0f}'.format(s.liquidity_usd or 0) }}</td>
       <td>
