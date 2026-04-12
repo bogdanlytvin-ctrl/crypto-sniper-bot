@@ -17,16 +17,12 @@ from typing import Callable, Awaitable
 import aiohttp
 
 import database as db
-from scanner.dexscreener import search_new_pairs, extract_pair_data, get_pairs_batch, CHAINS
+from scanner.dexscreener import search_new_pairs, extract_pair_data, CHAINS
 from scanner.geckoterminal import get_new_pools, get_trending_pools
 from scanner.rugcheck  import check_solana_token
 from scanner.honeypot  import check_bnb_token
-from scanner.signals   import (
-    score_token, format_signal_message,
-    SIGNAL_STRONG_BUY, SIGNAL_BUY, SIGNAL_WATCH,
-)
+from scanner.signals   import score_token, format_signal_message
 from scanner.pumpfun     import get_new_tokens, is_new as pumpfun_is_new, format_token_message
-from scanner.raydium     import get_pairs as raydium_get_pairs, prefilter as raydium_prefilter, to_pair_data as raydium_to_pair
 from scanner.pancakeswap import get_new_pairs as pcs_new_pairs
 from scanner.price_cache import (
     get_cached_safety, set_cached_safety, evict_expired as _cache_evict,
@@ -34,11 +30,10 @@ from scanner.price_cache import (
 
 logger = logging.getLogger(__name__)
 
-SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener (tertiary)
-GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "60"))   # GeckoTerminal Solana trending
+SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener
+GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "60"))   # GeckoTerminal Solana
 GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "180"))  # GeckoTerminal BSC
-RAYDIUM_INTERVAL     = int(os.getenv("RAYDIUM_INTERVAL_SEC",     "45"))   # Raydium AMM pools (PRIMARY)
-PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap subgraph (PRIMARY)
+PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap BSC (PRIMARY)
 PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
 MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",         "35"))
 
@@ -83,22 +78,20 @@ def _cleanup_seen() -> None:
 
 async def run_monitor(send_fn: SendCallback) -> None:
     logger.info(
-        "Monitor started. Raydium: %ds | PancakeSwap: %ds | Gecko SOL: %ds | DexScreener: %ds | pump.fun: %ds",
-        RAYDIUM_INTERVAL, PANCAKE_INTERVAL, GECKO_INTERVAL, SCAN_INTERVAL, PUMPFUN_INTERVAL,
+        "Monitor started. PancakeSwap: %ds | Gecko SOL: %ds | Gecko BSC: %ds | DexScreener: %ds | pump.fun: %ds",
+        PANCAKE_INTERVAL, GECKO_INTERVAL, GECKO_INTERVAL_BSC, SCAN_INTERVAL, PUMPFUN_INTERVAL,
     )
     async with aiohttp.ClientSession() as session:
         # ── Startup seeding: mark all current tokens as seen WITHOUT dispatching ──
-        # Prevents restart floods (each source opening positions for existing tokens)
         logger.info("Startup: seeding existing pairs (no dispatch)...")
         await _seed_all(session)
         logger.info("Startup seeding complete.")
 
         tasks = [
-            _raydium_loop(session, send_fn),       # PRIMARY: Solana all AMM pools
-            _pancake_loop(session, send_fn),       # PRIMARY: BSC new pools
-            _gecko_loop_solana(session, send_fn),  # SECONDARY: Solana trending
-            _gecko_loop_bsc(session, send_fn),     # SECONDARY: BSC trending
-            _dex_loop(session, send_fn),           # TERTIARY: DexScreener boosted
+            _pancake_loop(session, send_fn),       # PRIMARY BSC: PancakeSwap subgraph
+            _gecko_loop_solana(session, send_fn),  # PRIMARY SOL: GeckoTerminal new+trending
+            _gecko_loop_bsc(session, send_fn),     # SECONDARY BSC: GeckoTerminal trending
+            _dex_loop(session, send_fn),           # DexScreener boosted (both chains)
             _pump_loop(session, send_fn),          # Pump.fun (circuit-breaker)
         ]
         await asyncio.gather(*tasks)
@@ -132,24 +125,9 @@ async def _seed_all(session: aiohttp.ClientSession) -> None:
             logger.warning("Seed GeckoTerminal error (%s): %s", chain, e)
         await asyncio.sleep(2)
 
-    # Raydium (Solana PRIMARY)
-    try:
-        raw = await raydium_get_pairs(session)
-        filtered = raydium_prefilter(raw)
-        for p in filtered:
-            _seed_seen(p.get("ammId", ""))
-        logger.info("Seed Raydium: %d pairs", len(filtered))
-    except Exception as e:
-        logger.warning("Seed Raydium error: %s", e)
-
-    # PancakeSwap (BSC PRIMARY)
-    try:
-        pairs = await pcs_new_pairs(session)
-        for p in pairs:
-            _seed_seen(p.get("pair_address", ""))
-        logger.info("Seed PancakeSwap: %d pairs", len(pairs))
-    except Exception as e:
-        logger.warning("Seed PancakeSwap error: %s", e)
+    # Note: Raydium and PancakeSwap are NOT seeded on startup.
+    # Their DB UNIQUE(chain, token_address, signal_date) constraint prevents
+    # duplicate signals, and _mark_seen TTL handles repeated processing.
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -323,58 +301,6 @@ async def _dispatch_signals(
                 "(check tier score thresholds and user count)",
                 signal_id, symbol, score,
             )
-
-
-# ── Raydium loop (PRIMARY Solana) ────────────────────────────────────────────
-
-async def _raydium_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    logger.info("Raydium scanner active (Solana AMM pools every %ds)", RAYDIUM_INTERVAL)
-    while True:
-        try:
-            await _raydium_cycle(session, send_fn)
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error("Raydium cycle error: %s", e, exc_info=True)
-        await asyncio.sleep(RAYDIUM_INTERVAL)
-
-
-async def _raydium_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    new_signals: list = []
-
-    raw_pairs  = await raydium_get_pairs(session)
-    filtered   = raydium_prefilter(raw_pairs)
-    new_pairs  = [p for p in filtered if _mark_seen(p.get("ammId", ""))]
-
-    logger.info("Raydium: %d total, %d pass filter, %d new", len(raw_pairs), len(filtered), len(new_pairs))
-    if not new_pairs:
-        return
-
-    # Enrich top 30 new pairs with DexScreener (price change, txn counts, full data)
-    base_mints = [p.get("baseMint", "") for p in new_pairs if p.get("baseMint")][:30]
-    if base_mints:
-        enriched = await get_pairs_batch(session, "solana", base_mints)
-        dex_map  = {}
-        for ep in enriched:
-            pd = extract_pair_data(ep)
-            dex_map[pd["token_address"]] = pd
-
-        enriched_pairs = []
-        for p in new_pairs[:30]:
-            mint = p.get("baseMint", "")
-            enriched_pairs.append(dex_map.get(mint) or raydium_to_pair(p))
-    else:
-        enriched_pairs = [raydium_to_pair(p) for p in new_pairs[:30]]
-
-    # Safety checks in parallel (up to 10 at a time to avoid overwhelming APIs)
-    for i in range(0, len(enriched_pairs), 10):
-        batch = enriched_pairs[i:i+10]
-        await asyncio.gather(*[_process_pair(session, pd, new_signals) for pd in batch])
-        if i + 10 < len(enriched_pairs):
-            await asyncio.sleep(1)
-
-    if new_signals:
-        await _dispatch_signals(new_signals, send_fn)
 
 
 # ── PancakeSwap Subgraph loop (PRIMARY BSC) ───────────────────────────────────

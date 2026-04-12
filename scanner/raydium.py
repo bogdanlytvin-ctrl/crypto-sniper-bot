@@ -16,19 +16,32 @@ BASE = "https://api.raydium.io/v2"
 MIN_LIQ_USD = 5_000
 MIN_VOL_24H = 300   # pools with zero volume are dead/scam
 
+# Raydium returns 3000-8000 pairs; limit bytes read to prevent OOM on Railway
+_MAX_RESPONSE_BYTES = 4 * 1024 * 1024  # 4 MB cap
+
 
 async def get_pairs(session: aiohttp.ClientSession) -> list[dict]:
-    """Fetch all active Raydium AMM v2 pools. Returns raw list."""
+    """Fetch active Raydium AMM v2 pools. Capped at 4 MB to prevent OOM."""
     try:
         async with session.get(
             f"{BASE}/main/pairs",
             timeout=aiohttp.ClientTimeout(total=20),
         ) as r:
-            if r.status == 200:
-                data = await r.json(content_type=None)
-                return data if isinstance(data, list) else []
-            logger.warning("Raydium API → %s", r.status)
-            return []
+            if r.status != 200:
+                logger.warning("Raydium API → %s", r.status)
+                return []
+            # Read with size cap — avoids OOM when Raydium returns 8MB+ responses
+            raw = await r.content.read(_MAX_RESPONSE_BYTES)
+            if len(raw) == _MAX_RESPONSE_BYTES:
+                # Truncated — find last complete JSON object boundary
+                last_bracket = raw.rfind(b"}")
+                if last_bracket > 0:
+                    raw = raw[:last_bracket + 1] + b"]"
+                else:
+                    return []
+            import json
+            data = json.loads(raw)
+            return data if isinstance(data, list) else []
     except asyncio.TimeoutError:
         logger.warning("Raydium timeout")
         return []
