@@ -597,6 +597,38 @@ _T: dict[str, dict[str, str]] = {
     'sig_dex_link': {UA: 'Переглянути на DexScreener', EN: 'View on DexScreener'},
     'sig_created':  {UA: 'Створено', EN: 'Created'},
     'sig_ago':      {UA: 'тому',     EN: 'ago'},
+
+    # ── Main menu extra button ────────────────────────────────────────────────
+    'menu_notif': {UA: '🔔 Сповіщення', EN: '🔔 Notifications'},
+
+    # ── Notification settings ─────────────────────────────────────────────────
+    'notif_menu': {
+        UA: (
+            "🔔 <b>Налаштування сповіщень</b>\n\n"
+            "Авто-пуш: <b>{push}</b>\n"
+            "Мережа: <b>{chain}</b>\n"
+            "Мін. score: <b>{score}</b>\n"
+            "Тариф: <b>{tier}</b>\n\n"
+            "📡 Сигнали надходять <b>автоматично</b> щойно бот знаходить нову монету.\n"
+            "Basic/Pro також отримують <b>нові монети з pump.fun</b> відразу при запуску."
+        ),
+        EN: (
+            "🔔 <b>Notification Settings</b>\n\n"
+            "Auto-push: <b>{push}</b>\n"
+            "Network: <b>{chain}</b>\n"
+            "Min score: <b>{score}</b>\n"
+            "Plan: <b>{tier}</b>\n\n"
+            "📡 Signals are pushed <b>automatically</b> as soon as the bot finds a new coin.\n"
+            "Basic/Pro also receive <b>all new pump.fun coins</b> instantly at launch."
+        ),
+    },
+    'notif_push':         {UA: 'Авто-сповіщення',                   EN: 'Auto-push'},
+    'notif_chain_all':    {UA: 'Всі мережі',                         EN: 'All networks'},
+    'notif_score_auto':   {UA: 'Авто',                               EN: 'Auto'},
+    'notif_upgrade_hint': {
+        UA: '🔓 Фільтри доступні на Basic/Pro → /plans',
+        EN: '🔓 Filters available on Basic/Pro → /plans',
+    },
 }
 
 

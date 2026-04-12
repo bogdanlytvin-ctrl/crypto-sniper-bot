@@ -241,7 +241,20 @@ async def _dispatch_signals(
             telegram_id = user["telegram_id"]
             user_lang   = user["lang"] or "ua"
             tier        = user["tier"] or "free"
-            min_score   = _tier_min_score(tier)
+
+            # Respect user's push-notifications toggle (default ON)
+            if not user.get("signals_push", 1):
+                continue
+
+            # Per-user chain filter (all / solana / bsc)
+            chain_filter = user.get("signal_chain", "all")
+            signal_chain = pair_data.get("chain", "")
+            if chain_filter != "all" and chain_filter != signal_chain:
+                continue
+
+            # Min score: use user's override if set (>0), otherwise tier default
+            user_score_override = int(user.get("signal_min_score_user") or 0)
+            min_score = user_score_override if user_score_override > 0 else _tier_min_score(tier)
 
             if score < min_score:
                 logger.debug(
@@ -463,7 +476,17 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
 
     logger.info("pump.fun: %d new tokens", len(new_tokens))
     users = db.get_all_active_users_with_tier()
-    pump_users = [u for u in users if u.get("auto_mode") or u.get("notify_all_tokens")]
+    # Paid users (basic/pro) get pump.fun alerts automatically.
+    # Free users get them only if they opted in via notify_all_tokens or auto_mode.
+    pump_users = [
+        u for u in users
+        if u.get("signals_push", 1) and (
+            u.get("tier") in ("basic", "pro")
+            or u.get("auto_mode")
+            or u.get("notify_all_tokens")
+        )
+        and u.get("signal_chain", "all") in ("all", "solana")
+    ]
     if not pump_users:
         return None
 
@@ -480,5 +503,6 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
             msg  = format_token_message(token, lang)
             try:
                 await send_fn(user["telegram_id"], msg, pair_data, None)
+                await asyncio.sleep(0.04)
             except Exception as e:
                 logger.warning("pump.fun send error %d: %s", user["telegram_id"], e)

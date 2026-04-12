@@ -67,6 +67,7 @@ def _main_keyboard(lang: str) -> InlineKeyboardMarkup:
          InlineKeyboardButton(t(lang, 'menu_positions'), callback_data="menu:positions")],
         [InlineKeyboardButton(t(lang, 'menu_automode'),  callback_data="menu:automode"),
          InlineKeyboardButton(t(lang, 'menu_trades'),    callback_data="menu:trades")],
+        [InlineKeyboardButton(t(lang, 'menu_notif'),     callback_data="menu:notif")],
     ])
 
 
@@ -426,6 +427,7 @@ async def cb_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "positions": _menu_positions,
         "automode":  _menu_automode,
         "trades":    _menu_trades,
+        "notif":     _menu_notif,
         "plans":     lambda q, uid, lng: cmd_plans_via_callback(q, uid, lng),
     }
     handler = dispatch.get(action)
@@ -626,6 +628,58 @@ async def _menu_automode(query, user_id: int, lang: str) -> None:
         [InlineKeyboardButton(pump_btn,                   callback_data="auto:pump_toggle")],
         [InlineKeyboardButton(t(lang, 'auto_config'),     callback_data="auto:config")],
     ])
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def _menu_notif(query, user_id: int, lang: str) -> None:
+    """Notification settings menu."""
+    tier = db.get_user_tier(user_id)
+    s    = db.get_user_settings(user_id)
+
+    push  = bool(s["signals_push"])         if s and "signals_push"          in s.keys() else True
+    chain = (s["signal_chain"] or "all")    if s and "signal_chain"           in s.keys() else "all"
+    mscore = int(s["signal_min_score_user"] or 0) if s and "signal_min_score_user" in s.keys() else 0
+
+    push_icon  = "✅" if push else "❌"
+    chain_icon = {"all": "🌍", "solana": "◎", "bsc": "🔶"}.get(chain, "🌍")
+    chain_name = {"all": t(lang, "notif_chain_all"), "solana": "Solana", "bsc": "BNB Chain"}.get(chain, "All")
+
+    score_display = str(mscore) if mscore > 0 else t(lang, "notif_score_auto")
+
+    text = t(lang, "notif_menu",
+             push=push_icon, chain=f"{chain_icon} {chain_name}",
+             score=score_display, tier=tier.upper())
+
+    # Chain filter buttons (only paid can pick)
+    chain_row = []
+    if tier in ("basic", "pro"):
+        for c, lbl in [("all", f"🌍 {t(lang,'notif_chain_all')}"), ("solana", "◎ SOL"), ("bsc", "🔶 BSC")]:
+            active = "●" if chain == c else "○"
+            chain_row.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:chain:{c}"))
+
+    # Score filter buttons (only paid can pick)
+    score_row = []
+    if tier in ("basic", "pro"):
+        for sc, lbl in [(0, t(lang,"notif_score_auto")), (35, "35+"), (55, "55+"), (70, "70+"), (85, "85+")]:
+            active = "●" if mscore == sc else "○"
+            score_row.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:score:{sc}"))
+
+    rows = [
+        [InlineKeyboardButton(
+            f"🔔 {t(lang,'notif_push')}: {push_icon}",
+            callback_data="notif:push_toggle"
+        )],
+    ]
+    if chain_row:
+        rows.append(chain_row)
+    if score_row:
+        rows.append(score_row)
+    if tier == "free":
+        rows.append([InlineKeyboardButton(
+            t(lang, "notif_upgrade_hint"), callback_data="menu:plans"
+        )])
+
+    keyboard = InlineKeyboardMarkup(rows)
     await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
@@ -1069,6 +1123,42 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
+async def cb_notif(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles notification settings callbacks: notif:push_toggle, notif:chain:X, notif:score:N"""
+    query   = update.callback_query
+    user    = query.from_user
+    if _check_banned(user.id):
+        return
+    user_id = db.upsert_user(user.id, user.first_name, user.username)
+    lang    = db.get_user_lang(user_id)
+    tier    = db.get_user_tier(user_id)
+    await query.answer()
+
+    parts  = query.data.split(":")   # ["notif", action, ...value]
+    action = parts[1] if len(parts) > 1 else ""
+
+    s = db.get_user_settings(user_id)
+
+    if action == "push_toggle":
+        curr = bool(s["signals_push"]) if s and "signals_push" in s.keys() else True
+        db.update_user_settings(user_id, signals_push=0 if curr else 1)
+
+    elif action == "chain" and tier in ("basic", "pro"):
+        new_chain = parts[2] if len(parts) > 2 else "all"
+        if new_chain in ("all", "solana", "bsc"):
+            db.update_user_settings(user_id, signal_chain=new_chain)
+
+    elif action == "score" and tier in ("basic", "pro"):
+        try:
+            new_score = int(parts[2]) if len(parts) > 2 else 0
+        except ValueError:
+            new_score = 0
+        db.update_user_settings(user_id, signal_min_score_user=new_score)
+
+    # Re-render the notifications menu
+    await _menu_notif(query, user_id, lang)
+
+
 async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
     user    = query.from_user
@@ -1439,6 +1529,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(cb_language,  pattern=r"^lang:"))
     app.add_handler(CallbackQueryHandler(cb_buy,       pattern=r"^buy:"))
     app.add_handler(CallbackQueryHandler(cb_skip,      pattern=r"^skip$"))
+    app.add_handler(CallbackQueryHandler(cb_notif,     pattern=r"^notif:"))
     app.add_handler(CallbackQueryHandler(cb_auto,      pattern=r"^auto:"))
     app.add_handler(CallbackQueryHandler(cb_pos,       pattern=r"^pos:"))
     app.add_handler(CallbackQueryHandler(cb_sell,      pattern=r"^sell:"))

@@ -132,14 +132,17 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_id           INTEGER PRIMARY KEY REFERENCES users(id),
-                auto_mode         INTEGER DEFAULT 0,
-                auto_min_score    INTEGER DEFAULT 80,
-                auto_max_buy_sol  REAL DEFAULT 0.1,
-                auto_max_buy_bnb  REAL DEFAULT 0.01,
-                auto_stop_loss    REAL DEFAULT 20,
-                auto_take_profit  REAL DEFAULT 0,
-                notify_all_tokens INTEGER DEFAULT 0,
-                updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+                auto_mode              INTEGER DEFAULT 0,
+                auto_min_score         INTEGER DEFAULT 80,
+                auto_max_buy_sol       REAL DEFAULT 0.1,
+                auto_max_buy_bnb       REAL DEFAULT 0.01,
+                auto_stop_loss         REAL DEFAULT 20,
+                auto_take_profit       REAL DEFAULT 0,
+                notify_all_tokens      INTEGER DEFAULT 0,
+                signals_push           INTEGER DEFAULT 1,
+                signal_chain           TEXT DEFAULT 'all',
+                signal_min_score_user  INTEGER DEFAULT 0,
+                updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
             CREATE TABLE IF NOT EXISTS payments (
@@ -201,7 +204,11 @@ def init_db() -> None:
             ("expires_at",      "ALTER TABLE subscriptions ADD COLUMN expires_at TEXT"),
             ("updated_at",      "ALTER TABLE subscriptions ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))"),
             # user_settings columns added in v3
-            ("auto_take_profit", "ALTER TABLE user_settings ADD COLUMN auto_take_profit REAL DEFAULT 0"),
+            ("auto_take_profit",       "ALTER TABLE user_settings ADD COLUMN auto_take_profit REAL DEFAULT 0"),
+            # user_settings columns added in v4 (notification filters)
+            ("signals_push",           "ALTER TABLE user_settings ADD COLUMN signals_push INTEGER DEFAULT 1"),
+            ("signal_chain",           "ALTER TABLE user_settings ADD COLUMN signal_chain TEXT DEFAULT 'all'"),
+            ("signal_min_score_user",  "ALTER TABLE user_settings ADD COLUMN signal_min_score_user INTEGER DEFAULT 0"),
             # positions columns added in v3
             ("take_profit_pct", "ALTER TABLE positions ADD COLUMN take_profit_pct REAL DEFAULT 0"),
             ("exit_reason",     "ALTER TABLE positions ADD COLUMN exit_reason TEXT"),
@@ -336,9 +343,12 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
                    COALESCE(us.auto_min_score, 80) as auto_min_score,
                    COALESCE(us.auto_max_buy_sol, 0.1) as auto_max_buy_sol,
                    COALESCE(us.auto_max_buy_bnb, 0.01) as auto_max_buy_bnb,
-                   COALESCE(us.auto_stop_loss, 20)   as auto_stop_loss,
-                   COALESCE(us.auto_take_profit, 0)  as auto_take_profit,
-                   COALESCE(us.notify_all_tokens, 0) as notify_all_tokens
+                   COALESCE(us.auto_stop_loss, 20)         as auto_stop_loss,
+                   COALESCE(us.auto_take_profit, 0)        as auto_take_profit,
+                   COALESCE(us.notify_all_tokens, 0)       as notify_all_tokens,
+                   COALESCE(us.signals_push, 1)            as signals_push,
+                   COALESCE(us.signal_chain, 'all')        as signal_chain,
+                   COALESCE(us.signal_min_score_user, 0)   as signal_min_score_user
             FROM users u
             LEFT JOIN subscriptions s ON s.user_id=u.id
             LEFT JOIN user_settings us ON us.user_id=u.id
@@ -635,7 +645,8 @@ def get_user_settings(user_id: int) -> sqlite3.Row | None:
 def update_user_settings(user_id: int, **kwargs) -> None:
     allowed = {"auto_mode", "auto_min_score", "auto_max_buy_sol",
                "auto_max_buy_bnb", "auto_stop_loss", "auto_take_profit",
-               "notify_all_tokens"}
+               "notify_all_tokens", "signals_push", "signal_chain",
+               "signal_min_score_user"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
