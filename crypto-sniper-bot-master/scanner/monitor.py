@@ -1,8 +1,8 @@
 """
 Background monitoring loop.
 Sources (priority order):
-  - Birdeye:        new Solana listings every 30s  [PRIMARY, requires BIRDEYE_API_KEY]
-  - PancakeSwap:    new BSC pools every 90s         [PRIMARY, no key needed]
+  - Raydium:        all Solana AMM pools every 45s  [PRIMARY, no key, official Raydium API]
+  - PancakeSwap:    new BSC pools every 90s         [PRIMARY, no key, subgraph GraphQL]
   - GeckoTerminal:  Solana trending every 60s       [SECONDARY, rate-limited]
   - DexScreener:    boosted tokens every 90s        [TERTIARY]
   - Pump.fun:       new Solana launches every 30s   [circuit-breaker if blocked]
@@ -17,7 +17,7 @@ from typing import Callable, Awaitable
 import aiohttp
 
 import database as db
-from scanner.dexscreener import search_new_pairs, extract_pair_data, CHAINS
+from scanner.dexscreener import search_new_pairs, extract_pair_data, get_pairs_batch, CHAINS
 from scanner.geckoterminal import get_trending_pools
 from scanner.rugcheck  import check_solana_token
 from scanner.honeypot  import check_bnb_token
@@ -25,8 +25,8 @@ from scanner.signals   import (
     score_token, format_signal_message,
     SIGNAL_STRONG_BUY, SIGNAL_BUY, SIGNAL_WATCH,
 )
-from scanner.pumpfun   import get_new_tokens, is_new as pumpfun_is_new, format_token_message
-from scanner.birdeye   import get_new_listings, get_trending as birdeye_trending, is_available as birdeye_ok
+from scanner.pumpfun     import get_new_tokens, is_new as pumpfun_is_new, format_token_message
+from scanner.raydium     import get_pairs as raydium_get_pairs, prefilter as raydium_prefilter, to_pair_data as raydium_to_pair
 from scanner.pancakeswap import get_new_pairs as pcs_new_pairs
 from scanner.price_cache import (
     get_cached_safety, set_cached_safety, evict_expired as _cache_evict,
@@ -36,9 +36,9 @@ logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener (tertiary)
 GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "60"))   # GeckoTerminal Solana trending
-GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "180"))  # GeckoTerminal BSC (very limited)
-BIRDEYE_INTERVAL     = int(os.getenv("BIRDEYE_INTERVAL_SEC",     "30"))   # Birdeye new listings
-PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap subgraph
+GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "180"))  # GeckoTerminal BSC
+RAYDIUM_INTERVAL     = int(os.getenv("RAYDIUM_INTERVAL_SEC",     "45"))   # Raydium AMM pools (PRIMARY)
+PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap subgraph (PRIMARY)
 PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
 MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",         "35"))
 
@@ -78,15 +78,14 @@ def _cleanup_seen() -> None:
 
 
 async def run_monitor(send_fn: SendCallback) -> None:
-    birdeye_status = f"Birdeye: {BIRDEYE_INTERVAL}s" if birdeye_ok() else "Birdeye: NO KEY (set BIRDEYE_API_KEY)"
     logger.info(
-        "Monitor started. %s | PancakeSwap: %ds | Gecko SOL: %ds | DexScreener: %ds | pump.fun: %ds",
-        birdeye_status, PANCAKE_INTERVAL, GECKO_INTERVAL, SCAN_INTERVAL, PUMPFUN_INTERVAL,
+        "Monitor started. Raydium: %ds | PancakeSwap: %ds | Gecko SOL: %ds | DexScreener: %ds | pump.fun: %ds",
+        RAYDIUM_INTERVAL, PANCAKE_INTERVAL, GECKO_INTERVAL, SCAN_INTERVAL, PUMPFUN_INTERVAL,
     )
     async with aiohttp.ClientSession() as session:
         tasks = [
-            _birdeye_loop(session, send_fn),    # PRIMARY: Solana new listings
-            _pancake_loop(session, send_fn),    # PRIMARY: BSC new pools
+            _raydium_loop(session, send_fn),       # PRIMARY: Solana all AMM pools
+            _pancake_loop(session, send_fn),       # PRIMARY: BSC new pools
             _gecko_loop_solana(session, send_fn),  # SECONDARY: Solana trending
             _gecko_loop_bsc(session, send_fn),     # SECONDARY: BSC trending
             _dex_loop(session, send_fn),           # TERTIARY: DexScreener boosted
@@ -271,41 +270,50 @@ async def _dispatch_signals(
             )
 
 
-# ── Birdeye loop (PRIMARY Solana) ────────────────────────────────────────────
+# ── Raydium loop (PRIMARY Solana) ────────────────────────────────────────────
 
-async def _birdeye_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    if not birdeye_ok():
-        logger.warning(
-            "Birdeye: BIRDEYE_API_KEY not set — Solana new-listing scanner disabled. "
-            "Register free at https://birdeye.so/api and add env var."
-        )
-        return
-    logger.info("Birdeye scanner active (new Solana listings every %ds)", BIRDEYE_INTERVAL)
+async def _raydium_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    logger.info("Raydium scanner active (Solana AMM pools every %ds)", RAYDIUM_INTERVAL)
     while True:
         try:
-            await _birdeye_cycle(session, send_fn)
+            await _raydium_cycle(session, send_fn)
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.error("Birdeye cycle error: %s", e, exc_info=True)
-        await asyncio.sleep(BIRDEYE_INTERVAL)
+            logger.error("Raydium cycle error: %s", e, exc_info=True)
+        await asyncio.sleep(RAYDIUM_INTERVAL)
 
 
-async def _birdeye_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+async def _raydium_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
     new_signals: list = []
 
-    listings = await get_new_listings(session, limit=50)
-    new_tokens = [t for t in listings if _mark_seen(t.get("token_address", ""))]
-    logger.info("Birdeye new_listings: %d (%d new)", len(listings), len(new_tokens))
-    # Safety checks in parallel — much faster than sequential
-    await asyncio.gather(*[_process_pair(session, t, new_signals) for t in new_tokens])
+    raw_pairs  = await raydium_get_pairs(session)
+    filtered   = raydium_prefilter(raw_pairs)
+    new_pairs  = [p for p in filtered if _mark_seen(p.get("ammId", ""))]
 
-    await asyncio.sleep(2)
+    logger.info("Raydium: %d total, %d pass filter, %d new", len(raw_pairs), len(filtered), len(new_pairs))
+    if not new_pairs:
+        return
 
-    trending = await birdeye_trending(session, limit=20)
-    new_trending = [t for t in trending if _mark_seen(t.get("token_address", ""))]
-    logger.info("Birdeye trending: %d (%d new)", len(trending), len(new_trending))
-    await asyncio.gather(*[_process_pair(session, t, new_signals) for t in new_trending])
+    # Enrich top 30 new pairs with DexScreener (price change, txn counts, full data)
+    base_mints = [p.get("baseMint", "") for p in new_pairs if p.get("baseMint")][:30]
+    if base_mints:
+        enriched = await get_pairs_batch(session, "solana", base_mints)
+        dex_map  = {}
+        for ep in enriched:
+            pd = extract_pair_data(ep)
+            dex_map[pd["token_address"]] = pd
+
+        enriched_pairs = []
+        for p in new_pairs[:30]:
+            mint = p.get("baseMint", "")
+            # Prefer DexScreener data (has price change, txns); fall back to Raydium
+            enriched_pairs.append(dex_map.get(mint) or raydium_to_pair(p))
+    else:
+        enriched_pairs = [raydium_to_pair(p) for p in new_pairs[:30]]
+
+    # Safety checks in parallel
+    await asyncio.gather(*[_process_pair(session, pd, new_signals) for pd in enriched_pairs])
 
     if new_signals:
         await _dispatch_signals(new_signals, send_fn)
