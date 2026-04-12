@@ -177,8 +177,8 @@ def _tier_min_score(tier: str) -> int:
     Min score to dispatch a signal to a user of this tier.
     Reads from bot_settings so admin can tune live without redeploying.
     """
-    defaults = {"free": 40, "basic": 40, "pro": 40}
-    fallback = defaults.get(tier, 40)
+    defaults = {"free": 35, "basic": 30, "pro": 25}
+    fallback = defaults.get(tier, 35)
     key = f"{tier}_min_score"
     try:
         val = db.get_bot_setting(key)
