@@ -30,10 +30,15 @@ from scanner.price_cache import (
 
 logger = logging.getLogger(__name__)
 
-SCAN_INTERVAL    = int(os.getenv("SCAN_INTERVAL_SEC",    "60"))
-GECKO_INTERVAL   = int(os.getenv("GECKO_INTERVAL_SEC",   "45"))
-PUMPFUN_INTERVAL = int(os.getenv("PUMPFUN_INTERVAL_SEC", "30"))
-MIN_SIGNAL_SCORE = int(os.getenv("MIN_SIGNAL_SCORE",     "40"))
+SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "60"))
+GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "45"))
+GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "120"))  # BSC needs slower rate
+PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
+MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",          "40"))
+
+# pump.fun circuit breaker — suspend after this many consecutive all-endpoint failures
+_PUMP_MAX_FAILS   = 5
+_PUMP_SUSPEND_SEC = 3_600  # 1 hour
 
 # 4-arg callback: (telegram_id, message, pair_data, signal_meta)
 # signal_meta carries pre-loaded user context so send callback needs 0 extra DB queries
@@ -58,13 +63,14 @@ def _mark_seen(addr: str) -> bool:
 
 async def run_monitor(send_fn: SendCallback) -> None:
     logger.info(
-        "Monitor started. DexScreener: %ds, GeckoTerminal: %ds, pump.fun: %ds",
-        SCAN_INTERVAL, GECKO_INTERVAL, PUMPFUN_INTERVAL,
+        "Monitor started. DexScreener: %ds, Gecko SOL: %ds, Gecko BSC: %ds, pump.fun: %ds",
+        SCAN_INTERVAL, GECKO_INTERVAL, GECKO_INTERVAL_BSC, PUMPFUN_INTERVAL,
     )
     async with aiohttp.ClientSession() as session:
         await asyncio.gather(
             _dex_loop(session, send_fn),
-            _gecko_loop(session, send_fn),
+            _gecko_loop_solana(session, send_fn),
+            _gecko_loop_bsc(session, send_fn),
             _pump_loop(session, send_fn),
         )
 
@@ -262,38 +268,53 @@ async def _dex_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> N
         await _dispatch_signals(new_signals, send_fn)
 
 
-# ── GeckoTerminal loop ────────────────────────────────────────────────────────
+# ── GeckoTerminal loops (solana and BSC run at different intervals) ────────────
 
-async def _gecko_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+async def _gecko_loop_solana(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
     await asyncio.sleep(15)  # offset from DexScreener start
     while True:
         try:
-            await _gecko_cycle(session, send_fn)
+            await _gecko_cycle(session, send_fn, "solana")
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.error("GeckoTerminal cycle error: %s", e, exc_info=True)
+            logger.error("GeckoTerminal SOL cycle error: %s", e, exc_info=True)
         await asyncio.sleep(GECKO_INTERVAL)
 
 
-async def _gecko_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+async def _gecko_loop_bsc(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    # BSC gets a longer interval: free tier 429s are common on bsc endpoint
+    await asyncio.sleep(45)  # offset further to avoid burst at startup
+    while True:
+        try:
+            await _gecko_cycle(session, send_fn, "bsc")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("GeckoTerminal BSC cycle error: %s", e, exc_info=True)
+        await asyncio.sleep(GECKO_INTERVAL_BSC)
+
+
+async def _gecko_cycle(
+    session: aiohttp.ClientSession,
+    send_fn: SendCallback,
+    chain: str,
+) -> None:
     new_signals: list = []
-    for chain in CHAINS.values():
-        new_pool_pairs = await get_new_pools(session, chain)
-        new_pairs = [p for p in new_pool_pairs if _mark_seen(p.get("pair_address", ""))]
-        logger.info("GeckoTerminal %s new_pools: %d (%d new)", chain, len(new_pool_pairs), len(new_pairs))
-        for pair_data in new_pairs:
-            await _process_pair(session, pair_data, new_signals)
 
-        await asyncio.sleep(3)  # avoid 429 between chains
+    new_pool_pairs = await get_new_pools(session, chain)
+    new_pairs = [p for p in new_pool_pairs if _mark_seen(p.get("pair_address", ""))]
+    logger.info("GeckoTerminal %s new_pools: %d (%d new)", chain, len(new_pool_pairs), len(new_pairs))
+    for pair_data in new_pairs:
+        await _process_pair(session, pair_data, new_signals)
 
-        trending = await get_trending_pools(session, chain)
-        new_trending = [p for p in trending if _mark_seen(p.get("pair_address", ""))]
-        logger.info("GeckoTerminal %s trending: %d (%d new)", chain, len(trending), len(new_trending))
-        for pair_data in new_trending:
-            await _process_pair(session, pair_data, new_signals)
+    await asyncio.sleep(4)  # gap between new_pools and trending to stay within rate limit
 
-        await asyncio.sleep(3)  # space out per-chain requests
+    trending = await get_trending_pools(session, chain)
+    new_trending = [p for p in trending if _mark_seen(p.get("pair_address", ""))]
+    logger.info("GeckoTerminal %s trending: %d (%d new)", chain, len(trending), len(new_trending))
+    for pair_data in new_trending:
+        await _process_pair(session, pair_data, new_signals)
 
     if new_signals:
         await _dispatch_signals(new_signals, send_fn)
@@ -302,26 +323,48 @@ async def _gecko_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) ->
 # ── Pump.fun loop ─────────────────────────────────────────────────────────────
 
 async def _pump_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    # Seed seen set on startup (skip initial failure — not critical)
     tokens = await get_new_tokens(session, limit=50)
     for tok in tokens:
         pumpfun_is_new(tok.get("mint", ""))
-    logger.info("pump.fun: seeded %d existing tokens", len(tokens))
+    if tokens:
+        logger.info("pump.fun: seeded %d existing tokens", len(tokens))
+    else:
+        logger.warning("pump.fun: seed failed (endpoint may be blocked)")
+
+    consecutive_empty = 0  # circuit breaker counter
 
     while True:
         await asyncio.sleep(PUMPFUN_INTERVAL)
         try:
-            await _pump_cycle(session, send_fn)
+            result = await _pump_cycle(session, send_fn)
+            if result is False:
+                # get_new_tokens returned empty — all endpoints failed
+                consecutive_empty += 1
+                if consecutive_empty >= _PUMP_MAX_FAILS:
+                    logger.warning(
+                        "pump.fun: %d consecutive failures — suspending for %ds. "
+                        "Set PUMPFUN_INTERVAL_SEC env var to re-enable after endpoint recovers.",
+                        consecutive_empty, _PUMP_SUSPEND_SEC,
+                    )
+                    await asyncio.sleep(_PUMP_SUSPEND_SEC)
+                    consecutive_empty = 0
+            else:
+                consecutive_empty = 0
         except asyncio.CancelledError:
             break
         except Exception as e:
             logger.error("pump.fun cycle error: %s", e, exc_info=True)
 
 
-async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> bool | None:
+    """Returns False if all pump.fun endpoints failed (for circuit breaker)."""
     tokens = await get_new_tokens(session, limit=20)
+    if not tokens:
+        return False  # all endpoints returned empty — signal circuit breaker
     new_tokens = [t for t in tokens if pumpfun_is_new(t.get("mint", "")) and t.get("mint")]
     if not new_tokens:
-        return
+        return None  # got data, just no new tokens — normal
 
     logger.info("pump.fun: %d new tokens", len(new_tokens))
     users = db.get_all_active_users_with_tier()
