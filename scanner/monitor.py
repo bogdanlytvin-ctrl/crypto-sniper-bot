@@ -368,7 +368,8 @@ async def _dex_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> N
 # ── GeckoTerminal loops ────────────────────────────────────────────────────────
 
 async def _gecko_loop_solana(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    await asyncio.sleep(15)
+    # Wait 90s before first SOL cycle — seeding already hit gecko SOL, avoid 429
+    await asyncio.sleep(90)
     while True:
         try:
             await _gecko_cycle(session, send_fn, "solana")
@@ -380,8 +381,8 @@ async def _gecko_loop_solana(session: aiohttp.ClientSession, send_fn: SendCallba
 
 
 async def _gecko_loop_bsc(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    # BSC gets a longer interval: free tier 429s are common on bsc endpoint
-    await asyncio.sleep(45)
+    # Wait 120s — seeding already hit gecko BSC, longer offset avoids 429
+    await asyncio.sleep(120)
     while True:
         try:
             await _gecko_cycle(session, send_fn, "bsc")
