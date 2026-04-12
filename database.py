@@ -350,7 +350,11 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
                    COALESCE(us.signal_chain, 'all')        as signal_chain,
                    COALESCE(us.signal_min_score_user, 0)   as signal_min_score_user
             FROM users u
-            LEFT JOIN subscriptions s ON s.user_id=u.id
+            LEFT JOIN (
+                SELECT user_id, tier, status, expires_at
+                FROM subscriptions
+                WHERE id IN (SELECT MAX(id) FROM subscriptions GROUP BY user_id)
+            ) s ON s.user_id = u.id
             LEFT JOIN user_settings us ON us.user_id=u.id
             WHERE (COALESCE(s.status,'active')='active' OR COALESCE(s.tier,'free')='free')
               AND u.banned=0

@@ -242,19 +242,23 @@ async def _dispatch_signals(
             user_lang   = user["lang"] or "ua"
             tier        = user["tier"] or "free"
 
+            # sqlite3.Row doesn't support .get() — read columns directly
+            signals_push   = user["signals_push"]   if "signals_push"   in user.keys() else 1
+            chain_filter   = user["signal_chain"]   if "signal_chain"   in user.keys() else "all"
+            score_override = user["signal_min_score_user"] if "signal_min_score_user" in user.keys() else 0
+            auto_mode      = user["auto_mode"]      if "auto_mode"      in user.keys() else 0
+
             # Respect user's push-notifications toggle (default ON)
-            if not user.get("signals_push", 1):
+            if not signals_push:
                 continue
 
             # Per-user chain filter (all / solana / bsc)
-            chain_filter = user.get("signal_chain", "all")
             signal_chain = pair_data.get("chain", "")
             if chain_filter != "all" and chain_filter != signal_chain:
                 continue
 
             # Min score: use user's override if set (>0), otherwise tier default
-            user_score_override = int(user.get("signal_min_score_user") or 0)
-            min_score = user_score_override if user_score_override > 0 else _tier_min_score(tier)
+            min_score = int(score_override) if score_override else _tier_min_score(tier)
 
             if score < min_score:
                 logger.debug(
@@ -284,14 +288,14 @@ async def _dispatch_signals(
                 "user_id":     user_id,
                 "lang":        user_lang,
                 "user_tier":   tier,
-                "auto_mode":   user.get("auto_mode", 0),
+                "auto_mode":   auto_mode,
                 "user_settings": {
-                    "auto_mode":        user.get("auto_mode", 0),
-                    "auto_min_score":   user.get("auto_min_score", 80),
-                    "auto_max_buy_sol": user.get("auto_max_buy_sol", 0.1),
-                    "auto_max_buy_bnb": user.get("auto_max_buy_bnb", 0.01),
-                    "auto_stop_loss":   user.get("auto_stop_loss", 20),
-                    "auto_take_profit": user.get("auto_take_profit", 0),
+                    "auto_mode":        auto_mode,
+                    "auto_min_score":   user["auto_min_score"]   if "auto_min_score"   in user.keys() else 80,
+                    "auto_max_buy_sol": user["auto_max_buy_sol"] if "auto_max_buy_sol" in user.keys() else 0.1,
+                    "auto_max_buy_bnb": user["auto_max_buy_bnb"] if "auto_max_buy_bnb" in user.keys() else 0.01,
+                    "auto_stop_loss":   user["auto_stop_loss"]   if "auto_stop_loss"   in user.keys() else 20,
+                    "auto_take_profit": user["auto_take_profit"] if "auto_take_profit" in user.keys() else 0,
                 },
             }
 
@@ -478,14 +482,17 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
     users = db.get_all_active_users_with_tier()
     # Paid users (basic/pro) get pump.fun alerts automatically.
     # Free users get them only if they opted in via notify_all_tokens or auto_mode.
+    def _row(u, col, default):
+        return u[col] if col in u.keys() else default
+
     pump_users = [
         u for u in users
-        if u.get("signals_push", 1) and (
-            u.get("tier") in ("basic", "pro")
-            or u.get("auto_mode")
-            or u.get("notify_all_tokens")
+        if _row(u, "signals_push", 1) and (
+            _row(u, "tier", "free") in ("basic", "pro")
+            or _row(u, "auto_mode", 0)
+            or _row(u, "notify_all_tokens", 0)
         )
-        and u.get("signal_chain", "all") in ("all", "solana")
+        and _row(u, "signal_chain", "all") in ("all", "solana")
     ]
     if not pump_users:
         return None
