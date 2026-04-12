@@ -1,9 +1,11 @@
 """
 Background monitoring loop.
-Sources:
-  - DexScreener:    scans every 60s (latest token profiles + boosted)
-  - GeckoTerminal:  scans every 45s (new pools + trending) — main new-token source
-  - Pump.fun:       polls every 30s (new Solana launches)
+Sources (priority order):
+  - Birdeye:        new Solana listings every 30s  [PRIMARY, requires BIRDEYE_API_KEY]
+  - PancakeSwap:    new BSC pools every 90s         [PRIMARY, no key needed]
+  - GeckoTerminal:  Solana trending every 60s       [SECONDARY, rate-limited]
+  - DexScreener:    boosted tokens every 90s        [TERTIARY]
+  - Pump.fun:       new Solana launches every 30s   [circuit-breaker if blocked]
 """
 
 import asyncio
@@ -16,25 +18,29 @@ import aiohttp
 
 import database as db
 from scanner.dexscreener import search_new_pairs, extract_pair_data, CHAINS
-from scanner.geckoterminal import get_new_pools, get_trending_pools
+from scanner.geckoterminal import get_trending_pools
 from scanner.rugcheck  import check_solana_token
 from scanner.honeypot  import check_bnb_token
 from scanner.signals   import (
     score_token, format_signal_message,
     SIGNAL_STRONG_BUY, SIGNAL_BUY, SIGNAL_WATCH,
 )
-from scanner.pumpfun import get_new_tokens, is_new as pumpfun_is_new, format_token_message
+from scanner.pumpfun   import get_new_tokens, is_new as pumpfun_is_new, format_token_message
+from scanner.birdeye   import get_new_listings, get_trending as birdeye_trending, is_available as birdeye_ok
+from scanner.pancakeswap import get_new_pairs as pcs_new_pairs
 from scanner.price_cache import (
     get_cached_safety, set_cached_safety, evict_expired as _cache_evict,
 )
 
 logger = logging.getLogger(__name__)
 
-SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "60"))
-GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "45"))
-GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "120"))  # BSC needs slower rate
+SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener (tertiary)
+GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "60"))   # GeckoTerminal Solana trending
+GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "180"))  # GeckoTerminal BSC (very limited)
+BIRDEYE_INTERVAL     = int(os.getenv("BIRDEYE_INTERVAL_SEC",     "30"))   # Birdeye new listings
+PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap subgraph
 PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
-MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",  "35"))  # lowered: new tokens score lower
+MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",         "35"))
 
 # pump.fun circuit breaker — suspend after this many consecutive all-endpoint failures
 _PUMP_MAX_FAILS   = 5
@@ -72,17 +78,21 @@ def _cleanup_seen() -> None:
 
 
 async def run_monitor(send_fn: SendCallback) -> None:
+    birdeye_status = f"Birdeye: {BIRDEYE_INTERVAL}s" if birdeye_ok() else "Birdeye: NO KEY (set BIRDEYE_API_KEY)"
     logger.info(
-        "Monitor started. DexScreener: %ds, Gecko SOL: %ds, Gecko BSC: %ds, pump.fun: %ds",
-        SCAN_INTERVAL, GECKO_INTERVAL, GECKO_INTERVAL_BSC, PUMPFUN_INTERVAL,
+        "Monitor started. %s | PancakeSwap: %ds | Gecko SOL: %ds | DexScreener: %ds | pump.fun: %ds",
+        birdeye_status, PANCAKE_INTERVAL, GECKO_INTERVAL, SCAN_INTERVAL, PUMPFUN_INTERVAL,
     )
     async with aiohttp.ClientSession() as session:
-        await asyncio.gather(
-            _dex_loop(session, send_fn),
-            _gecko_loop_solana(session, send_fn),
-            _gecko_loop_bsc(session, send_fn),
-            _pump_loop(session, send_fn),
-        )
+        tasks = [
+            _birdeye_loop(session, send_fn),    # PRIMARY: Solana new listings
+            _pancake_loop(session, send_fn),    # PRIMARY: BSC new pools
+            _gecko_loop_solana(session, send_fn),  # SECONDARY: Solana trending
+            _gecko_loop_bsc(session, send_fn),     # SECONDARY: BSC trending
+            _dex_loop(session, send_fn),           # TERTIARY: DexScreener boosted
+            _pump_loop(session, send_fn),          # Pump.fun (circuit-breaker)
+        ]
+        await asyncio.gather(*tasks)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -95,6 +105,7 @@ async def _process_pair(
     """Score one pair, append to new_signals if good enough."""
     chain   = pair_data.get("chain", "")
     address = pair_data.get("token_address", "")
+    symbol  = pair_data.get("token_symbol", "?")
 
     # Use cached safety result if fresh (< 5 min) to avoid redundant API calls
     safety = get_cached_safety(chain, address)
@@ -108,13 +119,23 @@ async def _process_pair(
     result = score_token(pair_data, safety)
 
     if result["blocked"]:
-        logger.info("Blocked %s: %s", pair_data.get("token_symbol"), result["block_reason"])
-        return
-    if result["score"] < MIN_SIGNAL_SCORE:
         logger.info(
-            "Score too low %s: %d (min=%d)",
-            pair_data.get("token_symbol"), result["score"], MIN_SIGNAL_SCORE,
+            "BLOCKED  %s [%s] — %s",
+            symbol, chain.upper(), result["block_reason"],
         )
+        return
+
+    liq = pair_data.get("liquidity_usd", 0) or 0
+    vol = pair_data.get("volume_1h", 0) or 0
+    chg = pair_data.get("price_change_1h", 0) or 0
+    logger.info(
+        "SCORED   %s [%s] score=%d/%d  liq=$%s  vol1h=$%s  chg=%+.1f%%  src=%s",
+        symbol, chain.upper(), result["score"], MIN_SIGNAL_SCORE,
+        f"{liq:,.0f}", f"{vol:,.0f}", chg,
+        pair_data.get("dex", "?"),
+    )
+
+    if result["score"] < MIN_SIGNAL_SCORE:
         return
 
     signal_data = {
@@ -248,6 +269,74 @@ async def _dispatch_signals(
                 "(check tier score thresholds and user count)",
                 signal_id, symbol, score,
             )
+
+
+# ── Birdeye loop (PRIMARY Solana) ────────────────────────────────────────────
+
+async def _birdeye_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    if not birdeye_ok():
+        logger.warning(
+            "Birdeye: BIRDEYE_API_KEY not set — Solana new-listing scanner disabled. "
+            "Register free at https://birdeye.so/api and add env var."
+        )
+        return
+    logger.info("Birdeye scanner active (new Solana listings every %ds)", BIRDEYE_INTERVAL)
+    while True:
+        try:
+            await _birdeye_cycle(session, send_fn)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Birdeye cycle error: %s", e, exc_info=True)
+        await asyncio.sleep(BIRDEYE_INTERVAL)
+
+
+async def _birdeye_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    new_signals: list = []
+
+    listings = await get_new_listings(session, limit=50)
+    new_tokens = [t for t in listings if _mark_seen(t.get("token_address", ""))]
+    logger.info("Birdeye new_listings: %d (%d new)", len(listings), len(new_tokens))
+    # Safety checks in parallel — much faster than sequential
+    await asyncio.gather(*[_process_pair(session, t, new_signals) for t in new_tokens])
+
+    await asyncio.sleep(2)
+
+    trending = await birdeye_trending(session, limit=20)
+    new_trending = [t for t in trending if _mark_seen(t.get("token_address", ""))]
+    logger.info("Birdeye trending: %d (%d new)", len(trending), len(new_trending))
+    await asyncio.gather(*[_process_pair(session, t, new_signals) for t in new_trending])
+
+    if new_signals:
+        await _dispatch_signals(new_signals, send_fn)
+
+
+# ── PancakeSwap Subgraph loop (PRIMARY BSC) ───────────────────────────────────
+
+async def _pancake_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    logger.info("PancakeSwap subgraph scanner active (new BSC pools every %ds)", PANCAKE_INTERVAL)
+    await asyncio.sleep(10)  # offset from startup burst
+    while True:
+        try:
+            await _pancake_cycle(session, send_fn)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("PancakeSwap cycle error: %s", e, exc_info=True)
+        await asyncio.sleep(PANCAKE_INTERVAL)
+
+
+async def _pancake_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    new_signals: list = []
+
+    pairs = await pcs_new_pairs(session)
+    new_pairs = [p for p in pairs if _mark_seen(p.get("pair_address", ""))]
+    logger.info("PancakeSwap new_pairs: %d (%d new)", len(pairs), len(new_pairs))
+    # Safety checks in parallel
+    await asyncio.gather(*[_process_pair(session, p, new_signals) for p in new_pairs])
+
+    if new_signals:
+        await _dispatch_signals(new_signals, send_fn)
 
 
 # ── DexScreener loop ──────────────────────────────────────────────────────────
