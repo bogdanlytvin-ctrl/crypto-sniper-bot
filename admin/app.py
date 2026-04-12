@@ -51,12 +51,169 @@ def format_ts(ts) -> str:
 
 @app.context_processor
 def inject_globals():
-    today = _dt.date.today().isoformat()   # "2026-04-11" — for date comparisons in templates
+    today = _dt.date.today().isoformat()
+    lang  = session.get("admin_lang", "ua")
     return {
         "now_ts": time.time(),
         "today": today,
         "totp_enabled": bool(ADMIN_TOTP_SECRET),
+        "lang": lang,
+        "UI": _UI.get(lang, _UI["ua"]),
     }
+
+
+# ── Admin UI translations ─────────────────────────────────────────────────────
+
+_UI = {
+    "ua": {
+        # Sidebar
+        "nav_main":          "Основне",
+        "nav_trading":       "Торгівля",
+        "nav_management":    "Управління",
+        "nav_dashboard":     "Dashboard",
+        "nav_users":         "Користувачі",
+        "nav_subscriptions": "Підписки",
+        "nav_payments":      "Платежі",
+        "nav_signals":       "Сигнали",
+        "nav_trades":        "Угоди",
+        "nav_positions":     "Позиції",
+        "nav_broadcast":     "Розсилка",
+        "nav_settings":      "Налаштування",
+        "nav_audit":         "Аудит",
+        "nav_logout":        "Вийти",
+        # Common
+        "actions":           "Дії",
+        "user":              "Користувач",
+        "status":            "Статус",
+        "tier":              "Тариф",
+        "date":              "Дата",
+        "save":              "Зберегти",
+        "cancel":            "Скасувати",
+        "search":            "Пошук",
+        "ban":               "Заблокувати",
+        "unban":             "Розблокувати",
+        "all_tiers":         "Всі тарифи",
+        "all_chains":        "Всі ланцюги",
+        "all_statuses":      "Всі статуси",
+        # Dashboard
+        "db_title":          "Dashboard",
+        "db_users":          "Користувачів",
+        "db_signals_today":  "Сигналів сьогодні",
+        "db_active_subs":    "Активних підписок",
+        "db_open_pos":       "Відкритих позицій",
+        "db_revenue":        "Дохід (USD)",
+        "db_trades":         "Угод усього",
+        # Users
+        "users_title":       "Користувачі",
+        "users_id":          "ID",
+        "users_name":        "Ім'я",
+        "users_username":    "Username",
+        "users_lang":        "Мова",
+        "users_registered":  "Реєстрація",
+        "users_signals":     "Сигналів",
+        # Settings
+        "settings_title":    "Налаштування бота",
+        "settings_key":      "Ключ",
+        "settings_value":    "Значення",
+        "settings_saved":    "Збережено",
+        # Signals
+        "signals_title":     "Сигнали",
+        "sig_chain":         "Ланцюг",
+        "sig_token":         "Токен",
+        "sig_score":         "Скор",
+        "sig_type":          "Тип",
+        "sig_liq":           "Ліквідність",
+        "sig_vol":           "Обсяг 1г",
+        "sig_chg":           "Зміна",
+        # Positions
+        "pos_title":         "Позиції",
+        "pos_token":         "Токен",
+        "pos_amount":        "Кількість",
+        "pos_buy_price":     "Ціна купівлі",
+        "pos_sl":            "Stop-loss",
+        "pos_opened":        "Відкрито",
+        # Trades
+        "trades_title":      "Угоди",
+        "trades_type":       "Тип",
+        "trades_amount":     "Сума",
+        "trades_status":     "Статус",
+        "trades_tx":         "TX Hash",
+    },
+    "en": {
+        # Sidebar
+        "nav_main":          "Main",
+        "nav_trading":       "Trading",
+        "nav_management":    "Management",
+        "nav_dashboard":     "Dashboard",
+        "nav_users":         "Users",
+        "nav_subscriptions": "Subscriptions",
+        "nav_payments":      "Payments",
+        "nav_signals":       "Signals",
+        "nav_trades":        "Trades",
+        "nav_positions":     "Positions",
+        "nav_broadcast":     "Broadcast",
+        "nav_settings":      "Settings",
+        "nav_audit":         "Audit",
+        "nav_logout":        "Logout",
+        # Common
+        "actions":           "Actions",
+        "user":              "User",
+        "status":            "Status",
+        "tier":              "Tier",
+        "date":              "Date",
+        "save":              "Save",
+        "cancel":            "Cancel",
+        "search":            "Search",
+        "ban":               "Ban",
+        "unban":             "Unban",
+        "all_tiers":         "All tiers",
+        "all_chains":        "All chains",
+        "all_statuses":      "All statuses",
+        # Dashboard
+        "db_title":          "Dashboard",
+        "db_users":          "Users",
+        "db_signals_today":  "Signals today",
+        "db_active_subs":    "Active subscriptions",
+        "db_open_pos":       "Open positions",
+        "db_revenue":        "Revenue (USD)",
+        "db_trades":         "Total trades",
+        # Users
+        "users_title":       "Users",
+        "users_id":          "ID",
+        "users_name":        "Name",
+        "users_username":    "Username",
+        "users_lang":        "Language",
+        "users_registered":  "Registered",
+        "users_signals":     "Signals",
+        # Settings
+        "settings_title":    "Bot Settings",
+        "settings_key":      "Key",
+        "settings_value":    "Value",
+        "settings_saved":    "Saved",
+        # Signals
+        "signals_title":     "Signals",
+        "sig_chain":         "Chain",
+        "sig_token":         "Token",
+        "sig_score":         "Score",
+        "sig_type":          "Type",
+        "sig_liq":           "Liquidity",
+        "sig_vol":           "Vol 1h",
+        "sig_chg":           "Change",
+        # Positions
+        "pos_title":         "Positions",
+        "pos_token":         "Token",
+        "pos_amount":        "Amount",
+        "pos_buy_price":     "Buy price",
+        "pos_sl":            "Stop-loss",
+        "pos_opened":        "Opened",
+        # Trades
+        "trades_title":      "Trades",
+        "trades_type":       "Type",
+        "trades_amount":     "Amount",
+        "trades_status":     "Status",
+        "trades_tx":         "TX Hash",
+    },
+}
 
 
 # ── Security helpers ───────────────────────────────────────────────────────────
@@ -109,6 +266,16 @@ def _check_csrf() -> bool:
     form_token = request.form.get("csrf_token", "")
     sess_token = session.pop("csrf", "")
     return bool(sess_token and secrets.compare_digest(form_token, sess_token))
+
+
+# ── Language switch ───────────────────────────────────────────────────────────
+
+@app.route("/set_lang/<lang>")
+@login_required
+def set_lang(lang: str):
+    if lang in ("ua", "en"):
+        session["admin_lang"] = lang
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 # ── Auth ────────────────────────────────────────────────────────────────────────

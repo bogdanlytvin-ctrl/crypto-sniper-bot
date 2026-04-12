@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4>💱 Угоди</h4>
-  <span class="text-muted small">Всього: {{ total }}</span>
+  <h4>💱 {{ UI.nav_trades }}</h4>
+  <span class="text-muted small">{{ 'Всього' if lang=='ua' else 'Total' }}: {{ total }}</span>
 </div>
 
 <div class="card">
   <table class="table table-hover mb-0">
     <thead>
       <tr>
-        <th>Тип</th><th>Ланцюг</th><th>Токен</th><th>Сума in</th>
-        <th>Сума out</th><th>Tx Hash</th><th>Статус</th><th>Режим</th>
-        <th>Користувач</th><th>Дата</th>
+        <th>{{ UI.trades_type }}</th><th>{{ UI.sig_chain }}</th><th>{{ UI.sig_token }}</th>
+        <th>{{ 'Сума in' if lang=='ua' else 'Amount in' }}</th>
+        <th>{{ 'Сума out' if lang=='ua' else 'Amount out' }}</th>
+        <th>{{ UI.trades_tx }}</th><th>{{ UI.trades_status }}</th>
+        <th>{{ 'Режим' if lang=='ua' else 'Mode' }}</th>
+        <th>{{ UI.user }}</th><th>{{ UI.date }}</th>
       </tr>
     </thead>
     <tbody>
@@ -25,7 +28,7 @@
       <td>
         <b>{{ tr.token_symbol or '?' }}</b><br>
         <code class="small" style="cursor:pointer" data-copy="{{ tr.token_address }}"
-              title="Натисни щоб скопіювати">{{ tr.token_address[:12] }}...</code>
+              title="{{ 'Натисни щоб скопіювати' if lang=='ua' else 'Click to copy' }}">{{ tr.token_address[:12] }}...</code>
       </td>
       <td>{{ tr.amount_in }}</td>
       <td>{{ tr.amount_out or '—' }}</td>
@@ -48,7 +51,7 @@
         {% else %}<span class="badge bg-danger">✗ {{ tr.status }}</span>{% endif %}
       </td>
       <td>
-        {% if tr.mode=='auto' %}<span class="badge bg-purple" style="background:#a371f7">🤖 auto</span>
+        {% if tr.mode=='auto' %}<span class="badge" style="background:#a371f7">🤖 auto</span>
         {% else %}<span class="badge bg-secondary">👤 manual</span>{% endif %}
       </td>
       <td>
@@ -58,7 +61,7 @@
       <td class="text-muted small">{{ tr.created_at[:16] }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="10" class="text-center text-muted py-4">Угод ще немає</td></tr>
+    <tr><td colspan="10" class="text-center text-muted py-4">{{ 'Угод ще немає' if lang=='ua' else 'No trades yet' }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
