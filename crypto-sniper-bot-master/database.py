@@ -300,18 +300,24 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
             SELECT u.id, u.telegram_id, u.first_name,
                    COALESCE(u.lang,'ua') as lang,
                    COALESCE(s.tier,'free') as tier,
-                   s.status, s.expires_at,
+                   COALESCE(s.status,'active') as status,
+                   s.expires_at,
                    COALESCE(us.auto_mode, 0) as auto_mode,
                    COALESCE(us.auto_min_score, 80) as auto_min_score,
                    COALESCE(us.auto_max_buy_sol, 0.1) as auto_max_buy_sol,
                    COALESCE(us.auto_max_buy_bnb, 0.01) as auto_max_buy_bnb,
                    COALESCE(us.auto_stop_loss, 20) as auto_stop_loss,
+                   COALESCE(us.auto_take_profit, 0) as auto_take_profit,
                    COALESCE(us.notify_all_tokens, 0) as notify_all_tokens
             FROM users u
-            LEFT JOIN subscriptions s ON s.user_id=u.id
-            LEFT JOIN user_settings us ON us.user_id=u.id
-            WHERE (s.status='active' OR s.tier='free')
-              AND u.banned=0
+            LEFT JOIN subscriptions s ON s.user_id = u.id
+            LEFT JOIN user_settings us ON us.user_id = u.id
+            WHERE u.banned = 0
+              AND (
+                s.id IS NULL              -- no subscription row → treat as free
+                OR s.tier = 'free'        -- explicitly free tier
+                OR s.status = 'active'    -- paid and active
+              )
         """).fetchall()
 
 
