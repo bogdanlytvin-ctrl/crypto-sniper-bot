@@ -214,11 +214,11 @@ def init_db() -> None:
             # saved to DB are actually dispatched to users
             "min_signal_score":    "35",
             "free_min_score":      "35",
-            "basic_min_score":     "30",
-            "pro_min_score":       "25",
+            "basic_min_score":     "35",
+            "pro_min_score":       "35",
             # Daily signal limits per tier
-            "free_daily_signals":  "10",
-            "basic_daily_signals": "50",
+            "free_daily_signals":  "3",
+            "basic_daily_signals": "20",
             "pro_daily_signals":   "0",   # 0 = unlimited
             # Subscription prices
             "basic_price_usd":     "29",
