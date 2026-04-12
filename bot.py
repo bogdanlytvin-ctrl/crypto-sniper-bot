@@ -171,8 +171,8 @@ async def _maybe_auto_buy(telegram_id: int, pair_data: dict, signal_meta: dict) 
     if not chain or not token_address:
         return
 
-    # Max concurrent positions (basic: 3, pro: 10)
-    max_pos = 3 if tier == "basic" else 10
+    # Max concurrent positions (basic: 3, pro: unlimited=999)
+    max_pos = 3 if tier == "basic" else 999
     open_pos = db.get_open_positions(user_id)
     if len(open_pos) >= max_pos:
         try:
@@ -505,7 +505,7 @@ async def _menu_balance(query, user_id: int, lang: str) -> None:
 async def _menu_signals(query, user_id: int, lang: str) -> None:
     tier      = db.get_user_tier(user_id)
     signals   = db.get_recent_signals(limit=50)
-    min_score = {"free": 85, "basic": 70, "pro": 55}.get(tier, 85)
+    min_score = 35  # same threshold for all tiers — daily limit enforced at dispatch time
     visible   = [s for s in signals if s["score"] >= min_score]
 
     if not visible:
@@ -593,7 +593,7 @@ async def _menu_automode(query, user_id: int, lang: str) -> None:
     bnb  = s["auto_max_buy_bnb"]          if s else 0.01
 
     open_pos   = db.get_open_positions(user_id)
-    max_pos    = 3 if tier == "basic" else 10
+    max_pos    = 3 if tier == "basic" else 999
     tp_display = f"+{int(tp)}%" if tp > 0 else "—"
 
     text = t(lang, 'auto_status',
@@ -1095,7 +1095,7 @@ async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.answer(t(lang, 'auto_no_wallet'), show_alert=True)
             return
         db.update_user_settings(user_id, auto_mode=1)
-        max_pos = 3 if tier == "basic" else 10
+        max_pos = 3 if tier == "basic" else 999
         score   = settings["auto_min_score"] if settings else 80
         await query.edit_message_text(
             t(lang, 'auto_enabled', score=score, max_pos=max_pos, tier=tier.upper()),

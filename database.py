@@ -215,10 +215,10 @@ def init_db() -> None:
         defaults = {
             "min_signal_score":    "35",   # global floor (save to DB only)
             "free_min_score":      "35",   # min score to dispatch to free users
-            "basic_min_score":     "30",   # min score to dispatch to basic users
-            "pro_min_score":       "25",   # min score to dispatch to pro users
-            "free_daily_signals":  "10",
-            "basic_daily_signals": "50",
+            "basic_min_score":     "35",   # same quality, more per day
+            "pro_min_score":       "35",   # same quality, unlimited
+            "free_daily_signals":  "3",
+            "basic_daily_signals": "20",
             "pro_daily_signals":   "0",
             "basic_price_usd":     "29",
             "pro_price_usd":       "79",
@@ -238,12 +238,12 @@ def init_db() -> None:
         # Migration v1: reset overly-strict thresholds (85/70/55 → 35/30/25)
         # Migration v2: reset too-high thresholds (40/40/40 → 35/30/25)
         _migrations = {
-            "free_min_score":  [("85", "35"), ("40", "35")],
-            "basic_min_score": [("70", "30"), ("40", "30")],
-            "pro_min_score":   [("55", "25"), ("40", "25")],
-            "min_signal_score":[("40", "35")],
-            "free_daily_signals": [("3", "10")],
-            "basic_daily_signals": [("20", "50")],
+            "free_min_score":    [("85", "35"), ("40", "35"), ("30", "35"), ("25", "35")],
+            "basic_min_score":   [("70", "35"), ("40", "35"), ("30", "35")],
+            "pro_min_score":     [("55", "35"), ("40", "35"), ("25", "35")],
+            "min_signal_score":  [("40", "35")],
+            "free_daily_signals":  [("10", "3")],
+            "basic_daily_signals": [("50", "20")],
         }
         for key, steps in _migrations.items():
             try:
