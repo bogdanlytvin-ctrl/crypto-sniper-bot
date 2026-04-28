@@ -31,10 +31,10 @@ from scanner.price_cache import (
 logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener
-GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "60"))   # GeckoTerminal Solana
+GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "30"))   # GeckoTerminal Solana
 GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "180"))  # GeckoTerminal BSC
-PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap BSC (PRIMARY)
-PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
+PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "45"))   # PancakeSwap BSC (PRIMARY)
+PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "15"))
 MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",         "35"))
 
 # pump.fun circuit breaker — suspend after this many consecutive all-endpoint failures
@@ -142,6 +142,11 @@ async def _process_pair(
     address = pair_data.get("token_address", "")
     symbol  = pair_data.get("token_symbol", "?")
 
+    # Check blacklist before any safety API calls
+    if db.is_blacklisted(chain, address):
+        logger.info("BLACKLISTED %s [%s] — skipping", symbol, chain.upper())
+        return
+
     # Use cached safety result if fresh (< 5 min) to avoid redundant API calls
     safety = get_cached_safety(chain, address)
     if safety is None:
@@ -173,6 +178,15 @@ async def _process_pair(
     if result["score"] < MIN_SIGNAL_SCORE:
         return
 
+    # AI analysis for strong signals only (avoids rate-limit spam on WATCH)
+    ai_comment = ""
+    if result["signal_type"] in ("STRONG_BUY", "BUY"):
+        ai_comment = await _ai_analyze_token(session, pair_data, result)
+        if ai_comment:
+            logger.info("AI comment for %s: %s", symbol, ai_comment[:60])
+
+    pair_data["ai_comment"] = ai_comment
+
     signal_data = {
         **pair_data,
         "score":              result["score"],
@@ -196,6 +210,65 @@ async def _process_pair(
         chain.upper(), result["signal_type"],
         pair_data.get("token_symbol", "?"), result["score"],
     )
+
+
+async def _ai_analyze_token(
+    session: aiohttp.ClientSession,
+    pair_data: dict,
+    result: dict,
+) -> str:
+    """Call Groq to get a short AI comment on the token. Returns '' on failure."""
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if not groq_key:
+        return ""
+
+    chain  = pair_data.get("chain", "").upper()
+    symbol = pair_data.get("token_symbol", "?")
+    name   = pair_data.get("token_name",   "?")
+    score  = result["score"]
+    liq    = pair_data.get("liquidity_usd",   0) or 0
+    vol    = pair_data.get("volume_1h",        0) or 0
+    chg    = pair_data.get("price_change_1h",  0) or 0
+    mcap   = pair_data.get("market_cap",       0) or 0
+    buys   = pair_data.get("txns_1h_buys",     0) or 0
+    sells  = pair_data.get("txns_1h_sells",    0) or 0
+
+    reasons = ", ".join(result.get("reasons", [])[:4]) or "—"
+    risks   = ", ".join(result.get("risks",   [])[:3]) or "немає"
+
+    prompt = (
+        f"Ти — крипто-аналітик. Проаналізуй токен КОРОТКО (2-3 речення) УКРАЇНСЬКОЮ.\n\n"
+        f"Токен: {name} (${symbol}) | Мережа: {chain} | Сигнал: {result['signal_type']} | Оцінка: {score}/100\n"
+        f"Ліквідність: ${liq:,.0f} | Об'єм 1г: ${vol:,.0f} | Зміна ціни 1г: {chg:+.1f}%\n"
+        f"Транзакції 1г: {buys} купівель / {sells} продажів\n"
+        f"Ринкова капіталізація: ${mcap:,.0f}\n"
+        f"Переваги: {reasons}\n"
+        f"Ризики: {risks}\n\n"
+        f"Дай коротку оцінку: чи варто входити, з яким ризиком, на що звернути увагу. Тільки суть."
+    )
+
+    try:
+        async with session.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.4,
+                "max_tokens": 180,
+            },
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return data["choices"][0]["message"]["content"].strip()
+            logger.debug("Groq AI status %d", resp.status)
+    except Exception as e:
+        logger.debug("AI analyze failed: %s", e)
+    return ""
 
 
 def _daily_limit(tier: str) -> int:
@@ -247,6 +320,7 @@ async def _dispatch_signals(
             chain_filter   = user["signal_chain"]   if "signal_chain"   in user.keys() else "all"
             score_override = user["signal_min_score_user"] if "signal_min_score_user" in user.keys() else 0
             auto_mode      = user["auto_mode"]      if "auto_mode"      in user.keys() else 0
+            safe_mode      = user["safe_mode"]      if "safe_mode"      in user.keys() else 0
 
             # Respect user's push-notifications toggle (default ON)
             if not signals_push:
@@ -257,8 +331,11 @@ async def _dispatch_signals(
             if chain_filter != "all" and chain_filter != signal_chain:
                 continue
 
-            # Min score: use user's override if set (>0), otherwise tier default
-            min_score = int(score_override) if score_override else _tier_min_score(tier)
+            # Min score: safe_mode overrides all (85), then user override, then tier default
+            if safe_mode:
+                min_score = 85
+            else:
+                min_score = int(score_override) if score_override else _tier_min_score(tier)
 
             if score < min_score:
                 logger.debug(
@@ -289,6 +366,7 @@ async def _dispatch_signals(
                 "lang":        user_lang,
                 "user_tier":   tier,
                 "auto_mode":   auto_mode,
+                "safe_mode":   safe_mode,
                 "user_settings": {
                     "auto_mode":        auto_mode,
                     "auto_min_score":   user["auto_min_score"]   if "auto_min_score"   in user.keys() else 80,
@@ -487,12 +565,17 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
 
     pump_users = [
         u for u in users
-        if _row(u, "signals_push", 1) and (
+        if _row(u, "signals_push", 1)
+        and (
             _row(u, "tier", "free") in ("basic", "pro")
             or _row(u, "auto_mode", 0)
             or _row(u, "notify_all_tokens", 0)
         )
         and _row(u, "signal_chain", "all") in ("all", "solana")
+        # LAUNCH signals have score=0 — skip users who set an explicit min-score filter
+        and _row(u, "signal_min_score_user", 0) == 0
+        # safe_mode users skip pump.fun (unverified launches)
+        and _row(u, "safe_mode", 0) == 0
     ]
     if not pump_users:
         return None

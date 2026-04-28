@@ -192,6 +192,18 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
 
     score = max(0, min(100, score))
 
+    # ── VOLUME SPIKE DETECTION (anti-pump-and-dump) ────────────────────────
+    vol_1h_check = pair_data.get("volume_1h") or 0
+    chg_1h_check = pair_data.get("price_change_1h") or 0
+    liq_check    = pair_data.get("liquidity_usd") or 0
+
+    if chg_1h_check > 500:
+        score = min(score, 20)
+        risks.append(f"Extreme price spike +{chg_1h_check:.0f}% — likely pump & dump ❌")
+    elif liq_check > 0 and vol_1h_check > liq_check * 5 and chg_1h_check > 200:
+        score = min(score, 30)
+        risks.append("Suspicious volume spike — possible pump & dump ⚠️")
+
     if score >= SCORE_STRONG_BUY:
         signal_type = SIGNAL_STRONG_BUY
     elif score >= SCORE_BUY:
@@ -312,6 +324,10 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
 
     if url:
         lines.append(f'🔗 <a href="{url}">{_t(lang, "sig_dex_link")}</a>')
+
+    ai_comment = pair_data.get("ai_comment", "")
+    if ai_comment:
+        lines += ["", f"🤖 <b>ШІ аналіз:</b>", f"<i>{ai_comment}</i>"]
 
     lines += ["", _t(lang, 'sig_disc')]
 
