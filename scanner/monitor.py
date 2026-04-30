@@ -178,14 +178,18 @@ async def _process_pair(
     if result["score"] < MIN_SIGNAL_SCORE:
         return
 
-    # AI analysis for strong signals only (avoids rate-limit spam on WATCH)
-    ai_comment = ""
+    # AI analysis for strong signals only — generate UA + EN in parallel
+    ai_ua, ai_en = "", ""
     if result["signal_type"] in ("STRONG_BUY", "BUY"):
-        ai_comment = await _ai_analyze_token(session, pair_data, result)
-        if ai_comment:
-            logger.info("AI comment for %s: %s", symbol, ai_comment[:60])
+        ai_ua, ai_en = await asyncio.gather(
+            _ai_analyze_token(session, pair_data, result, lang="ua"),
+            _ai_analyze_token(session, pair_data, result, lang="en"),
+        )
+        if ai_ua:
+            logger.info("AI comment for %s: %s", symbol, ai_ua[:60])
 
-    pair_data["ai_comment"] = ai_comment
+    pair_data["ai_comment_ua"] = ai_ua
+    pair_data["ai_comment_en"] = ai_en
 
     signal_data = {
         **pair_data,
@@ -216,8 +220,9 @@ async def _ai_analyze_token(
     session: aiohttp.ClientSession,
     pair_data: dict,
     result: dict,
+    lang: str = "ua",
 ) -> str:
-    """Call Groq to get a short AI comment on the token. Returns '' on failure."""
+    """Call Groq to get a short AI comment in the given language. Returns '' on failure."""
     groq_key = os.getenv("GROQ_API_KEY", "")
     if not groq_key:
         return ""
@@ -233,27 +238,44 @@ async def _ai_analyze_token(
     buys   = pair_data.get("txns_1h_buys",     0) or 0
     sells  = pair_data.get("txns_1h_sells",    0) or 0
 
-    reasons = ", ".join(result.get("reasons", [])[:4]) or "—"
-    risks   = ", ".join(result.get("risks",   [])[:3]) or "немає"
-
-    prompt = (
-        f"Ти — крипто-аналітик. Проаналізуй токен КОРОТКО (2-3 речення) УКРАЇНСЬКОЮ.\n\n"
-        f"Токен: {name} (${symbol}) | Мережа: {chain} | Сигнал: {result['signal_type']} | Оцінка: {score}/100\n"
-        f"Ліквідність: ${liq:,.0f} | Об'єм 1г: ${vol:,.0f} | Зміна ціни 1г: {chg:+.1f}%\n"
-        f"Транзакції 1г: {buys} купівель / {sells} продажів\n"
-        f"Ринкова капіталізація: ${mcap:,.0f}\n"
-        f"Переваги: {reasons}\n"
-        f"Ризики: {risks}\n\n"
-        f"Дай коротку оцінку: чи варто входити, з яким ризиком, на що звернути увагу. Тільки суть."
-    )
-
-    system_role = (
-        "Ти — досвідчений крипто-аналітик мем-коїнів. "
-        "Відповідай ВИКЛЮЧНО українською мовою. "
-        "Формат відповіді: 2-3 речення. "
-        "Структура: (1) загальна оцінка потенціалу, (2) ключовий ризик, (3) чітка рекомендація — входити чи ні. "
-        "Будь конкретним і прямим. Не вживай вступних фраз типо 'Звичайно' або 'Ось аналіз'."
-    )
+    if lang == "ua":
+        reasons = ", ".join(result.get("reasons", [])[:4]) or "—"
+        risks   = ", ".join(result.get("risks",   [])[:3]) or "немає"
+        system_role = (
+            "Ти — досвідчений крипто-аналітик мем-коїнів. "
+            "Відповідай ВИКЛЮЧНО українською мовою. "
+            "Формат: 2-3 речення. "
+            "Структура: (1) загальна оцінка потенціалу, (2) ключовий ризик, (3) чітка рекомендація — входити чи ні. "
+            "Будь конкретним і прямим. Не вживай вступних фраз типу 'Звичайно' або 'Ось аналіз'."
+        )
+        prompt = (
+            f"Токен: {name} (${symbol}) | Мережа: {chain} | Сигнал: {result['signal_type']} | Оцінка: {score}/100\n"
+            f"Ліквідність: ${liq:,.0f} | Об'єм 1г: ${vol:,.0f} | Зміна ціни 1г: {chg:+.1f}%\n"
+            f"Транзакції 1г: {buys} купівель / {sells} продажів\n"
+            f"Ринкова капіталізація: ${mcap:,.0f}\n"
+            f"Переваги: {reasons}\n"
+            f"Ризики: {risks}\n\n"
+            f"Дай коротку оцінку: чи варто входити, з яким ризиком, на що звернути увагу. Тільки суть."
+        )
+    else:
+        reasons = ", ".join(result.get("reasons", [])[:4]) or "—"
+        risks   = ", ".join(result.get("risks",   [])[:3]) or "none"
+        system_role = (
+            "You are an experienced memecoin crypto analyst. "
+            "Respond ONLY in English. "
+            "Format: 2-3 sentences. "
+            "Structure: (1) overall potential assessment, (2) key risk, (3) clear recommendation — enter or not. "
+            "Be specific and direct. No filler phrases like 'Sure' or 'Here is my analysis'."
+        )
+        prompt = (
+            f"Token: {name} (${symbol}) | Network: {chain} | Signal: {result['signal_type']} | Score: {score}/100\n"
+            f"Liquidity: ${liq:,.0f} | 1h Volume: ${vol:,.0f} | 1h Price change: {chg:+.1f}%\n"
+            f"1h Transactions: {buys} buys / {sells} sells\n"
+            f"Market cap: ${mcap:,.0f}\n"
+            f"Positives: {reasons}\n"
+            f"Risks: {risks}\n\n"
+            f"Give a brief assessment: worth entering, risk level, what to watch. Just the essentials."
+        )
 
     try:
         async with session.post(
@@ -276,9 +298,9 @@ async def _ai_analyze_token(
             if resp.status == 200:
                 data = await resp.json()
                 return data["choices"][0]["message"]["content"].strip()
-            logger.debug("Groq AI status %d", resp.status)
+            logger.debug("Groq AI status %d for lang=%s", resp.status, lang)
     except Exception as e:
-        logger.debug("AI analyze failed: %s", e)
+        logger.debug("AI analyze failed (lang=%s): %s", lang, e)
     return ""
 
 

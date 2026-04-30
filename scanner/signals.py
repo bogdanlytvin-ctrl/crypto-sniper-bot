@@ -325,9 +325,10 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
     if url:
         lines.append(f'🔗 <a href="{url}">{_t(lang, "sig_dex_link")}</a>')
 
-    ai_comment = pair_data.get("ai_comment", "")
+    ai_comment = pair_data.get(f"ai_comment_{lang}") or pair_data.get("ai_comment", "")
     if ai_comment:
-        lines += ["", f"🤖 <b>ШІ аналіз:</b>", f"<i>{ai_comment}</i>"]
+        ai_label = "ШІ аналіз" if lang == "ua" else "AI Analysis"
+        lines += ["", f"🤖 <b>{ai_label}:</b>", f"<i>{ai_comment}</i>"]
 
     lines += ["", _t(lang, 'sig_disc')]
 
