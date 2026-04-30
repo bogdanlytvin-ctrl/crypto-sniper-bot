@@ -178,19 +178,21 @@ async def _process_pair(
     if result["score"] < MIN_SIGNAL_SCORE:
         return
 
-    # AI analysis for strong signals only — generate UA + EN in parallel
+    # AI analysis for all non-skip signals — generate UA + EN in parallel
     ai_ua, ai_en = "", ""
-    if result["signal_type"] in ("STRONG_BUY", "BUY"):
+    if result["signal_type"] in ("STRONG_BUY", "BUY", "WATCH"):
         try:
             ai_ua, ai_en = await asyncio.gather(
                 _ai_analyze_token(session, pair_data, result, lang="ua"),
                 _ai_analyze_token(session, pair_data, result, lang="en"),
             )
         except Exception as e:
-            logger.debug("AI analysis skipped for %s: %s", symbol, e)
+            logger.warning("AI analysis skipped for %s: %s", symbol, e)
             ai_ua, ai_en = "", ""
         if ai_ua:
             logger.info("AI comment for %s: %s", symbol, ai_ua[:60])
+        else:
+            logger.info("AI comment empty for %s (key set: %s)", symbol, bool(os.getenv("GROQ_API_KEY")))
 
     pair_data["ai_comment_ua"] = ai_ua
     pair_data["ai_comment_en"] = ai_en
@@ -227,8 +229,9 @@ async def _ai_analyze_token(
     lang: str = "ua",
 ) -> str:
     """Call Groq to get a short AI comment in the given language. Returns '' on failure."""
-    groq_key = os.getenv("GROQ_API_KEY", "")
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
     if not groq_key:
+        logger.warning("GROQ_API_KEY not set — AI analysis disabled")
         return ""
 
     chain  = pair_data.get("chain", "").upper()
@@ -302,9 +305,10 @@ async def _ai_analyze_token(
             if resp.status == 200:
                 data = await resp.json()
                 return data["choices"][0]["message"]["content"].strip()
-            logger.debug("Groq AI status %d for lang=%s", resp.status, lang)
+            body = await resp.text()
+            logger.warning("Groq AI status %d (lang=%s): %s", resp.status, lang, body[:200])
     except Exception as e:
-        logger.debug("AI analyze failed (lang=%s): %s", lang, e)
+        logger.warning("AI analyze failed (lang=%s): %s", lang, e)
     return ""
 
 
