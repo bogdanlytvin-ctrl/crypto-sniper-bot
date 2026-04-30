@@ -41,9 +41,9 @@ MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",         "35"))
 _PUMP_MAX_FAILS   = 5
 _PUMP_SUSPEND_SEC = 3_600  # 1 hour
 
-# seen-pairs TTL: allow re-evaluation after 4 hours (DexScreener promoted tokens
-# stay live for 24h, so without TTL DexScreener becomes useless after cycle 1)
-_SEEN_TTL = 4 * 3600  # 4 hours
+# seen-pairs TTL: re-evaluate tokens after this delay.
+# DB dedup (UNIQUE signal per day + was_signal_sent) prevents duplicate dispatches.
+_SEEN_TTL = 1 * 3600  # 1 hour
 
 SendCallback = Callable[[int, str, dict | None, dict | None], Awaitable[None]]
 
@@ -178,7 +178,11 @@ async def _process_pair(
     if result["score"] < MIN_SIGNAL_SCORE:
         return
 
-    # AI analysis for all non-skip signals — generate UA + EN in parallel
+    # Don't dispatch SKIP-type signals (score 35-54, below WATCH threshold of 55)
+    if result["signal_type"] == "SKIP":
+        return
+
+    # AI analysis — generate UA + EN in parallel
     ai_ua, ai_en = "", ""
     if result["signal_type"] in ("STRONG_BUY", "BUY", "WATCH"):
         try:
