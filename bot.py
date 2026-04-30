@@ -261,7 +261,7 @@ async def _maybe_auto_buy(telegram_id: int, pair_data: dict, signal_meta: dict) 
         logger.error("Auto-buy error for %s: %s", token_address, e)
 
     if result["success"]:
-        entry_price = signal_meta.get("price_usd", 0)
+        entry_price = signal_meta.get("price_usd") or 0
         signal_id   = signal_meta.get("signal_id")
         db.save_trade(user_id, chain, token_address, token_symbol, "buy",
                       amount, result.get("amount_out", 0), entry_price,

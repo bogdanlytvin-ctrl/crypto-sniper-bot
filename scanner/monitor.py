@@ -181,10 +181,14 @@ async def _process_pair(
     # AI analysis for strong signals only — generate UA + EN in parallel
     ai_ua, ai_en = "", ""
     if result["signal_type"] in ("STRONG_BUY", "BUY"):
-        ai_ua, ai_en = await asyncio.gather(
-            _ai_analyze_token(session, pair_data, result, lang="ua"),
-            _ai_analyze_token(session, pair_data, result, lang="en"),
-        )
+        try:
+            ai_ua, ai_en = await asyncio.gather(
+                _ai_analyze_token(session, pair_data, result, lang="ua"),
+                _ai_analyze_token(session, pair_data, result, lang="en"),
+            )
+        except Exception as e:
+            logger.debug("AI analysis skipped for %s: %s", symbol, e)
+            ai_ua, ai_en = "", ""
         if ai_ua:
             logger.info("AI comment for %s: %s", symbol, ai_ua[:60])
 

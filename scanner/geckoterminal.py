@@ -47,10 +47,10 @@ async def _get(session: aiohttp.ClientSession, url: str,
                 logger.warning("GeckoTerminal %s → %s", url, r.status)
                 return None
         except asyncio.TimeoutError:
-            logger.warning("GeckoTerminal timeout: %s", url)
+            logger.warning("GeckoTerminal timeout (attempt %d/3): %s", attempt + 1, url)
         except Exception as e:
-            logger.warning("GeckoTerminal error: %s", e)
-        return None
+            logger.warning("GeckoTerminal error (attempt %d/3): %s", attempt + 1, e)
+        # timeout/error — loop to next attempt
     return None
 
 

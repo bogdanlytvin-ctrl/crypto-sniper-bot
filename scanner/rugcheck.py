@@ -65,11 +65,11 @@ async def check_solana_token(session: aiohttp.ClientSession, token_address: str)
             lp_locked = True
             lp_locked_pct = max(lp_locked_pct, float(lp.get("lpLockedPct", 0)))
 
-    # Top holders
+    # Top holders — pct is already 0-100 percentage, no multiplication needed
     top_holders = data.get("topHolders") or []
     top10_pct = None
     if top_holders:
-        top10_pct = sum(float(h.get("pct", 0)) for h in top_holders[:10]) * 100
+        top10_pct = min(sum(float(h.get("pct", 0)) for h in top_holders[:10]), 100.0)
 
     total_holders = data.get("totalHolders") or data.get("holders")
 
