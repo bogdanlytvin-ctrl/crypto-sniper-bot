@@ -5,7 +5,7 @@ Sources (priority order):
   - PancakeSwap:    new BSC pools every 90s         [PRIMARY, no key, subgraph GraphQL]
   - GeckoTerminal:  Solana trending every 60s       [SECONDARY, rate-limited]
   - DexScreener:    boosted tokens every 90s        [TERTIARY]
-  - Pump.fun:       new Solana launches every 30s   [circuit-breaker if blocked]
+  - Pump.fun:       polls every 30s                 [circuit-breaker if blocked]
 """
 
 import asyncio
@@ -17,16 +17,12 @@ from typing import Callable, Awaitable
 import aiohttp
 
 import database as db
-from scanner.dexscreener import search_new_pairs, extract_pair_data, get_pairs_batch, CHAINS
-from scanner.geckoterminal import get_trending_pools
+from scanner.dexscreener import search_new_pairs, extract_pair_data, CHAINS
+from scanner.geckoterminal import get_new_pools, get_trending_pools
 from scanner.rugcheck  import check_solana_token
 from scanner.honeypot  import check_bnb_token
-from scanner.signals   import (
-    score_token, format_signal_message,
-    SIGNAL_STRONG_BUY, SIGNAL_BUY, SIGNAL_WATCH,
-)
+from scanner.signals   import score_token, format_signal_message
 from scanner.pumpfun     import get_new_tokens, is_new as pumpfun_is_new, format_token_message
-from scanner.raydium     import get_pairs as raydium_get_pairs, prefilter as raydium_prefilter, to_pair_data as raydium_to_pair
 from scanner.pancakeswap import get_new_pairs as pcs_new_pairs
 from scanner.price_cache import (
     get_cached_safety, set_cached_safety, evict_expired as _cache_evict,
@@ -34,12 +30,11 @@ from scanner.price_cache import (
 
 logger = logging.getLogger(__name__)
 
-SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener (tertiary)
-GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "60"))   # GeckoTerminal Solana trending
+SCAN_INTERVAL        = int(os.getenv("SCAN_INTERVAL_SEC",        "90"))   # DexScreener
+GECKO_INTERVAL       = int(os.getenv("GECKO_INTERVAL_SEC",       "30"))   # GeckoTerminal Solana
 GECKO_INTERVAL_BSC   = int(os.getenv("GECKO_INTERVAL_BSC_SEC",  "180"))  # GeckoTerminal BSC
-RAYDIUM_INTERVAL     = int(os.getenv("RAYDIUM_INTERVAL_SEC",     "45"))   # Raydium AMM pools (PRIMARY)
-PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "90"))   # PancakeSwap subgraph (PRIMARY)
-PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "30"))
+PANCAKE_INTERVAL     = int(os.getenv("PANCAKE_INTERVAL_SEC",     "45"))   # PancakeSwap BSC (PRIMARY)
+PUMPFUN_INTERVAL     = int(os.getenv("PUMPFUN_INTERVAL_SEC",     "15"))
 MIN_SIGNAL_SCORE     = int(os.getenv("MIN_SIGNAL_SCORE",         "35"))
 
 # pump.fun circuit breaker — suspend after this many consecutive all-endpoint failures
@@ -50,8 +45,6 @@ _PUMP_SUSPEND_SEC = 3_600  # 1 hour
 # stay live for 24h, so without TTL DexScreener becomes useless after cycle 1)
 _SEEN_TTL = 4 * 3600  # 4 hours
 
-# 4-arg callback: (telegram_id, message, pair_data, signal_meta)
-# signal_meta carries pre-loaded user context so send callback needs 0 extra DB queries
 SendCallback = Callable[[int, str, dict | None, dict | None], Awaitable[None]]
 
 _seen_pairs: dict[str, float] = {}  # addr → timestamp first seen
@@ -69,6 +62,12 @@ def _mark_seen(addr: str) -> bool:
     return True
 
 
+def _seed_seen(addr: str) -> None:
+    """Mark address as seen right now (startup seeding — no dispatch)."""
+    if addr:
+        _seen_pairs[addr] = _time.time()
+
+
 def _cleanup_seen() -> None:
     """Remove expired entries to prevent unbounded memory growth."""
     cutoff = _time.time() - _SEEN_TTL
@@ -79,19 +78,56 @@ def _cleanup_seen() -> None:
 
 async def run_monitor(send_fn: SendCallback) -> None:
     logger.info(
-        "Monitor started. Raydium: %ds | PancakeSwap: %ds | Gecko SOL: %ds | DexScreener: %ds | pump.fun: %ds",
-        RAYDIUM_INTERVAL, PANCAKE_INTERVAL, GECKO_INTERVAL, SCAN_INTERVAL, PUMPFUN_INTERVAL,
+        "Monitor started. PancakeSwap: %ds | Gecko SOL: %ds | Gecko BSC: %ds | DexScreener: %ds | pump.fun: %ds",
+        PANCAKE_INTERVAL, GECKO_INTERVAL, GECKO_INTERVAL_BSC, SCAN_INTERVAL, PUMPFUN_INTERVAL,
     )
     async with aiohttp.ClientSession() as session:
+        # ── Startup seeding: mark all current tokens as seen WITHOUT dispatching ──
+        logger.info("Startup: seeding existing pairs (no dispatch)...")
+        await _seed_all(session)
+        logger.info("Startup seeding complete.")
+
         tasks = [
-            _raydium_loop(session, send_fn),       # PRIMARY: Solana all AMM pools
-            _pancake_loop(session, send_fn),       # PRIMARY: BSC new pools
-            _gecko_loop_solana(session, send_fn),  # SECONDARY: Solana trending
-            _gecko_loop_bsc(session, send_fn),     # SECONDARY: BSC trending
-            _dex_loop(session, send_fn),           # TERTIARY: DexScreener boosted
+            _pancake_loop(session, send_fn),       # PRIMARY BSC: PancakeSwap subgraph
+            _gecko_loop_solana(session, send_fn),  # PRIMARY SOL: GeckoTerminal new+trending
+            _gecko_loop_bsc(session, send_fn),     # SECONDARY BSC: GeckoTerminal trending
+            _dex_loop(session, send_fn),           # DexScreener boosted (both chains)
             _pump_loop(session, send_fn),          # Pump.fun (circuit-breaker)
         ]
         await asyncio.gather(*tasks)
+
+
+async def _seed_all(session: aiohttp.ClientSession) -> None:
+    """Seed all current tokens as seen at startup to prevent dispatch flood on restart."""
+    # DexScreener
+    for chain in CHAINS.values():
+        try:
+            pairs = await search_new_pairs(session, chain)
+            for p in pairs:
+                _seed_seen(p.get("pairAddress", ""))
+            logger.info("Seed DexScreener %s: %d pairs", chain, len(pairs))
+        except Exception as e:
+            logger.warning("Seed DexScreener error (%s): %s", chain, e)
+        await asyncio.sleep(1)
+
+    # GeckoTerminal
+    for chain in CHAINS.values():
+        try:
+            pools = await get_new_pools(session, chain)
+            for p in pools:
+                _seed_seen(p.get("pair_address", ""))
+            await asyncio.sleep(2)
+            trending = await get_trending_pools(session, chain)
+            for p in trending:
+                _seed_seen(p.get("pair_address", ""))
+            logger.info("Seed GeckoTerminal %s: %d+%d", chain, len(pools), len(trending))
+        except Exception as e:
+            logger.warning("Seed GeckoTerminal error (%s): %s", chain, e)
+        await asyncio.sleep(2)
+
+    # Note: Raydium and PancakeSwap are NOT seeded on startup.
+    # Their DB UNIQUE(chain, token_address, signal_date) constraint prevents
+    # duplicate signals, and _mark_seen TTL handles repeated processing.
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -105,6 +141,11 @@ async def _process_pair(
     chain   = pair_data.get("chain", "")
     address = pair_data.get("token_address", "")
     symbol  = pair_data.get("token_symbol", "?")
+
+    # Check blacklist before any safety API calls
+    if db.is_blacklisted(chain, address):
+        logger.info("BLACKLISTED %s [%s] — skipping", symbol, chain.upper())
+        return
 
     # Use cached safety result if fresh (< 5 min) to avoid redundant API calls
     safety = get_cached_safety(chain, address)
@@ -137,6 +178,23 @@ async def _process_pair(
     if result["score"] < MIN_SIGNAL_SCORE:
         return
 
+    # AI analysis for strong signals only — generate UA + EN in parallel
+    ai_ua, ai_en = "", ""
+    if result["signal_type"] in ("STRONG_BUY", "BUY"):
+        try:
+            ai_ua, ai_en = await asyncio.gather(
+                _ai_analyze_token(session, pair_data, result, lang="ua"),
+                _ai_analyze_token(session, pair_data, result, lang="en"),
+            )
+        except Exception as e:
+            logger.debug("AI analysis skipped for %s: %s", symbol, e)
+            ai_ua, ai_en = "", ""
+        if ai_ua:
+            logger.info("AI comment for %s: %s", symbol, ai_ua[:60])
+
+    pair_data["ai_comment_ua"] = ai_ua
+    pair_data["ai_comment_en"] = ai_en
+
     signal_data = {
         **pair_data,
         "score":              result["score"],
@@ -162,6 +220,94 @@ async def _process_pair(
     )
 
 
+async def _ai_analyze_token(
+    session: aiohttp.ClientSession,
+    pair_data: dict,
+    result: dict,
+    lang: str = "ua",
+) -> str:
+    """Call Groq to get a short AI comment in the given language. Returns '' on failure."""
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if not groq_key:
+        return ""
+
+    chain  = pair_data.get("chain", "").upper()
+    symbol = pair_data.get("token_symbol", "?")
+    name   = pair_data.get("token_name",   "?")
+    score  = result["score"]
+    liq    = pair_data.get("liquidity_usd",   0) or 0
+    vol    = pair_data.get("volume_1h",        0) or 0
+    chg    = pair_data.get("price_change_1h",  0) or 0
+    mcap   = pair_data.get("market_cap",       0) or 0
+    buys   = pair_data.get("txns_1h_buys",     0) or 0
+    sells  = pair_data.get("txns_1h_sells",    0) or 0
+
+    if lang == "ua":
+        reasons = ", ".join(result.get("reasons", [])[:4]) or "—"
+        risks   = ", ".join(result.get("risks",   [])[:3]) or "немає"
+        system_role = (
+            "Ти — досвідчений крипто-аналітик мем-коїнів. "
+            "Відповідай ВИКЛЮЧНО українською мовою. "
+            "Формат: 2-3 речення. "
+            "Структура: (1) загальна оцінка потенціалу, (2) ключовий ризик, (3) чітка рекомендація — входити чи ні. "
+            "Будь конкретним і прямим. Не вживай вступних фраз типу 'Звичайно' або 'Ось аналіз'."
+        )
+        prompt = (
+            f"Токен: {name} (${symbol}) | Мережа: {chain} | Сигнал: {result['signal_type']} | Оцінка: {score}/100\n"
+            f"Ліквідність: ${liq:,.0f} | Об'єм 1г: ${vol:,.0f} | Зміна ціни 1г: {chg:+.1f}%\n"
+            f"Транзакції 1г: {buys} купівель / {sells} продажів\n"
+            f"Ринкова капіталізація: ${mcap:,.0f}\n"
+            f"Переваги: {reasons}\n"
+            f"Ризики: {risks}\n\n"
+            f"Дай коротку оцінку: чи варто входити, з яким ризиком, на що звернути увагу. Тільки суть."
+        )
+    else:
+        reasons = ", ".join(result.get("reasons", [])[:4]) or "—"
+        risks   = ", ".join(result.get("risks",   [])[:3]) or "none"
+        system_role = (
+            "You are an experienced memecoin crypto analyst. "
+            "Respond ONLY in English. "
+            "Format: 2-3 sentences. "
+            "Structure: (1) overall potential assessment, (2) key risk, (3) clear recommendation — enter or not. "
+            "Be specific and direct. No filler phrases like 'Sure' or 'Here is my analysis'."
+        )
+        prompt = (
+            f"Token: {name} (${symbol}) | Network: {chain} | Signal: {result['signal_type']} | Score: {score}/100\n"
+            f"Liquidity: ${liq:,.0f} | 1h Volume: ${vol:,.0f} | 1h Price change: {chg:+.1f}%\n"
+            f"1h Transactions: {buys} buys / {sells} sells\n"
+            f"Market cap: ${mcap:,.0f}\n"
+            f"Positives: {reasons}\n"
+            f"Risks: {risks}\n\n"
+            f"Give a brief assessment: worth entering, risk level, what to watch. Just the essentials."
+        )
+
+    try:
+        async with session.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": system_role},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.4,
+                "max_tokens": 180,
+            },
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return data["choices"][0]["message"]["content"].strip()
+            logger.debug("Groq AI status %d for lang=%s", resp.status, lang)
+    except Exception as e:
+        logger.debug("AI analyze failed (lang=%s): %s", lang, e)
+    return ""
+
+
 def _daily_limit(tier: str) -> int:
     """Returns daily signal limit for tier. 0 = unlimited."""
     key = f"{tier}_daily_signals"
@@ -173,10 +319,8 @@ def _daily_limit(tier: str) -> int:
 
 
 def _tier_min_score(tier: str) -> int:
-    """
-    Min score to dispatch a signal to a user of this tier.
-    Reads from bot_settings so admin can tune live without redeploying.
-    """
+    """Min score to dispatch a signal to a user of this tier.
+    Reads from bot_settings so admin can tune live without redeploying."""
     defaults = {"free": 35, "basic": 35, "pro": 35}
     fallback = defaults.get(tier, 35)
     key = f"{tier}_min_score"
@@ -207,7 +351,28 @@ async def _dispatch_signals(
             telegram_id = user["telegram_id"]
             user_lang   = user["lang"] or "ua"
             tier        = user["tier"] or "free"
-            min_score   = _tier_min_score(tier)
+
+            # sqlite3.Row doesn't support .get() — read columns directly
+            signals_push   = user["signals_push"]   if "signals_push"   in user.keys() else 1
+            chain_filter   = user["signal_chain"]   if "signal_chain"   in user.keys() else "all"
+            score_override = user["signal_min_score_user"] if "signal_min_score_user" in user.keys() else 0
+            auto_mode      = user["auto_mode"]      if "auto_mode"      in user.keys() else 0
+            safe_mode      = user["safe_mode"]      if "safe_mode"      in user.keys() else 0
+
+            # Respect user's push-notifications toggle (default ON)
+            if not signals_push:
+                continue
+
+            # Per-user chain filter (all / solana / bsc)
+            signal_chain = pair_data.get("chain", "")
+            if chain_filter != "all" and chain_filter != signal_chain:
+                continue
+
+            # Min score: safe_mode overrides all (85), then user override, then tier default
+            if safe_mode:
+                min_score = 85
+            else:
+                min_score = int(score_override) if score_override else _tier_min_score(tier)
 
             if score < min_score:
                 logger.debug(
@@ -229,7 +394,6 @@ async def _dispatch_signals(
 
             message = format_signal_message(pair_data, signal_result, lang=user_lang)
 
-            # Embed user context so send_fn needs zero extra DB queries per user
             signal_meta = {
                 "signal_id":   signal_id,
                 "score":       score,
@@ -238,14 +402,15 @@ async def _dispatch_signals(
                 "user_id":     user_id,
                 "lang":        user_lang,
                 "user_tier":   tier,
-                "auto_mode":   user.get("auto_mode", 0),
+                "auto_mode":   auto_mode,
+                "safe_mode":   safe_mode,
                 "user_settings": {
-                    "auto_mode":        user.get("auto_mode", 0),
-                    "auto_min_score":   user.get("auto_min_score", 80),
-                    "auto_max_buy_sol": user.get("auto_max_buy_sol", 0.1),
-                    "auto_max_buy_bnb": user.get("auto_max_buy_bnb", 0.01),
-                    "auto_stop_loss":   user.get("auto_stop_loss", 20),
-                    "auto_take_profit": user.get("auto_take_profit", 0),
+                    "auto_mode":        auto_mode,
+                    "auto_min_score":   user["auto_min_score"]   if "auto_min_score"   in user.keys() else 80,
+                    "auto_max_buy_sol": user["auto_max_buy_sol"] if "auto_max_buy_sol" in user.keys() else 0.1,
+                    "auto_max_buy_bnb": user["auto_max_buy_bnb"] if "auto_max_buy_bnb" in user.keys() else 0.01,
+                    "auto_stop_loss":   user["auto_stop_loss"]   if "auto_stop_loss"   in user.keys() else 20,
+                    "auto_take_profit": user["auto_take_profit"] if "auto_take_profit" in user.keys() else 0,
                 },
             }
 
@@ -270,60 +435,11 @@ async def _dispatch_signals(
             )
 
 
-# ── Raydium loop (PRIMARY Solana) ────────────────────────────────────────────
-
-async def _raydium_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    logger.info("Raydium scanner active (Solana AMM pools every %ds)", RAYDIUM_INTERVAL)
-    while True:
-        try:
-            await _raydium_cycle(session, send_fn)
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error("Raydium cycle error: %s", e, exc_info=True)
-        await asyncio.sleep(RAYDIUM_INTERVAL)
-
-
-async def _raydium_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    new_signals: list = []
-
-    raw_pairs  = await raydium_get_pairs(session)
-    filtered   = raydium_prefilter(raw_pairs)
-    new_pairs  = [p for p in filtered if _mark_seen(p.get("ammId", ""))]
-
-    logger.info("Raydium: %d total, %d pass filter, %d new", len(raw_pairs), len(filtered), len(new_pairs))
-    if not new_pairs:
-        return
-
-    # Enrich top 30 new pairs with DexScreener (price change, txn counts, full data)
-    base_mints = [p.get("baseMint", "") for p in new_pairs if p.get("baseMint")][:30]
-    if base_mints:
-        enriched = await get_pairs_batch(session, "solana", base_mints)
-        dex_map  = {}
-        for ep in enriched:
-            pd = extract_pair_data(ep)
-            dex_map[pd["token_address"]] = pd
-
-        enriched_pairs = []
-        for p in new_pairs[:30]:
-            mint = p.get("baseMint", "")
-            # Prefer DexScreener data (has price change, txns); fall back to Raydium
-            enriched_pairs.append(dex_map.get(mint) or raydium_to_pair(p))
-    else:
-        enriched_pairs = [raydium_to_pair(p) for p in new_pairs[:30]]
-
-    # Safety checks in parallel
-    await asyncio.gather(*[_process_pair(session, pd, new_signals) for pd in enriched_pairs])
-
-    if new_signals:
-        await _dispatch_signals(new_signals, send_fn)
-
-
 # ── PancakeSwap Subgraph loop (PRIMARY BSC) ───────────────────────────────────
 
 async def _pancake_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
     logger.info("PancakeSwap subgraph scanner active (new BSC pools every %ds)", PANCAKE_INTERVAL)
-    await asyncio.sleep(10)  # offset from startup burst
+    await asyncio.sleep(10)  # offset from startup
     while True:
         try:
             await _pancake_cycle(session, send_fn)
@@ -340,16 +456,21 @@ async def _pancake_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) 
     pairs = await pcs_new_pairs(session)
     new_pairs = [p for p in pairs if _mark_seen(p.get("pair_address", ""))]
     logger.info("PancakeSwap new_pairs: %d (%d new)", len(pairs), len(new_pairs))
-    # Safety checks in parallel
-    await asyncio.gather(*[_process_pair(session, p, new_signals) for p in new_pairs])
+
+    for i in range(0, len(new_pairs), 10):
+        batch = new_pairs[i:i+10]
+        await asyncio.gather(*[_process_pair(session, p, new_signals) for p in batch])
+        if i + 10 < len(new_pairs):
+            await asyncio.sleep(1)
 
     if new_signals:
         await _dispatch_signals(new_signals, send_fn)
 
 
-# ── DexScreener loop ──────────────────────────────────────────────────────────
+# ── DexScreener loop (TERTIARY) ───────────────────────────────────────────────
 
 async def _dex_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
+    await asyncio.sleep(20)  # offset from startup
     while True:
         try:
             await _dex_cycle(session, send_fn)
@@ -376,10 +497,11 @@ async def _dex_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> N
         await _dispatch_signals(new_signals, send_fn)
 
 
-# ── GeckoTerminal loops (solana and BSC run at different intervals) ────────────
+# ── GeckoTerminal loops ────────────────────────────────────────────────────────
 
 async def _gecko_loop_solana(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    await asyncio.sleep(15)  # offset from DexScreener start
+    # Wait 90s before first SOL cycle — seeding already hit gecko SOL, avoid 429
+    await asyncio.sleep(90)
     while True:
         try:
             await _gecko_cycle(session, send_fn, "solana")
@@ -391,8 +513,8 @@ async def _gecko_loop_solana(session: aiohttp.ClientSession, send_fn: SendCallba
 
 
 async def _gecko_loop_bsc(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    # BSC gets a longer interval: free tier 429s are common on bsc endpoint
-    await asyncio.sleep(45)  # offset further to avoid burst at startup
+    # Wait 120s — seeding already hit gecko BSC, longer offset avoids 429
+    await asyncio.sleep(120)
     while True:
         try:
             await _gecko_cycle(session, send_fn, "bsc")
@@ -416,7 +538,7 @@ async def _gecko_cycle(
     for pair_data in new_pairs:
         await _process_pair(session, pair_data, new_signals)
 
-    await asyncio.sleep(4)  # gap between new_pools and trending to stay within rate limit
+    await asyncio.sleep(4)  # gap between new_pools and trending
 
     trending = await get_trending_pools(session, chain)
     new_trending = [p for p in trending if _mark_seen(p.get("pair_address", ""))]
@@ -431,7 +553,6 @@ async def _gecko_cycle(
 # ── Pump.fun loop ─────────────────────────────────────────────────────────────
 
 async def _pump_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> None:
-    # Seed seen set on startup (skip initial failure — not critical)
     tokens = await get_new_tokens(session, limit=50)
     for tok in tokens:
         pumpfun_is_new(tok.get("mint", ""))
@@ -447,12 +568,10 @@ async def _pump_loop(session: aiohttp.ClientSession, send_fn: SendCallback) -> N
         try:
             result = await _pump_cycle(session, send_fn)
             if result is False:
-                # get_new_tokens returned empty — all endpoints failed
                 consecutive_empty += 1
                 if consecutive_empty >= _PUMP_MAX_FAILS:
                     logger.warning(
-                        "pump.fun: %d consecutive failures — suspending for %ds. "
-                        "Set PUMPFUN_INTERVAL_SEC env var to re-enable after endpoint recovers.",
+                        "pump.fun: %d consecutive failures — suspending for %ds.",
                         consecutive_empty, _PUMP_SUSPEND_SEC,
                     )
                     await asyncio.sleep(_PUMP_SUSPEND_SEC)
@@ -469,29 +588,76 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
     """Returns False if all pump.fun endpoints failed (for circuit breaker)."""
     tokens = await get_new_tokens(session, limit=20)
     if not tokens:
-        return False  # all endpoints returned empty — signal circuit breaker
+        return False
     new_tokens = [t for t in tokens if pumpfun_is_new(t.get("mint", "")) and t.get("mint")]
     if not new_tokens:
-        return None  # got data, just no new tokens — normal
+        return None
 
     logger.info("pump.fun: %d new tokens", len(new_tokens))
     users = db.get_all_active_users_with_tier()
-    pump_users = [u for u in users if u.get("auto_mode") or u.get("notify_all_tokens")]
+    # Paid users (basic/pro) get pump.fun alerts automatically.
+    # Free users get them only if they opted in via notify_all_tokens or auto_mode.
+    def _row(u, col, default):
+        return u[col] if col in u.keys() else default
+
+    pump_users = [
+        u for u in users
+        if _row(u, "signals_push", 1)
+        and _row(u, "signal_chain", "all") in ("all", "solana")
+        # LAUNCH signals have score=0 — skip users who set an explicit min-score filter
+        and _row(u, "signal_min_score_user", 0) == 0
+        # safe_mode users skip pump.fun (unverified launches)
+        and _row(u, "safe_mode", 0) == 0
+    ]
     if not pump_users:
-        return
+        return None
 
     for token in new_tokens:
         mint = token.get("mint", "")
         pair_data = {
-            "chain":         "solana",
-            "token_address": mint,
-            "token_name":    token.get("name", "?"),
-            "token_symbol":  token.get("symbol", "?"),
+            "chain":            "solana",
+            "token_address":    mint,
+            "token_name":       token.get("name", "?"),
+            "token_symbol":     token.get("symbol", "?"),
+            "dex":              "pump.fun",
+            "pair_address":     mint,
+            "price_usd":        float(token.get("usd_market_cap") or 0) / max(float(token.get("total_supply") or 1), 1),
+            "liquidity_usd":    float(token.get("virtual_sol_reserves") or 0) * 150,
+            "volume_1h":        0.0,
+            "volume_24h":       0.0,
+            "price_change_1h":  0.0,
+            "price_change_24h": 0.0,
+            "market_cap":       float(token.get("usd_market_cap") or 0),
+            "pair_created_at":  None,
+            "pair_url":         f"https://pump.fun/{mint}",
         }
+
+        # Save to signals table so admin panel shows it (LAUNCH type, score=0)
+        signal_id = db.save_signal({
+            **pair_data,
+            "score":              0,
+            "signal_type":        "LAUNCH",
+            "liq_locked":         False,
+            "contract_renounced": False,
+            "honeypot":           False,
+        })
+        if signal_id is None:
+            continue  # already dispatched today
+
+        sent_count = 0
         for user in pump_users:
+            user_id = user["id"]
+            if db.was_signal_sent(user_id, signal_id):
+                continue
             lang = user["lang"] or "ua"
             msg  = format_token_message(token, lang)
             try:
                 await send_fn(user["telegram_id"], msg, pair_data, None)
+                db.mark_signal_sent(user_id, signal_id)
+                sent_count += 1
+                await asyncio.sleep(0.04)
             except Exception as e:
                 logger.warning("pump.fun send error %d: %s", user["telegram_id"], e)
+
+        if sent_count:
+            logger.info("pump.fun LAUNCH %s sent to %d users", token.get("symbol","?"), sent_count)

@@ -12,8 +12,8 @@ Score thresholds:
 import logging
 import sys
 import os
-import time as _time_module
 
+# Allow importing lang from project root when running as part of the package
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lang import t as _t
 
@@ -48,7 +48,7 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
     risks   = list(safety_data.get("risks") or [])
     chain   = pair_data.get("chain", "")
 
-    # ── HARD BLOCKS ────────────────────────────────────────────────────────────
+    # ── HARD BLOCKS ────────────────────────────────────────────────────────
     if chain == "bsc" and safety_data.get("is_honeypot"):
         return _blocked("HONEYPOT — cannot sell token")
 
@@ -62,36 +62,22 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
     if liq < 5_000:
         return _blocked(f"Liquidity ${liq:,.0f} — too low (min $5k)")
 
-    # ── SAFETY SCORE (max 45 pts) ───────────────────────────────────────────────
+    # ── SAFETY SCORE (max 45 pts) ──────────────────────────────────────────
 
-    # LP lock — fix: use explicit None check, not truthiness (0.0 is falsy but valid)
     if safety_data.get("liq_locked") or safety_data.get("lp_locked"):
-        locked_pct = safety_data.get("lp_locked_pct")
-        if locked_pct is None:
-            locked_pct = safety_data.get("liq_locked_pct")
-        locked_pct = float(locked_pct) if locked_pct is not None else 0.0
-
+        locked_pct = safety_data.get("lp_locked_pct") or safety_data.get("liq_locked_pct") or 100
         if locked_pct >= 90:
             score += 20
             reasons.append(f"Liquidity locked {locked_pct:.0f}% 🔒")
         elif locked_pct >= 70:
             score += 12
             reasons.append(f"Liquidity locked {locked_pct:.0f}% 🔒")
-        elif locked_pct >= 50:
-            score += 6
-            reasons.append(f"Liquidity locked {locked_pct:.0f}% 🔒")
-        elif locked_pct > 0:
-            score += 3
-        # locked_pct == 0 → liq_locked flag set but 0% locked → no points
-
-    has_data = safety_data.get("has_data", True)  # True = backward compat
+        else:
+            score += 5
 
     if chain == "solana":
         rc_score = safety_data.get("rugcheck_score") or 0
-        if not has_data:
-            # API unavailable for brand-new token — neutral, no penalty
-            risks.append("RugCheck: no data yet (new token)")
-        elif rc_score >= 800:
+        if rc_score >= 800:
             score += 20
             reasons.append(f"RugCheck: {rc_score}/1000 ✅")
         elif rc_score >= 600:
@@ -99,27 +85,23 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
             reasons.append(f"RugCheck: {rc_score}/1000 ⚠️")
         elif rc_score >= 400:
             score += 5
-        else:
+        elif rc_score > 0:
+            # Real bad score — penalize
             score -= 5
             risks.append(f"RugCheck low: {rc_score}/1000")
+        # rc_score == 0 means API timeout / unavailable — neutral, no penalty
 
     if chain == "bsc":
-        if not has_data:
-            # Honeypot.is unavailable — neutral, flag as unverified
-            risks.append("Safety check unavailable")
+        if safety_data.get("is_open_source"):
+            score += 10
+            reasons.append("Contract verified (open source) ✅")
         else:
-            if safety_data.get("is_open_source"):
-                score += 10
-                reasons.append("Contract verified (open source) ✅")
-            else:
-                score -= 5
-                risks.append("Contract not verified")
+            score -= 5
+            risks.append("Contract not verified")
 
-        sell_tax = safety_data.get("sell_tax")  # None = unknown
-        buy_tax  = safety_data.get("buy_tax")
-        if sell_tax is None or buy_tax is None:
-            pass  # no tax data — skip, don't award or penalize
-        elif sell_tax <= 5 and buy_tax <= 5:
+        sell_tax = safety_data.get("sell_tax") or 0
+        buy_tax  = safety_data.get("buy_tax")  or 0
+        if sell_tax <= 5 and buy_tax <= 5:
             score += 10
             reasons.append(f"Low tax: buy {buy_tax}% / sell {sell_tax}% ✅")
         elif sell_tax <= 10:
@@ -130,7 +112,6 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
 
     top10 = safety_data.get("top10_holders_pct")
     if top10 is not None:
-        top10 = float(top10)
         if top10 <= 20:
             score += 15
             reasons.append(f"Top-10 holders: {top10:.1f}% — well distributed ✅")
@@ -144,13 +125,9 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
             score -= 10
             risks.append(f"Top-10 holders: {top10:.1f}% — VERY concentrated ⚠️")
 
-    # ── MOMENTUM SCORE (max 40 pts) ────────────────────────────────────────────
+    # ── MOMENTUM SCORE (max 40 pts) ────────────────────────────────────────
 
-    vol_1h  = pair_data.get("volume_1h")  or 0
-    vol_6h  = pair_data.get("volume_6h")  or 0
-    chg_1h  = pair_data.get("price_change_1h")  or 0
-    chg_6h  = pair_data.get("price_change_6h")  or 0
-
+    vol_1h = pair_data.get("volume_1h") or 0
     if liq > 0:
         vol_liq_ratio = vol_1h / liq
         if vol_liq_ratio >= 1.0:
@@ -164,20 +141,15 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
         else:
             risks.append("Low trading volume")
 
-    # 1h price change — cap extreme pumps (>200% in 1h = likely manipulation)
-    if chg_1h > 200:
-        score += 3
-        risks.append(f"Extreme pump +{chg_1h:.0f}% — possible manipulation ⚠️")
-    elif 10 <= chg_1h <= 200:
-        # Cross-check with 6h trend: if 6h is deeply negative, 1h pump is a dead-cat bounce
-        if chg_6h < -20:
-            score += 4
-            risks.append(f"1h pump +{chg_1h:.0f}% but 6h: {chg_6h:.0f}% — dead-cat bounce?")
-        else:
-            score += 12
-            reasons.append(f"1h price growth: +{chg_1h:.1f}% 📈")
+    chg_1h = pair_data.get("price_change_1h") or 0
+    if 10 <= chg_1h <= 100:
+        score += 12
+        reasons.append(f"1h price growth: +{chg_1h:.1f}% 📈")
     elif 5 <= chg_1h < 10:
         score += 6
+    elif chg_1h > 100:
+        score += 5
+        risks.append(f"Growth +{chg_1h:.0f}% — possible pump & dump")
     elif chg_1h < -15:
         score -= 10
         risks.append(f"Price drop: {chg_1h:.1f}%")
@@ -195,7 +167,7 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
             score -= 5
             risks.append(f"Sell pressure: {(1-buy_ratio)*100:.0f}% sells")
 
-    # ── LIQUIDITY SCORE (max 15 pts) ───────────────────────────────────────────
+    # ── LIQUIDITY SCORE (max 15 pts) ───────────────────────────────────────
 
     if liq >= 200_000:
         score += 15
@@ -208,24 +180,7 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
     elif liq >= 10_000:
         score += 3
 
-    # ── TOKEN AGE BONUS (max +5 pts) ───────────────────────────────────────────
-    # Fresh tokens get a slight bonus for being genuinely new.
-    # Very old tokens lose the early-entry advantage.
-    created_ms = pair_data.get("pair_created_at")
-    if created_ms:
-        age_h = (_time_module.time() * 1000 - created_ms) / 3_600_000
-        if age_h <= 1:
-            score += 5
-            reasons.append(f"Fresh token: {age_h*60:.0f}min old 🆕")
-        elif age_h <= 6:
-            score += 3
-        elif age_h <= 24:
-            score += 1
-        elif age_h > 36:
-            score -= 3
-            risks.append(f"Token age: {age_h:.0f}h — opportunity window closing")
-
-    # ── HOLDERS (bonus, max +5 pts) ────────────────────────────────────────────
+    # ── HOLDERS (bonus) ────────────────────────────────────────────────────
     holders = safety_data.get("holders") or pair_data.get("holders") or 0
     if holders >= 1000:
         score += 5
@@ -236,6 +191,18 @@ def score_token(pair_data: dict, safety_data: dict) -> dict:
         score += 1
 
     score = max(0, min(100, score))
+
+    # ── VOLUME SPIKE DETECTION (anti-pump-and-dump) ────────────────────────
+    vol_1h_check = pair_data.get("volume_1h") or 0
+    chg_1h_check = pair_data.get("price_change_1h") or 0
+    liq_check    = pair_data.get("liquidity_usd") or 0
+
+    if chg_1h_check > 500:
+        score = min(score, 20)
+        risks.append(f"Extreme price spike +{chg_1h_check:.0f}% — likely pump & dump ❌")
+    elif liq_check > 0 and vol_1h_check > liq_check * 5 and chg_1h_check > 200:
+        score = min(score, 30)
+        risks.append("Suspicious volume spike — possible pump & dump ⚠️")
 
     if score >= SCORE_STRONG_BUY:
         signal_type = SIGNAL_STRONG_BUY
@@ -269,8 +236,7 @@ def _blocked(reason: str) -> dict:
 
 def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua") -> str:
     """Format a Telegram signal message in the given language."""
-    import datetime as _dt
-
+    import time as _time
     st    = signal_result["signal_type"]
     score = signal_result["score"]
     chain = pair_data.get("chain", "").upper()
@@ -280,31 +246,35 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
         SIGNAL_BUY:        "🟡 BUY",
         SIGNAL_WATCH:      "👀 WATCH",
     }
-    header = emoji_map.get(st, "⬜ SKIP")
+    header = emoji_map.get(st, "")
 
-    name       = pair_data.get("token_name",    "?")
-    symbol     = pair_data.get("token_symbol",  "?")
-    address    = pair_data.get("token_address", "")
-    price      = pair_data.get("price_usd",         0) or 0
-    liq        = pair_data.get("liquidity_usd",     0) or 0
-    vol_1h     = pair_data.get("volume_1h",         0) or 0
-    chg_1h     = pair_data.get("price_change_1h",   0) or 0
-    mcap       = pair_data.get("market_cap",        0) or 0
-    dex        = (pair_data.get("dex") or "").capitalize()
-    url        = pair_data.get("pair_url", "")
-    created_ms = pair_data.get("pair_created_at")
-    chg_sign   = "+" if chg_1h >= 0 else ""
+    name        = pair_data.get("token_name",    "?")
+    symbol      = pair_data.get("token_symbol",  "?")
+    address     = pair_data.get("token_address", "")
+    price       = pair_data.get("price_usd",         0) or 0
+    liq         = pair_data.get("liquidity_usd",     0) or 0
+    vol_1h      = pair_data.get("volume_1h",         0) or 0
+    chg_1h      = pair_data.get("price_change_1h",   0) or 0
+    mcap        = pair_data.get("market_cap",        0) or 0
+    dex         = (pair_data.get("dex") or "").capitalize()
+    url         = pair_data.get("pair_url", "")
+    created_ms  = pair_data.get("pair_created_at")
+    chg_sign    = "+" if chg_1h >= 0 else ""
 
     chain_emoji = "◎" if chain == "SOLANA" else "🔶"
     price_fmt   = f"${price:.8f}" if price < 0.0001 else f"${price:.6f}"
 
-    # Token age
+    # Token age / creation time
     age_str = ""
     created_str = ""
     if created_ms:
-        age_min = (_time_module.time() * 1000 - created_ms) / 60_000
-        age_str = f"{int(age_min)}хв" if age_min < 60 else f"{age_min/60:.1f}г"
-        created_dt  = _dt.datetime.fromtimestamp(created_ms / 1000, tz=_dt.timezone.utc)
+        age_min = (_time.time() * 1000 - created_ms) / 60_000
+        if age_min < 60:
+            age_str = f"{int(age_min)}{'хв' if lang == 'ua' else 'min'}"
+        else:
+            age_str = f"{age_min/60:.1f}{'г' if lang == 'ua' else 'h'}"
+        import datetime as _dt
+        created_dt = _dt.datetime.utcfromtimestamp(created_ms / 1000)
         created_str = created_dt.strftime("%d.%m.%Y %H:%M UTC")
 
     lines = [
@@ -315,7 +285,7 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
     ]
 
     if created_str:
-        lines.append(f"🕐 Створено: {created_str}  ({age_str} тому)")
+        lines.append(f"🕐 {_t(lang,'sig_created')}: {created_str}  ({age_str} {_t(lang,'sig_ago')})")
 
     lines += [
         "",
@@ -346,21 +316,19 @@ def format_signal_message(pair_data: dict, signal_result: dict, lang: str = "ua"
         f"  {_t(lang,'sig_tp3')}",
         f"  {_t(lang,'sig_sl')}",
         "",
-        "📋 <b>Контракт:</b>",
+        _t(lang, 'sig_contract'),
     ]
 
     if address:
         lines.append(f"<code>{address}</code>")
 
     if url:
-        # Show correct link source based on URL
-        if "dexscreener.com" in url:
-            link_text = "Переглянути на DexScreener"
-        elif "geckoterminal.com" in url:
-            link_text = "Переглянути на GeckoTerminal"
-        else:
-            link_text = "Переглянути пару"
-        lines.append(f'🔗 <a href="{url}">{link_text}</a>')
+        lines.append(f'🔗 <a href="{url}">{_t(lang, "sig_dex_link")}</a>')
+
+    ai_comment = pair_data.get(f"ai_comment_{lang}") or pair_data.get("ai_comment", "")
+    if ai_comment:
+        ai_label = "ШІ аналіз" if lang == "ua" else "AI Analysis"
+        lines += ["", f"🤖 <b>{ai_label}:</b>", f"<i>{ai_comment}</i>"]
 
     lines += ["", _t(lang, 'sig_disc')]
 

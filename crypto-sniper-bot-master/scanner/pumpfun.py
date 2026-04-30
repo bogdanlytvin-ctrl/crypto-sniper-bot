@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 PUMPFUN_INTERVAL = int(os.getenv("PUMPFUN_INTERVAL_SEC", "30"))
 
-# Fallback list — try each endpoint in order until one responds with 200
-_ENDPOINTS = [
+# Fallback list — try each in order until one works
+_PUMPFUN_ENDPOINTS = [
     "https://client-api-2.pump.fun/coins",
     "https://frontend-api-v3.pump.fun/coins",
     "https://frontend-api.pump.fun/coins",
@@ -25,20 +25,21 @@ _SEEN_MAX = 2_000
 _seen_mints: deque[str] = deque(maxlen=_SEEN_MAX)
 _seen_set:   set[str]   = set()
 
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     ),
-    "Accept":          "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Origin":          "https://pump.fun",
-    "Referer":         "https://pump.fun/",
-    "Sec-Fetch-Dest":  "empty",
-    "Sec-Fetch-Mode":  "cors",
-    "Sec-Fetch-Site":  "same-site",
+    "Accept":           "application/json, text/plain, */*",
+    "Accept-Language":  "en-US,en;q=0.9",
+    "Accept-Encoding":  "gzip, deflate, br",
+    "Origin":           "https://pump.fun",
+    "Referer":          "https://pump.fun/",
+    "Sec-Fetch-Dest":   "empty",
+    "Sec-Fetch-Mode":   "cors",
+    "Sec-Fetch-Site":   "same-site",
 }
 
 
@@ -51,7 +52,7 @@ async def get_new_tokens(session: aiohttp.ClientSession, limit: int = 30) -> lis
         "order":       "DESC",
         "includeNsfw": "true",
     }
-    for url in _ENDPOINTS:
+    for url in _PUMPFUN_ENDPOINTS:
         try:
             async with session.get(
                 url, params=params, headers=_HEADERS,
@@ -89,7 +90,9 @@ def format_token_message(token: dict, lang: str = "ua") -> str:
     mcap        = token.get("usd_market_cap") or token.get("market_cap") or 0
     complete    = token.get("complete", False)
     king        = token.get("king_of_the_hill_timestamp")
+    creator     = token.get("creator", "")
     reply_count = token.get("reply_count", 0)
+    image_uri   = token.get("image_uri", "")
 
     status = "🎓 Raydium" if complete else ("👑 King of Hill" if king else "🟣 Bonding Curve")
 

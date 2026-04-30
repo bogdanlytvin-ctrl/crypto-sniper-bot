@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 import time
 from collections import defaultdict
 
@@ -11,6 +12,7 @@ from telegram import (
     InlineKeyboardButton, InlineKeyboardMarkup,
 )
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ConversationHandler, filters, ContextTypes,
@@ -21,10 +23,8 @@ from lang import t
 from scanner.monitor import run_monitor
 from trader.wallet import (
     get_sol_balance, get_sol_token_balances, get_bnb_balance,
-    get_sol_token_balance_raw, get_bsc_token_balance_raw,
     encrypt_pk, decrypt_pk, can_trade,
     is_valid_solana_address, is_valid_evm_address,
-    is_valid_solana_private_key, is_valid_bsc_private_key,
 )
 import payments as pay
 
@@ -54,41 +54,8 @@ def _rate_limited(tid: int, limit: int = 10, window: int = 60) -> bool:
     return False
 
 
-# Stricter rate limit for financial operations (buy/sell): 3 per 60s per user
-_trade_tracker: dict[int, list[float]] = defaultdict(list)
-
-
-def _trade_rate_limited(tid: int) -> bool:
-    """Max 3 trade actions per 60 seconds per user."""
-    now = time.time()
-    _trade_tracker[tid] = [ts for ts in _trade_tracker[tid] if now - ts < 60]
-    if len(_trade_tracker[tid]) >= 3:
-        return True
-    _trade_tracker[tid].append(now)
-    return False
-
-
-# ── Amount caps ────────────────────────────────────────────────────────────────
-_MAX_BUY_SOL = float(os.getenv("MAX_BUY_SOL", "5.0"))   # max manual SOL per trade
-_MAX_BUY_BNB = float(os.getenv("MAX_BUY_BNB", "2.0"))   # max manual BNB per trade
-
-
 # ── App reference ──────────────────────────────────────────────────────────────
 _app: Application | None = None
-
-# ── Shared aiohttp session ─────────────────────────────────────────────────────
-# One long-lived session with connection pooling for all bot HTTP calls.
-# Initialized in post_init, closed on shutdown.
-_http: aiohttp.ClientSession | None = None
-
-
-def _get_http() -> aiohttp.ClientSession:
-    """Return the shared session, or create a fallback if called before init."""
-    if _http is not None:
-        return _http
-    return aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=20, ttl_dns_cache=300),
-    )
 
 
 # ── Keyboards ──────────────────────────────────────────────────────────────────
@@ -101,25 +68,48 @@ def _main_keyboard(lang: str) -> InlineKeyboardMarkup:
          InlineKeyboardButton(t(lang, 'menu_positions'), callback_data="menu:positions")],
         [InlineKeyboardButton(t(lang, 'menu_automode'),  callback_data="menu:automode"),
          InlineKeyboardButton(t(lang, 'menu_trades'),    callback_data="menu:trades")],
+        [InlineKeyboardButton(t(lang, 'menu_notif'),     callback_data="menu:notif")],
     ])
 
 
-def _buy_keyboard(chain: str, token_address: str) -> InlineKeyboardMarkup | None:
-    """Inline buy buttons for signal messages. Returns None if address missing."""
+def _buy_keyboard(chain: str, token_address: str,
+                  user_settings: dict | None = None) -> InlineKeyboardMarkup | None:
+    """Inline buy buttons for signal messages. Returns None if address missing.
+    If user_settings provided — first row is a ⚡ Quick Buy with the user's configured amount."""
     if not token_address:
         return None
+
     if chain == "solana":
-        amounts = [("0.1 SOL", "0.1"), ("0.5 SOL", "0.5"), ("1 SOL", "1.0")]
+        std = [("0.1 SOL", "0.1"), ("0.5 SOL", "0.5"), ("1 SOL", "1.0")]
     else:
-        amounts = [("0.01 BNB", "0.01"), ("0.05 BNB", "0.05"), ("0.1 BNB", "0.1")]
-    buttons = [
-        InlineKeyboardButton(
-            f"💰 {label}",
-            callback_data=f"buy:{chain}:{token_address}:{amt}",
-        )
-        for label, amt in amounts
-    ]
-    return InlineKeyboardMarkup([buttons, [InlineKeyboardButton("❌ Skip", callback_data="skip")]])
+        std = [("0.01 BNB", "0.01"), ("0.05 BNB", "0.05"), ("0.1 BNB", "0.1")]
+
+    rows = []
+
+    # Quick Buy row — user's configured amount (one-tap)
+    if user_settings:
+        if chain == "solana":
+            qa  = float(user_settings.get("auto_max_buy_sol") or 0.1)
+            lbl = f"{qa:g}"  # strips trailing zeros: 0.10000 → 0.1
+            rows.append([InlineKeyboardButton(
+                f"⚡ Quick Buy {lbl} SOL",
+                callback_data=f"buy:{chain}:{token_address}:{lbl}",
+            )])
+        else:
+            qa  = float(user_settings.get("auto_max_buy_bnb") or 0.01)
+            lbl = f"{qa:g}"
+            rows.append([InlineKeyboardButton(
+                f"⚡ Quick Buy {lbl} BNB",
+                callback_data=f"buy:{chain}:{token_address}:{lbl}",
+            )])
+
+    # Standard amounts row
+    rows.append([
+        InlineKeyboardButton(f"💰 {lbl}", callback_data=f"buy:{chain}:{token_address}:{amt}")
+        for lbl, amt in std
+    ])
+    rows.append([InlineKeyboardButton("❌ Skip", callback_data="skip")])
+    return InlineKeyboardMarkup(rows)
 
 
 def _plans_keyboard(lang: str, current_tier: str) -> InlineKeyboardMarkup:
@@ -144,229 +134,163 @@ def _plans_keyboard(lang: str, current_tier: str) -> InlineKeyboardMarkup:
 
 # ── Monitor send callback ──────────────────────────────────────────────────────
 
-async def _send_signal(
-    telegram_id: int,
-    message: str,
-    pair_data: dict | None = None,
-    signal_meta: dict | None = None,
-) -> None:
+async def _send_signal(telegram_id: int, message: str,
+                       pair_data: dict | None = None,
+                       signal_meta: dict | None = None) -> None:
     if _app is None:
         return
 
-    # Show BUY buttons only when auto-mode is OFF (auto-mode buys silently)
-    auto_on = (
-        signal_meta is not None
-        and bool(signal_meta.get("auto_mode"))
-        and signal_meta.get("user_tier") in ("basic", "pro")
-    )
+    # Use user data pre-loaded by _dispatch_signals (zero extra DB queries)
+    auto_on = False
+    if signal_meta:
+        auto_on = bool(signal_meta.get("auto_mode")) and signal_meta.get("user_tier") in ("basic", "pro")
+
     keyboard = None
     if pair_data and not auto_on:
+        user_settings = signal_meta.get("user_settings") if signal_meta else None
         keyboard = _buy_keyboard(
             pair_data.get("chain", ""),
             pair_data.get("token_address", ""),
+            user_settings=user_settings,
         )
 
-    try:
-        await _app.bot.send_message(
-            chat_id=telegram_id,
-            text=message,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
-            reply_markup=keyboard,
-        )
-    except Exception as e:
-        logger.warning("send_message failed to %d: %s", telegram_id, e)
-        return
+    await _app.bot.send_message(
+        chat_id=telegram_id,
+        text=message,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
+        reply_markup=keyboard,
+    )
+    # Throttle: Telegram allows ~30 msg/sec globally
+    await asyncio.sleep(0.04)
 
-    await asyncio.sleep(0.04)  # ~25 msg/sec — stay under Telegram 30/sec limit
-
+    # Trigger auto-buy if applicable (uses pre-loaded data from signal_meta)
     if pair_data and signal_meta and auto_on:
         await _maybe_auto_buy(telegram_id, pair_data, signal_meta)
 
 
-# ── Auto-buy ───────────────────────────────────────────────────────────────────
-
-_MAX_OPEN_POSITIONS = 5  # hard cap per user
-
-
-async def _maybe_auto_buy(
-    telegram_id: int,
-    pair_data: dict,
-    signal_meta: dict,
-) -> None:
-    """
-    Triggered after a signal is delivered to a user with auto_mode=1.
-    Guards:
-      1. Trading must be enabled (ENCRYPTION_KEY set)
-      2. Score must meet user's auto_min_score
-      3. No duplicate open position for this token
-      4. User must not exceed MAX_OPEN_POSITIONS
-      5. Sufficient balance
-    On success: saves position + trade, notifies user with TX hash.
-    Retry: up to 2 attempts with 5s gap.
-    Timeout: 30s for Jupiter swaps.
-    """
-    if not can_trade():
-        return
-
-    user_id    = signal_meta.get("user_id")
-    user_settings = signal_meta.get("user_settings", {})
-    chain      = pair_data.get("chain", "")
-    token_addr = pair_data.get("token_address", "")
-    token_sym  = pair_data.get("token_symbol", "?")
-    token_name = pair_data.get("token_name",   "?")
-    score      = signal_meta.get("score", 0)
-    price_usd  = signal_meta.get("price_usd") or pair_data.get("price_usd") or 0
-
-    if not user_id or not token_addr or chain not in ("solana", "bsc"):
-        return
-
-    # ── Guard 1: user's personal min score for auto-buy
-    auto_min = user_settings.get("auto_min_score", 80)
-    if score < auto_min:
-        logger.debug("Auto-buy skipped uid=%d: score %d < min %d", user_id, score, auto_min)
-        return
-
-    # ── Guard 2: no duplicate position
-    if db.has_open_position(user_id, chain, token_addr):
-        logger.debug("Auto-buy skipped uid=%d: already have open position in %s", user_id, token_sym)
-        return
-
-    # ── Guard 3: position cap
-    open_count = db.count_open_positions(user_id)
-    if open_count >= _MAX_OPEN_POSITIONS:
-        logger.info("Auto-buy skipped uid=%d: %d open positions (max %d)", user_id, open_count, _MAX_OPEN_POSITIONS)
-        await _notify_auto(telegram_id, f"Auto-buy <b>{token_sym}</b> skipped — max {_MAX_OPEN_POSITIONS} open positions reached.", signal_meta.get("lang", "ua"))
-        return
-
-    # ── Resolve wallet + private key for this chain
-    wallet_row = db.get_wallet(user_id, chain)
-    if not wallet_row or not wallet_row["encrypted_pk"]:
-        logger.debug("Auto-buy skipped uid=%d: no %s wallet/key stored", user_id, chain)
-        return
-    from trader.wallet import decrypt_pk
-    pk = decrypt_pk(wallet_row["encrypted_pk"])
-    if not pk:
-        logger.warning("Auto-buy uid=%d: failed to decrypt private key", user_id)
-        return
-    pub_key = wallet_row["address"]
-    if not pub_key:
-        return
-
-    # ── Determine buy amount and check balance
-    if chain == "solana":
-        max_buy = float(user_settings.get("auto_max_buy_sol") or 0.1)
-        balance = await get_sol_balance(pub_key)
-        if balance < max_buy:
-            logger.info("Auto-buy skipped uid=%d: SOL balance %.4f < %.4f", user_id, balance, max_buy)
-            await _notify_auto(telegram_id, f"Auto-buy <b>{token_sym}</b> skipped — insufficient SOL balance ({balance:.4f} < {max_buy:.4f}).", signal_meta.get("lang", "ua"))
-            return
-        buy_amount = max_buy
-    else:
-        max_buy = float(user_settings.get("auto_max_buy_bnb") or 0.01)
-        balance = await get_bnb_balance(pub_key)
-        if balance < max_buy:
-            logger.info("Auto-buy skipped uid=%d: BNB balance %.4f < %.4f", user_id, balance, max_buy)
-            await _notify_auto(telegram_id, f"Auto-buy <b>{token_sym}</b> skipped — insufficient BNB balance ({balance:.4f} < {max_buy:.4f}).", signal_meta.get("lang", "ua"))
-            return
-        buy_amount = max_buy
-
-    stop_loss_pct = float(user_settings.get("auto_stop_loss") or 20)
-
-    # ── Execute with up to 2 retries
-    result = None
-    session = _get_http()
-    for attempt in range(1, 3):
-        try:
-            if chain == "solana":
-                from trader.jupiter import get_buy_quote, execute_swap
-                quote = await asyncio.wait_for(
-                    get_buy_quote(session, token_addr, buy_amount, slippage_bps=500),
-                    timeout=30,
-                )
-                if not quote:
-                    logger.warning("Auto-buy uid=%d attempt %d: no quote", user_id, attempt)
-                    await asyncio.sleep(5)
-                    continue
-                result = await asyncio.wait_for(
-                    execute_swap(session, quote, pub_key, pk),
-                    timeout=30,
-                )
-            else:
-                from trader.bsc import execute_buy as bsc_buy
-                result = await asyncio.wait_for(
-                    asyncio.to_thread(bsc_buy, token_addr, buy_amount, pk, 10.0),
-                    timeout=30,
-                )
-        except asyncio.TimeoutError:
-            logger.warning("Auto-buy uid=%d attempt %d: timeout", user_id, attempt)
-            result = {"success": False, "tx_hash": None, "error": "timeout"}
-
-        if result and result.get("success"):
-            break
-        if attempt < 2:
-            await asyncio.sleep(5)
-
-    if not result or not result.get("success"):
-        err = (result or {}).get("error", "unknown error")
-        logger.warning("Auto-buy uid=%d %s failed: %s", user_id, token_sym, err)
-        await _notify_auto(telegram_id, f"Auto-buy <b>{token_sym}</b> failed: {err}", signal_meta.get("lang", "ua"))
-        return
-
-    tx_hash = result.get("tx_hash", "")
-
-    # ── Save to DB
-    db.save_trade(
-        user_id=user_id, chain=chain,
-        token_address=token_addr, token_symbol=token_sym,
-        trade_type="buy", amount_in=buy_amount,
-        amount_out=0, price_usd=float(price_usd),
-        tx_hash=tx_hash, status="confirmed", mode="auto",
-    )
-    db.upsert_position(
-        user_id=user_id, chain=chain,
-        token_address=token_addr, token_symbol=token_sym,
-        token_name=token_name, amount=buy_amount,
-        buy_price_usd=float(price_usd),
-        buy_amount_native=buy_amount,
-        stop_loss_pct=stop_loss_pct,
-    )
-
-    logger.info(
-        "Auto-buy SUCCESS uid=%d %s chain=%s amount=%.4f tx=%s",
-        user_id, token_sym, chain, buy_amount, tx_hash,
-    )
-
-    native = "SOL" if chain == "solana" else "BNB"
-    tx_link = (
-        f'<a href="https://solscan.io/tx/{tx_hash}">Solscan</a>'
-        if chain == "solana"
-        else f'<a href="https://bscscan.com/tx/{tx_hash}">BscScan</a>'
-    )
-    msg = (
-        f"Auto-buy executed!\n"
-        f"Token: <b>{token_name}</b> (${token_sym})\n"
-        f"Amount: <b>{buy_amount} {native}</b>\n"
-        f"Price: ${float(price_usd):.8f}\n"
-        f"SL: -{stop_loss_pct:.0f}%\n"
-        f"TX: {tx_link}"
-    )
-    await _notify_auto(telegram_id, msg, signal_meta.get("lang", "ua"))
-
-
-async def _notify_auto(telegram_id: int, text: str, _lang: str = "ua") -> None:
-    """Send an auto-trading notification. Silently skip on error."""
+async def _maybe_auto_buy(telegram_id: int, pair_data: dict, signal_meta: dict) -> None:
+    """Execute automatic buy. All user data must be pre-loaded in signal_meta
+    by _dispatch_signals to avoid N×M DB queries."""
     if _app is None:
         return
+
+    user_id  = signal_meta.get("user_id")
+    lang     = signal_meta.get("lang", "ua")
+    tier     = signal_meta.get("user_tier", "free")
+    settings = signal_meta.get("user_settings")
+
+    if not user_id or tier not in ("basic", "pro"):
+        return
+    if not settings or not settings.get("auto_mode"):
+        return
+
+    score = signal_meta.get("score", 0)
+    if score < (settings.get("auto_min_score") or 80):
+        return
+
+    chain         = pair_data.get("chain", "")
+    token_address = pair_data.get("token_address", "")
+    token_symbol  = pair_data.get("token_symbol", "?")
+    token_name    = pair_data.get("token_name", "?")
+
+    if not chain or not token_address:
+        return
+
+    # Max concurrent positions (basic: 3, pro: unlimited=999)
+    max_pos = 3 if tier == "basic" else 999
+    open_pos = db.get_open_positions(user_id)
+    if len(open_pos) >= max_pos:
+        try:
+            await _app.bot.send_message(
+                chat_id=telegram_id,
+                text=t(lang, 'auto_max_positions', max=max_pos, tier=tier.upper()),
+                parse_mode=ParseMode.HTML,
+            )
+        except Exception:
+            pass
+        return
+
+    # Skip if position already open for this token
+    if any(p["chain"] == chain and p["token_address"] == token_address for p in open_pos):
+        return
+
+    # Check wallet
+    wallet = db.get_wallet(user_id, chain)
+    if not wallet or not wallet["encrypted_pk"]:
+        return
+
+    pk = decrypt_pk(wallet["encrypted_pk"])
+    if not pk:
+        return
+
+    amount = settings.get("auto_max_buy_sol", 0.1) if chain == "solana" else settings.get("auto_max_buy_bnb", 0.01)
+    sl_pct = settings.get("auto_stop_loss") or 20
+    tp_pct = settings.get("auto_take_profit") or 0
+    chain_label = "SOL" if chain == "solana" else "BNB"
+
+    # Notify user that auto-buy is starting
     try:
         await _app.bot.send_message(
             chat_id=telegram_id,
-            text=text,
+            text=t(lang, 'auto_buying',
+                   symbol=token_symbol, amount=amount, chain=chain_label,
+                   score=score, sl=sl_pct,
+                   tp=f"+{tp_pct}%" if tp_pct > 0 else "—"),
             parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
         )
+    except Exception:
+        pass
+
+    # Execute buy
+    result: dict = {"success": False, "error": "unknown"}
+    try:
+        if chain == "solana":
+            async with aiohttp.ClientSession() as session:
+                from trader.jupiter import get_buy_quote, execute_swap
+                quote = await get_buy_quote(session, token_address, amount)
+                if not quote:
+                    result = {"success": False, "error": "no_quote"}
+                else:
+                    result = await execute_swap(session, quote, wallet["address"], pk)
+        else:
+            from trader.bsc import execute_buy
+            result = execute_buy(token_address, amount, pk)
     except Exception as e:
-        logger.warning("_notify_auto to %d failed: %s", telegram_id, e)
+        result = {"success": False, "error": str(e)}
+        logger.error("Auto-buy error for %s: %s", token_address, e)
+
+    if result["success"]:
+        entry_price = signal_meta.get("price_usd") or 0
+        signal_id   = signal_meta.get("signal_id")
+        db.save_trade(user_id, chain, token_address, token_symbol, "buy",
+                      amount, result.get("amount_out", 0), entry_price,
+                      result["tx_hash"], "confirmed", "auto", signal_id)
+        db.upsert_position(user_id, chain, token_address, token_symbol, token_name,
+                           amount, entry_price, amount, sl_pct, tp_pct)
+        try:
+            await _app.bot.send_message(
+                chat_id=telegram_id,
+                text=t(lang, 'auto_buy_success',
+                       symbol=token_symbol, amount=amount, chain=chain_label,
+                       tx=result["tx_hash"], sl=sl_pct,
+                       tp=f"+{tp_pct}%" if tp_pct > 0 else "—"),
+                parse_mode=ParseMode.HTML,
+            )
+        except Exception:
+            pass
+        logger.info("Auto-buy %s %s for user %d tx=%s", amount, token_symbol, telegram_id, result["tx_hash"])
+    else:
+        logger.warning("Auto-buy failed for %s: %s", token_symbol, result.get("error"))
+        try:
+            await _app.bot.send_message(
+                chat_id=telegram_id,
+                text=t(lang, 'auto_buy_failed',
+                       symbol=token_symbol, error=str(result.get("error", "?"))),
+                parse_mode=ParseMode.HTML,
+            )
+        except Exception:
+            pass
 
 
 # ── Ban guard ──────────────────────────────────────────────────────────────────
@@ -499,15 +423,63 @@ async def cb_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if _check_banned(user.id):
         return
     user_id  = db.upsert_user(user.id, user.first_name, user.username)
-    parts    = query.data.split(":")
-    new_lang = parts[1] if len(parts) > 1 else "ua"
-    if new_lang not in ("ua", "en"):
-        await query.answer()
-        return
+    new_lang = query.data.split(":")[1]
     db.set_user_lang(user_id, new_lang)
     key = 'lang_set_ua' if new_lang == 'ua' else 'lang_set_en'
     await query.answer()
     await query.edit_message_text(t(new_lang, key))
+
+
+async def cmd_results(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
+    user_id = db.upsert_user(user.id, user.first_name, user.username)
+    perf = db.get_bot_performance()
+
+    pnl_sign = "+" if perf["total_pnl"] >= 0 else ""
+    lines = [
+        "📊 <b>Bot Performance</b>",
+        "",
+        f"✅ Total trades: {perf['total_trades']}",
+        f"🏆 Winrate: {perf['winrate']}%",
+        f"💰 Total P&L: {pnl_sign}${perf['total_pnl']:,.2f}",
+    ]
+
+    if perf["recent"]:
+        lines += ["", "📋 <b>Recent 10 trades:</b>", ""]
+        for row in perf["recent"]:
+            symbol    = row["token_symbol"] or "?"
+            chain     = (row["chain"] or "").upper()
+            buy_price = row["buy_price"] or 0
+            sell_price = row["sell_price"] or 0
+            pnl_usd   = row["pnl_usd"] or 0
+            pnl_pct   = row["pnl_percent"] or 0
+            pnl_sign2 = "+" if pnl_usd >= 0 else ""
+            pnl_pct_sign = "+" if pnl_pct >= 0 else ""
+            lines.append(f"<b>${symbol}</b> ({chain})")
+            lines.append(f"  BUY: ${buy_price:.6g}  SELL: ${sell_price:.6g}")
+            lines.append(f"  P&L: {pnl_pct_sign}{pnl_pct:.1f}% ({pnl_sign2}${pnl_usd:.2f})")
+            lines.append("")
+    else:
+        lines += ["", "📭 Немає закритих угод."]
+
+    lines.append("⚠️ Not financial advice. Past results ≠ future performance.")
+
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
+async def _menu_main(query, user_id: int, lang: str) -> None:
+    """Re-render the main menu in-place (used by back buttons)."""
+    try:
+        await query.edit_message_text(
+            t(lang, 'start', name=query.from_user.first_name),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_main_keyboard(lang),
+        )
+    except BadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
 
 
 # ── Main menu callbacks ────────────────────────────────────────────────────────
@@ -525,11 +497,6 @@ async def cb_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     action  = query.data.split(":")[1]
     await query.answer()
 
-    # Extra rate limit for network-heavy menu items
-    if action in ("balance", "positions") and _rate_limited(user.id, limit=3, window=30):
-        await query.answer("Зачекайте перед наступним запитом.", show_alert=True)
-        return
-
     dispatch = {
         "wallet":    _menu_wallet,
         "balance":   _menu_balance,
@@ -537,10 +504,29 @@ async def cb_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "positions": _menu_positions,
         "automode":  _menu_automode,
         "trades":    _menu_trades,
+        "notif":     _menu_notif,
+        "plans":     lambda q, uid, lng: cmd_plans_via_callback(q, uid, lng),
+        "main":      _menu_main,
     }
     handler = dispatch.get(action)
     if handler:
         await handler(query, user_id, lang)
+
+
+async def cmd_plans_via_callback(query, user_id: int, lang: str) -> None:
+    tier = db.get_user_tier(user_id)
+    basic_price = db.get_bot_setting("basic_price_usd", "29")
+    pro_price   = db.get_bot_setting("pro_price_usd",   "79")
+    basic_days  = db.get_bot_setting("basic_duration_days", "30")
+    pro_days    = db.get_bot_setting("pro_duration_days",   "30")
+    tier_labels = {"free": "🆓 Free", "basic": "💳 Basic", "pro": "🚀 Pro"}
+    text = t(lang, 'plans',
+             basic_price=basic_price, pro_price=pro_price,
+             basic_days=basic_days, pro_days=pro_days,
+             current_tier=tier_labels.get(tier, tier.upper()))
+    keyboard = _plans_keyboard(lang, tier)
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard,
+                                  disable_web_page_preview=True)
 
 
 async def _menu_wallet(query, user_id: int, lang: str) -> None:
@@ -574,12 +560,6 @@ async def _menu_balance(query, user_id: int, lang: str) -> None:
         return
     await query.edit_message_text(t(lang, 'balance_loading'))
 
-    # Pre-load open positions to show BSC token balances
-    open_positions = {
-        (p["chain"], p["token_address"]): p
-        for p in db.get_open_positions(user_id)
-    }
-
     lines = [t(lang, 'balance_header')]
     for w in wallets:
         icon  = "◎" if w["chain"] == "solana" else "🔶"
@@ -590,36 +570,22 @@ async def _menu_balance(query, user_id: int, lang: str) -> None:
             bal = await get_sol_balance(w["address"])
             lines.append(f"  💰 SOL: <b>{bal:.4f}</b>")
             tokens = await get_sol_token_balances(w["address"])
-            if tokens:
-                for tok in tokens[:5]:
-                    mint_short = tok["mint"][:8] + "..."
-                    lines.append(f"  🪙 <code>{mint_short}</code>: {tok['amount']:,.4f}")
-                if len(tokens) > 5:
-                    lines.append(f"  … та ще {len(tokens) - 5} токенів")
-            else:
-                lines.append("  🪙 Токени не знайдено")
+            for tok in tokens[:5]:
+                mint_short = tok["mint"][:8] + "..."
+                lines.append(f"  🪙 <code>{mint_short}</code>: {tok['amount']:,.2f}")
+            if len(tokens) > 5:
+                lines.append(f"  … та ще {len(tokens) - 5} токенів")
         else:
             bal = await get_bnb_balance(w["address"])
             lines.append(f"  💰 BNB: <b>{bal:.4f}</b>")
-            # Show BSC token balances from open positions
-            bsc_positions = [p for (ch, _addr), p in open_positions.items() if ch == "bsc"]
-            for pos in bsc_positions[:5]:
-                raw, decimals = await get_bsc_token_balance_raw(w["address"], pos["token_address"])
-                if raw > 0:
-                    ui_amt = raw / (10 ** decimals) if decimals else raw
-                    sym    = pos["token_symbol"] or pos["token_address"][:8] + "..."
-                    lines.append(f"  🪙 <b>{sym}</b>: {ui_amt:,.4f}")
-            if not bsc_positions:
-                lines.append("  🪙 Відкритих позицій немає")
 
     await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
 async def _menu_signals(query, user_id: int, lang: str) -> None:
-    from scanner.monitor import _tier_min_score
     tier      = db.get_user_tier(user_id)
     signals   = db.get_recent_signals(limit=50)
-    min_score = _tier_min_score(tier)
+    min_score = 35  # same threshold for all tiers — daily limit enforced at dispatch time
     visible   = [s for s in signals if s["score"] >= min_score]
 
     if not visible:
@@ -663,83 +629,210 @@ async def _menu_positions(query, user_id: int, lang: str) -> None:
         await query.edit_message_text(t(lang, 'positions_empty'))
         return
 
-    await query.edit_message_text(
-        t(lang, 'positions_header', count=len(positions)),
-        parse_mode=ParseMode.HTML,
-    )
+    await query.edit_message_text("⏳ Завантаження позицій...")
 
-    from scanner.dexscreener import get_pairs_by_token
-    from scanner.price_cache import get_cached_price, set_cached_price
+    # Fetch current prices via DexScreener (batch per chain)
+    prices: dict[str, float] = {}
+    try:
+        from scanner.dexscreener import get_pairs_batch
+        sol_addrs = [p["token_address"] for p in positions if p["chain"] == "solana"]
+        bsc_addrs = [p["token_address"] for p in positions if p["chain"] == "bsc"]
+        async with aiohttp.ClientSession() as session:
+            if sol_addrs:
+                pairs = await get_pairs_batch(session, "solana", sol_addrs)
+                for pair in pairs:
+                    addr  = (pair.get("baseToken") or {}).get("address", "")
+                    price = float(pair.get("priceUsd") or 0)
+                    if addr and price and addr not in prices:
+                        prices[addr] = price
+            if bsc_addrs:
+                pairs = await get_pairs_batch(session, "bsc", bsc_addrs)
+                for pair in pairs:
+                    addr  = (pair.get("baseToken") or {}).get("address", "")
+                    price = float(pair.get("priceUsd") or 0)
+                    if addr and price and addr not in prices:
+                        prices[addr] = price
+    except Exception:
+        pass  # show positions without live prices if API fails
 
-    session = _get_http()
+    # Calculate totals
+    total_invested = 0.0
+    total_current  = 0.0
     for pos in positions:
-        icon       = "◎" if pos["chain"] == "solana" else "🔶"
-        buy_price  = float(pos["buy_price_usd"] or 0)
-        sym        = pos["token_symbol"] or "?"
-        name       = pos["token_name"]   or "?"
+        bp  = float(pos["buy_price_usd"] or 0)
+        amt = float(pos["amount"] or 0)
+        cur = prices.get(pos["token_address"], 0)
+        total_invested += amt * bp
+        total_current  += amt * cur if cur else amt * bp  # fallback: no change
 
-        # Use cached price when available to avoid hammering DexScreener
-        pnl_line = ""
-        try:
-            cur_price = get_cached_price(pos["chain"], pos["token_address"])
-            if cur_price is None:
-                pairs = await asyncio.wait_for(
-                    get_pairs_by_token(session, pos["chain"], pos["token_address"]),
-                    timeout=8,
-                )
-                if pairs:
-                    best = max(pairs, key=lambda p: float(
-                        (p.get("liquidity") or {}).get("usd") or 0))
-                    raw = best.get("priceUsd") or best.get("priceNative")
-                    if raw:
-                        cur_price = float(raw)
-                        set_cached_price(pos["chain"], pos["token_address"], cur_price)
-            if cur_price and buy_price > 0:
-                pnl_pct  = (cur_price - buy_price) / buy_price * 100
-                sign     = "+" if pnl_pct >= 0 else ""
-                emoji    = "" if pnl_pct >= 0 else ""
-                pnl_line = f"\n{emoji} PnL: <b>{sign}{pnl_pct:.1f}%</b>  (cur: ${cur_price:.8f})"
-        except (asyncio.TimeoutError, Exception):
-            pass
+    total_pnl     = total_current - total_invested
+    total_pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0.0
+    pnl_emoji     = "📈" if total_pnl >= 0 else "📉"
+    sign          = "+" if total_pnl >= 0 else ""
 
-        buy_price_fmt = f"${buy_price:.8f}" if buy_price > 0 else "невідомо"
+    ua = lang == "ua"
+    header = (
+        f"📂 <b>{'Позиції' if ua else 'Positions'}: {len(positions)}</b>\n"
+        f"💼 {'Вкладено' if ua else 'Invested'}: <b>${total_invested:,.4f}</b>\n"
+        f"💰 {'Поточна вартість' if ua else 'Current value'}: <b>${total_current:,.4f}</b>\n"
+        f"{pnl_emoji} P&amp;L: <b>{sign}${total_pnl:,.4f}</b> ({sign}{total_pnl_pct:.1f}%)"
+    )
+    await query.edit_message_text(header, parse_mode=ParseMode.HTML)
+
+    # Individual position cards
+    for pos in positions:
+        icon      = "◎" if pos["chain"] == "solana" else "🔶"
+        bp        = float(pos["buy_price_usd"] or 0)
+        amt       = float(pos["amount"] or 0)
+        cur_price = prices.get(pos["token_address"], 0)
+        sl_pct    = pos["stop_loss_pct"] or 20
+        tp_pct    = pos["take_profit_pct"] or 0
+
+        if bp > 0 and cur_price > 0:
+            pnl_pct = (cur_price - bp) / bp * 100
+            pnl_usd = (cur_price - bp) * amt
+            p_sign  = "+" if pnl_pct >= 0 else ""
+            p_emoji = "📈" if pnl_pct >= 0 else "📉"
+            pnl_line = f"{p_emoji} P&amp;L: <b>{p_sign}{pnl_pct:.1f}%</b> ({p_sign}${pnl_usd:,.4f})"
+            cur_line = f"💵 {'Поточна' if ua else 'Current'}: ${cur_price:,.8f}"
+        else:
+            pnl_line = f"📊 P&amp;L: {'немає ціни' if ua else 'no price data'}"
+            cur_line = ""
+
+        tp_str = f"+{int(tp_pct)}%" if tp_pct > 0 else ("—" if ua else "—")
         msg = (
-            f"{icon} <b>{sym}</b> ({name})\n"
-            f"📦 {pos['amount']:,.4f} токенів\n"
-            f"💵 Куплено по: {buy_price_fmt}"
-            f"{pnl_line}\n"
-            f"🛑 Stop-loss: -{pos['stop_loss_pct']}%\n"
+            f"{icon} <b>{pos['token_symbol'] or '?'}</b>  {pos['token_name'] or ''}\n"
+            f"📦 {amt:,.4f}  @  ${bp:,.8f}\n"
+            + (cur_line + "\n" if cur_line else "")
+            + f"{pnl_line}\n"
+            f"🛑 SL: -{int(sl_pct)}%  |  🎯 TP: {tp_str}\n"
             f"📅 {pos['opened_at'][:10]}\n"
             f"<code>{pos['token_address']}</code>"
         )
+
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🔴 Sell 50%",  callback_data=f"sell:{pos['id']}:50"),
             InlineKeyboardButton("🔴 Sell 100%", callback_data=f"sell:{pos['id']}:100"),
         ]])
         await query.message.reply_text(msg, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-        await asyncio.sleep(0.5)  # space out DexScreener calls
 
 
 async def _menu_automode(query, user_id: int, lang: str) -> None:
+    tier = db.get_user_tier(user_id)
+
+    # Free tier: show upgrade prompt
+    if tier == "free":
+        text = t(lang, 'auto_tier_required')
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🚀 Upgrade → /plans", callback_data="menu:plans")
+        ]])
+        await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        return
+
     s    = db.get_user_settings(user_id)
-    on   = bool(s["auto_mode"])          if s else False
-    pump = bool(s["notify_all_tokens"])  if s else False
+    on   = bool(s["auto_mode"])           if s else False
+    pump = bool(s["notify_all_tokens"])   if s else False
+    sl   = s["auto_stop_loss"]            if s else 20
+    tp   = s["auto_take_profit"]          if s else 0
+    score = s["auto_min_score"]           if s else 80
+    sol  = s["auto_max_buy_sol"]          if s else 0.1
+    bnb  = s["auto_max_buy_bnb"]          if s else 0.01
+
+    open_pos   = db.get_open_positions(user_id)
+    max_pos    = 3 if tier == "basic" else 999
+    tp_display = f"+{int(tp)}%" if tp > 0 else "—"
 
     text = t(lang, 'auto_status',
-             status=t(lang, 'auto_on') if on else t(lang, 'auto_off'),
-             score=s["auto_min_score"]  if s else 80,
-             sol=s["auto_max_buy_sol"]  if s else 0.1,
-             bnb=s["auto_max_buy_bnb"]  if s else 0.01,
-             sl=s["auto_stop_loss"]     if s else 20)
+             status   = t(lang, 'auto_on') if on else t(lang, 'auto_off'),
+             tier     = tier.upper(),
+             score    = score,
+             sol      = sol,
+             bnb      = bnb,
+             sl       = int(sl),
+             tp       = tp_display,
+             positions = f"{len(open_pos)}/{max_pos}")
 
-    pump_btn = ("🟣 pump.fun: ON ✅" if pump else "🟣 pump.fun: OFF")
+    pump_btn  = ("🟣 pump.fun ✅" if pump else "🟣 pump.fun ❌")
+    sl_active = lambda v: "●" if int(sl) == v else "○"
+    tp_active = lambda v: "●" if int(tp) == v else "○"
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(t(lang, 'auto_toggle_on'),  callback_data="auto:on"),
          InlineKeyboardButton(t(lang, 'auto_toggle_off'), callback_data="auto:off")],
-        [InlineKeyboardButton(pump_btn, callback_data="auto:pump_toggle")],
+        # Stop-loss presets
+        [InlineKeyboardButton(f"SL {sl_active(10)} 10%",  callback_data="auto:sl:10"),
+         InlineKeyboardButton(f"SL {sl_active(20)} 20%",  callback_data="auto:sl:20"),
+         InlineKeyboardButton(f"SL {sl_active(30)} 30%",  callback_data="auto:sl:30"),
+         InlineKeyboardButton(f"SL {sl_active(50)} 50%",  callback_data="auto:sl:50")],
+        # Take-profit presets
+        [InlineKeyboardButton(f"TP {tp_active(0)} OFF",   callback_data="auto:tp:0"),
+         InlineKeyboardButton(f"TP {tp_active(50)} 50%",  callback_data="auto:tp:50"),
+         InlineKeyboardButton(f"TP {tp_active(100)} 100%",callback_data="auto:tp:100"),
+         InlineKeyboardButton(f"TP {tp_active(200)} 200%",callback_data="auto:tp:200")],
+        [InlineKeyboardButton(pump_btn,                   callback_data="auto:pump_toggle")],
         [InlineKeyboardButton(t(lang, 'auto_config'),     callback_data="auto:config")],
+        [InlineKeyboardButton("⚙️ Рекомендовані",        callback_data="auto:recommended"),
+         InlineKeyboardButton("🛡 Safe Mode",             callback_data="auto:safe_mode")],
     ])
     await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def _menu_notif(query, user_id: int, lang: str) -> None:
+    """Notification settings menu."""
+    tier = db.get_user_tier(user_id)
+    s    = db.get_user_settings(user_id)
+
+    push  = bool(s["signals_push"])         if s and "signals_push"          in s.keys() else True
+    chain = (s["signal_chain"] or "all")    if s and "signal_chain"           in s.keys() else "all"
+    mscore = int(s["signal_min_score_user"] or 0) if s and "signal_min_score_user" in s.keys() else 0
+
+    push_icon  = "✅" if push else "❌"
+    chain_icon = {"all": "🌍", "solana": "◎", "bsc": "🔶"}.get(chain, "🌍")
+    chain_name = {"all": t(lang, "notif_chain_all"), "solana": "Solana", "bsc": "BNB Chain"}.get(chain, "All")
+
+    score_display = str(mscore) if mscore > 0 else t(lang, "notif_score_auto")
+
+    text = t(lang, "notif_menu",
+             push=push_icon, chain=f"{chain_icon} {chain_name}",
+             score=score_display, tier=tier.upper())
+
+    # Chain filter buttons (all tiers)
+    chain_row = []
+    for c, lbl in [("all", f"🌍 {t(lang,'notif_chain_all')}"), ("solana", "◎ SOL"), ("bsc", "🔶 BSC")]:
+        active = "●" if chain == c else "○"
+        chain_row.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:chain:{c}"))
+
+    # Score filter buttons — split into 2 rows (5 buttons → too narrow in one row on mobile)
+    score_row1, score_row2 = [], []
+    score_opts = [(0, t(lang,"notif_score_auto")), (35, "35+"), (55, "55+"), (70, "70+"), (85, "85+")]
+    for sc, lbl in score_opts[:3]:
+        active = "●" if mscore == sc else "○"
+        score_row1.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:score:{sc}"))
+    for sc, lbl in score_opts[3:]:
+        active = "●" if mscore == sc else "○"
+        score_row2.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:score:{sc}"))
+
+    back_lbl = "← Назад" if lang == "ua" else "← Back"
+    rows = [
+        [InlineKeyboardButton(
+            f"🔔 {t(lang,'notif_push')}: {push_icon}",
+            callback_data="notif:push_toggle"
+        )],
+    ]
+    if chain_row:
+        rows.append(chain_row)
+    if score_row1:
+        rows.append(score_row1)
+    if score_row2:
+        rows.append(score_row2)
+    rows.append([InlineKeyboardButton(back_lbl, callback_data="menu:main")])
+
+    keyboard = InlineKeyboardMarkup(rows)
+    try:
+        await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    except BadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
 
 
 async def _menu_trades(query, user_id: int, lang: str) -> None:
@@ -752,18 +845,12 @@ async def _menu_trades(query, user_id: int, lang: str) -> None:
     for tr in trades:
         type_icon  = "🟢" if tr["trade_type"] == "buy" else "🔴"
         chain_icon = "◎" if tr["chain"] == "solana" else "🔶"
-        stat_icon  = {"confirmed": "✅", "pending": "⏳", "failed": "❌"}.get(tr["status"] or "", "❓")
-        native     = "SOL" if tr["chain"] == "solana" else "BNB"
-        mode_icon  = "🤖" if (tr["mode"] if "mode" in tr.keys() else "") == "auto" else "👤"
-        amount_in  = float(tr["amount_in"]  or 0)
-        price_usd  = float(tr["price_usd"]  or 0) if "price_usd" in tr.keys() else 0
-        price_str  = f"  📈 ${price_usd:.8f}\n" if price_usd > 0 else ""
+        stat_icon  = {"confirmed": "✅", "pending": "⏳", "failed": "❌"}.get(tr["status"], "❓")
         lines.append(
-            f"\n{type_icon} {tr['trade_type'].upper()} {chain_icon} {mode_icon} "
+            f"\n{type_icon} {tr['trade_type'].upper()} {chain_icon} "
             f"<b>{tr['token_symbol'] or '?'}</b>\n"
-            f"  {amount_in:.4f} {native} {stat_icon}\n"
-            f"{price_str}"
-            f"  {(tr['created_at'] or '')[:16]}"
+            f"  {tr['amount_in']} → {tr['amount_out'] or '?'} | {stat_icon} {tr['status']}\n"
+            f"  {tr['created_at'][:16]}"
         )
     await query.edit_message_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
@@ -998,16 +1085,6 @@ async def _recv_pk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     except Exception:
         pass
 
-    # Validate key format before storing
-    if chain == "solana":
-        if not is_valid_solana_private_key(pk):
-            await update.message.reply_text(t(lang, 'wallet_pk_invalid'))
-            return ConversationHandler.END
-    else:
-        if not is_valid_bsc_private_key(pk):
-            await update.message.reply_text(t(lang, 'wallet_pk_invalid'))
-            return ConversationHandler.END
-
     encrypted = encrypt_pk(pk)
     if not encrypted:
         await update.message.reply_text(t(lang, 'wallet_pk_encrypt_failed'))
@@ -1035,11 +1112,6 @@ async def cb_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
-
-    # ── Rate limit: max 3 buy actions per 60s
-    if _trade_rate_limited(user.id):
-        await query.answer("Забагато запитів. Зачекайте хвилину.", show_alert=True)
-        return
     await query.answer()
 
     parts = query.data.split(":", 3)
@@ -1048,38 +1120,7 @@ async def cb_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     _, chain, token_address, amount_str = parts
-
-    # ── Validate chain
-    if chain not in ("solana", "bsc"):
-        await query.message.reply_text("❌ Unknown chain.")
-        return
-
-    # ── Validate token address
-    if chain == "solana" and not is_valid_solana_address(token_address):
-        await query.message.reply_text("❌ Invalid token address.")
-        return
-    if chain == "bsc" and not is_valid_evm_address(token_address):
-        await query.message.reply_text("❌ Invalid token address.")
-        return
-
-    # ── Validate and cap amount
-    try:
-        amount = float(amount_str)
-        if amount <= 0:
-            raise ValueError
-    except (ValueError, TypeError):
-        await query.message.reply_text("❌ Invalid amount.")
-        return
-    max_allowed = _MAX_BUY_SOL if chain == "solana" else _MAX_BUY_BNB
-    if amount > max_allowed:
-        native = "SOL" if chain == "solana" else "BNB"
-        await query.message.reply_text(f"❌ Amount exceeds max allowed ({max_allowed} {native}).")
-        return
-
-    # ── Duplicate buy guard
-    if db.has_open_position(user_id, chain, token_address):
-        await query.message.reply_text("⚠️ Ви вже маєте відкриту позицію по цьому токену.")
-        return
+    amount = float(amount_str)
 
     wallet = db.get_wallet(user_id, chain)
     if not wallet:
@@ -1102,18 +1143,17 @@ async def cb_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.HTML,
     )
 
-    session = _get_http()
     if chain == "solana":
-        from trader.jupiter import get_buy_quote, execute_swap
-        quote = await get_buy_quote(session, token_address, amount)
-        if not quote:
-            await query.message.reply_text(t(lang, 'buy_quote_failed'))
-            return
-        result = await execute_swap(session, quote, wallet["address"], pk)
+        async with aiohttp.ClientSession() as session:
+            from trader.jupiter import get_buy_quote, execute_swap
+            quote = await get_buy_quote(session, token_address, amount)
+            if not quote:
+                await query.message.reply_text(t(lang, 'buy_quote_failed'))
+                return
+            result = await execute_swap(session, quote, wallet["address"], pk)
     else:
         from trader.bsc import execute_buy
-        # execute_buy is synchronous (web3) — run in thread to avoid blocking event loop
-        result = await asyncio.to_thread(execute_buy, token_address, amount, pk)
+        result = execute_buy(token_address, amount, pk)
 
     if result["success"]:
         trade_id = db.save_trade(user_id, chain, token_address, "?", "buy",
@@ -1153,31 +1193,10 @@ async def cb_pos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang    = db.get_user_lang(user_id)
     await query.answer()
 
-    parts  = query.data.split(":")
-    action = parts[1] if len(parts) > 1 else ""
-
-    if action == "close_all_confirm":
-        # Confirmed — close all open positions (DB only, no on-chain sell)
-        positions = db.get_open_positions(user_id)
-        for pos in positions:
-            db.close_position(pos["id"])
-        await query.edit_message_text(t(lang, 'pos_closed_all', count=len(positions)))
-    else:
-        # First tap — ask for confirmation before wiping all positions
-        positions = db.get_open_positions(user_id)
-        if not positions:
-            await query.edit_message_text(t(lang, 'positions_empty'))
-            return
-        kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("✅ Підтвердити закриття", callback_data="pos:close_all_confirm"),
-            InlineKeyboardButton("❌ Скасувати",            callback_data="skip"),
-        ]])
-        await query.edit_message_text(
-            f"⚠️ Закрити всі <b>{len(positions)}</b> відкритих позицій?\n"
-            f"(Продаж на блокчейні НЕ виконується — тільки видалення з бота.)",
-            parse_mode=ParseMode.HTML,
-            reply_markup=kb,
-        )
+    positions = db.get_open_positions(user_id)
+    for pos in positions:
+        db.close_position(pos["id"])
+    await query.edit_message_text(t(lang, 'pos_closed_all', count=len(positions)))
 
 
 async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1187,27 +1206,11 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     user_id = db.upsert_user(user.id, user.first_name, user.username)
     lang    = db.get_user_lang(user_id)
-
-    # ── Rate limit: max 3 sell actions per 60s
-    if _trade_rate_limited(user.id):
-        await query.answer("Забагато запитів. Зачекайте хвилину.", show_alert=True)
-        return
     await query.answer()
 
-    # ── Safe parse of callback data
-    parts = query.data.split(":")
-    if len(parts) < 3:
-        await query.edit_message_text("❌ Invalid callback data.")
-        return
-    try:
-        pos_id   = int(parts[1])
-        sell_pct = int(parts[2])
-    except (ValueError, IndexError):
-        await query.edit_message_text("❌ Invalid sell parameters.")
-        return
-    if sell_pct not in (50, 100):
-        await query.edit_message_text("❌ Invalid sell percentage.")
-        return
+    parts    = query.data.split(":")
+    pos_id   = int(parts[1])
+    sell_pct = int(parts[2])
 
     positions = db.get_open_positions(user_id)
     pos = next((p for p in positions if p["id"] == pos_id), None)
@@ -1226,47 +1229,48 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await query.edit_message_text(t(lang, 'buy_decrypt_failed'))
         return
 
-    sym = pos["token_symbol"] or "?"
+    sell_amount = pos["amount"] * sell_pct / 100
     await query.edit_message_text(
-        f"⏳ Продаю {sell_pct}% <b>{sym}</b>...",
+        f"⏳ Продаю {sell_pct}% <b>{pos['token_symbol'] or '?'}</b>...",
         parse_mode=ParseMode.HTML,
     )
 
-    session = _get_http()
     if chain == "solana":
-        # Get actual on-chain balance for exact raw amount
-        raw_total, decimals = await get_sol_token_balance_raw(
-            wallet["address"], pos["token_address"])
-        if raw_total <= 0:
-            await query.edit_message_text("❌ Токени не знайдено в гаманці.")
-            return
-        amount_raw = int(raw_total * sell_pct / 100)
-        from trader.jupiter import get_sell_quote, execute_swap
-        quote = await get_sell_quote(session, pos["token_address"], amount_raw)
-        if not quote:
-            await query.edit_message_text("❌ Не вдалося отримати ціну продажу.")
-            return
-        result = await execute_swap(session, quote, wallet["address"], pk)
-    else:
-        # Get actual decimals from chain — don't assume 18
-        raw_total, decimals = await get_bsc_token_balance_raw(
-            wallet["address"], pos["token_address"])
-        if raw_total <= 0:
-            await query.edit_message_text("❌ Токени не знайдено в гаманці.")
-            return
-        amount_raw = int(raw_total * sell_pct / 100)
-        from trader.bsc import execute_sell
-        result = await asyncio.to_thread(execute_sell, pos["token_address"], amount_raw, pk, 10.0)
+        tokens   = await get_sol_token_balances(wallet["address"])
+        tok      = next((tk for tk in tokens if tk["mint"] == pos["token_address"]), None)
+        decimals = tok["decimals"] if tok else 6
+        amount_raw = int(sell_amount * (10 ** decimals))
 
-    sell_ui = amount_raw / (10 ** decimals) if decimals else amount_raw
+        async with aiohttp.ClientSession() as session:
+            from trader.jupiter import get_sell_quote, execute_swap
+            quote = await get_sell_quote(session, pos["token_address"], amount_raw)
+            if not quote:
+                await query.edit_message_text("❌ Не вдалося отримати ціну продажу.")
+                return
+            result = await execute_swap(session, quote, wallet["address"], pk)
+    else:
+        from trader.bsc import execute_sell
+        # BSC: sell_amount is in token units, convert with decimals (assume 18)
+        amount_raw = int(sell_amount * (10 ** 18))
+        result = execute_sell(pos["token_address"], amount_raw, pk)
 
     if result["success"]:
-        db.save_trade(
-            user_id=user_id, chain=chain,
-            token_address=pos["token_address"], token_symbol=sym,
-            trade_type="sell", amount_in=sell_ui, amount_out=0,
-            price_usd=0, tx_hash=result["tx_hash"], status="pending",
-        )
+        # Calculate sell price and P&L
+        buy_price_usd = pos["buy_price_usd"] or 0
+        # Estimate sell price from quote output / sell_amount or fallback to buy price
+        try:
+            amount_out_native = float(result.get("amount_out") or 0)
+            sell_price_usd = amount_out_native / sell_amount if sell_amount > 0 and amount_out_native > 0 else 0.0
+        except Exception:
+            sell_price_usd = 0.0
+        pnl_usd_val     = (sell_price_usd - buy_price_usd) * sell_amount if buy_price_usd > 0 and sell_price_usd > 0 else None
+        pnl_percent_val = ((sell_price_usd - buy_price_usd) / buy_price_usd * 100) if buy_price_usd > 0 and sell_price_usd > 0 else None
+        db.save_trade(user_id, chain, pos["token_address"],
+                      pos["token_symbol"] or "?", "sell",
+                      sell_amount, 0, buy_price_usd, result["tx_hash"], "pending",
+                      sell_price=sell_price_usd if sell_price_usd > 0 else None,
+                      pnl_usd=pnl_usd_val,
+                      pnl_percent=pnl_percent_val)
         if sell_pct == 100:
             db.close_position(pos_id)
         else:
@@ -1284,6 +1288,42 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
+async def cb_notif(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles notification settings callbacks: notif:push_toggle, notif:chain:X, notif:score:N"""
+    query   = update.callback_query
+    user    = query.from_user
+    if _check_banned(user.id):
+        return
+    user_id = db.upsert_user(user.id, user.first_name, user.username)
+    lang    = db.get_user_lang(user_id)
+    tier    = db.get_user_tier(user_id)
+    await query.answer()
+
+    parts  = query.data.split(":")   # ["notif", action, ...value]
+    action = parts[1] if len(parts) > 1 else ""
+
+    s = db.get_user_settings(user_id)
+
+    if action == "push_toggle":
+        curr = bool(s["signals_push"]) if s and "signals_push" in s.keys() else True
+        db.update_user_settings(user_id, signals_push=0 if curr else 1)
+
+    elif action == "chain":
+        new_chain = parts[2] if len(parts) > 2 else "all"
+        if new_chain in ("all", "solana", "bsc"):
+            db.update_user_settings(user_id, signal_chain=new_chain)
+
+    elif action == "score":
+        try:
+            new_score = int(parts[2]) if len(parts) > 2 else 0
+        except ValueError:
+            new_score = 0
+        db.update_user_settings(user_id, signal_min_score_user=new_score)
+
+    # Re-render the notifications menu
+    await _menu_notif(query, user_id, lang)
+
+
 async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
     user    = query.from_user
@@ -1293,13 +1333,51 @@ async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang    = db.get_user_lang(user_id)
     await query.answer()
 
-    action = query.data.split(":")[1]
+    parts  = query.data.split(":")
+    action = parts[1]
+
     if action == "on":
+        # Tier gate — free users cannot enable auto-trade
+        tier = db.get_user_tier(user_id)
+        if tier == "free":
+            await query.answer(t(lang, 'auto_tier_required_short'), show_alert=True)
+            return
+        # Wallet + pk check
+        settings = db.get_user_settings(user_id)
+        has_sol = bool(db.get_wallet(user_id, "solana"))
+        has_bnb = bool(db.get_wallet(user_id, "bsc"))
+        if not (has_sol or has_bnb):
+            await query.answer(t(lang, 'auto_no_wallet'), show_alert=True)
+            return
         db.update_user_settings(user_id, auto_mode=1)
-        await query.edit_message_text(t(lang, 'auto_enabled'), parse_mode=ParseMode.HTML)
+        max_pos = 3 if tier == "basic" else 999
+        score   = settings["auto_min_score"] if settings else 80
+        await query.edit_message_text(
+            t(lang, 'auto_enabled', score=score, max_pos=max_pos, tier=tier.upper()),
+            parse_mode=ParseMode.HTML,
+        )
     elif action == "off":
         db.update_user_settings(user_id, auto_mode=0)
         await query.edit_message_text(t(lang, 'auto_disabled'))
+    elif action == "sl" and len(parts) >= 3:
+        try:
+            sl_val = int(parts[2])
+            db.update_user_settings(user_id, auto_stop_loss=float(sl_val))
+            await query.answer(f"Stop-loss: {sl_val}%", show_alert=False)
+            await _menu_automode(query, user_id, lang)
+        except (ValueError, IndexError):
+            pass
+        return
+    elif action == "tp" and len(parts) >= 3:
+        try:
+            tp_val = int(parts[2])
+            db.update_user_settings(user_id, auto_take_profit=float(tp_val))
+            label = f"+{tp_val}%" if tp_val > 0 else "OFF"
+            await query.answer(f"Take-profit: {label}", show_alert=False)
+            await _menu_automode(query, user_id, lang)
+        except (ValueError, IndexError):
+            pass
+        return
     elif action == "config":
         await query.edit_message_text(t(lang, 'auto_config_help'), parse_mode=ParseMode.HTML)
     elif action == "pump_toggle":
@@ -1310,6 +1388,226 @@ async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.edit_message_text("🟣 pump.fun сповіщення <b>вимкнено</b>.", parse_mode=ParseMode.HTML)
         else:
             await query.edit_message_text("🟣 pump.fun сповіщення <b>увімкнено</b>!\n\nБот надсилатиме кожен новий токен з pump.fun.", parse_mode=ParseMode.HTML)
+    elif action == "recommended":
+        tier = db.get_user_tier(user_id)
+        if tier == "free":
+            await query.answer(t(lang, 'auto_tier_required_short'), show_alert=True)
+            return
+        db.update_user_settings(
+            user_id,
+            auto_mode=1,
+            auto_min_score=80,
+            auto_max_buy_sol=0.1,
+            auto_max_buy_bnb=0.01,
+            auto_stop_loss=20,
+            auto_take_profit=80,
+        )
+        await query.edit_message_text(
+            "⚙️ <b>Рекомендовані налаштування застосовано!</b>\n\n"
+            "✅ Auto-mode: ON\n"
+            "📊 Min score: 80\n"
+            "◎ Max buy SOL: 0.1\n"
+            "🔶 Max buy BNB: 0.01\n"
+            "🛑 Stop-loss: 20%\n"
+            "🎯 Take-profit: 80%",
+            parse_mode=ParseMode.HTML,
+        )
+    elif action == "safe_mode":
+        s    = db.get_user_settings(user_id)
+        curr = bool(s["safe_mode"]) if s and "safe_mode" in s.keys() else False
+        db.update_user_settings(user_id, safe_mode=0 if curr else 1)
+        if curr:
+            await query.edit_message_text(
+                "🛡 <b>Safe Mode вимкнено.</b>\n\nБот буде використовувати стандартні фільтри.",
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            await query.edit_message_text(
+                "🛡 <b>Safe Mode увімкнено!</b>\n\n"
+                "✅ Мінімальний score: 85\n"
+                "❌ pump.fun токени — виключені\n\n"
+                "Тільки найбезпечніші сигнали.",
+                parse_mode=ParseMode.HTML,
+            )
+
+
+# ── Background: position monitor (stop-loss / take-profit) ────────────────────
+
+async def _position_monitor_loop() -> None:
+    """Check open positions every 5 minutes for stop-loss / take-profit triggers."""
+    logger.info("Position monitor loop started.")
+    await asyncio.sleep(90)   # short delay after startup
+    while True:
+        try:
+            await _check_positions_for_exit()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Position monitor error: %s", e)
+        await asyncio.sleep(300)   # every 5 minutes
+
+
+async def _check_positions_for_exit() -> None:
+    if _app is None:
+        return
+    from scanner.dexscreener import get_pairs_by_token
+
+    positions = db.get_all_open_positions_with_users()
+    if not positions:
+        return
+
+    # Deduplicate price fetches: fetch price once per unique chain+token
+    # (multiple users may hold the same token — no need to call DexScreener N times)
+    price_cache: dict[str, float] = {}
+
+    async with aiohttp.ClientSession() as session:
+        for pos in positions:
+            try:
+                cache_key = f"{pos['chain']}:{pos['token_address']}"
+                if cache_key not in price_cache:
+                    pairs = await get_pairs_by_token(session, pos["chain"], pos["token_address"])
+                    price = float(pairs[0].get("priceUsd") or 0) if pairs else 0.0
+                    price_cache[cache_key] = price
+                    await asyncio.sleep(0.2)   # rate-limit only on cache miss
+                await _evaluate_position(session, pos, price_cache[cache_key])
+            except Exception as e:
+                logger.warning("Position eval error (id=%d): %s", pos["id"], e)
+
+
+async def _evaluate_position(session, pos, current_price: float) -> None:
+    """Check one open position and execute auto-sell if SL/TP triggered.
+    current_price is pre-fetched and cached by _check_positions_for_exit."""
+    buy_price = pos["buy_price_usd"]
+    if not buy_price or buy_price <= 0 or current_price <= 0:
+        return
+
+    sl_pct = pos["stop_loss_pct"] if pos["stop_loss_pct"] is not None else (pos["eff_sl"] or 20)
+    tp_pct = pos["take_profit_pct"] if pos["take_profit_pct"] is not None else pos["eff_tp"]
+
+    pnl_pct = (current_price - buy_price) / buy_price * 100
+
+    triggered_reason = None
+    if pnl_pct <= -sl_pct:
+        triggered_reason = "sl"
+    elif tp_pct > 0 and pnl_pct >= tp_pct:
+        triggered_reason = "tp"
+
+    if triggered_reason is None:
+        return
+
+    logger.info(
+        "Position %d %s %s triggered %s (pnl=%.1f%%)",
+        pos["id"], pos["chain"], pos["token_symbol"] or "?", triggered_reason, pnl_pct
+    )
+
+    # Execute sell if wallet+pk available
+    sell_ok = False
+    tx_hash = "—"
+    if pos["encrypted_pk"] and pos["wallet_address"]:
+        pk = decrypt_pk(pos["encrypted_pk"])
+        if pk:
+            chain  = pos["chain"]
+            amount = pos["amount"]
+            try:
+                if chain == "solana":
+                    from trader.wallet import get_sol_token_balances
+                    tokens     = await get_sol_token_balances(pos["wallet_address"])
+                    tok        = next((tk for tk in tokens if tk["mint"] == pos["token_address"]), None)
+                    decimals   = tok["decimals"] if tok else 6
+                    amount_raw = int(amount * (10 ** decimals))
+                    from trader.jupiter import get_sell_quote, execute_swap
+                    quote = await get_sell_quote(session, pos["token_address"], amount_raw)
+                    if quote:
+                        result = await execute_swap(session, quote, pos["wallet_address"], pk)
+                        sell_ok = result["success"]
+                        tx_hash = result.get("tx_hash", "—")
+                else:
+                    from trader.bsc import execute_sell
+                    amount_raw = int(amount * (10 ** 18))
+                    result     = execute_sell(pos["token_address"], amount_raw, pk)
+                    sell_ok    = result["success"]
+                    tx_hash    = result.get("tx_hash", "—")
+            except Exception as e:
+                logger.error("Auto-sell error pos %d: %s", pos["id"], e)
+
+    # Close position in DB regardless of sell success (to avoid looping)
+    db.close_position_with_reason(pos["id"], triggered_reason)
+
+    # Record trade if sell went through
+    if sell_ok and _app:
+        db.save_trade(pos["user_id"], pos["chain"], pos["token_address"],
+                      pos["token_symbol"] or "?", "sell",
+                      pos["amount"], 0, current_price,
+                      tx_hash, "confirmed", "auto")
+
+    # Notify user
+    if _app is None:
+        return
+    lang = pos["lang"] or "ua"
+    symbol = pos["token_symbol"] or pos["token_address"][:8]
+    if triggered_reason == "sl":
+        text = t(lang, 'auto_sl_hit',
+                 symbol=symbol, pnl=f"{pnl_pct:.1f}",
+                 sl=sl_pct, tx=tx_hash if sell_ok else "—",
+                 sold=("✅" if sell_ok else "⚠️ не вдалося продати"))
+    else:
+        text = t(lang, 'auto_tp_hit',
+                 symbol=symbol, pnl=f"+{pnl_pct:.1f}",
+                 tp=tp_pct, tx=tx_hash if sell_ok else "—",
+                 sold=("✅" if sell_ok else "⚠️ не вдалося продати"))
+    try:
+        await _app.bot.send_message(
+            chat_id=pos["telegram_id"],
+            text=text,
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception as e:
+        logger.warning("Notify user after auto-sell failed: %s", e)
+
+
+# ── Background: subscription expiry reminders ─────────────────────────────────
+
+async def _subscription_reminder_loop() -> None:
+    """Once per day check for subscriptions expiring in ~3 days and notify users."""
+    logger.info("Subscription reminder loop started.")
+    await asyncio.sleep(60)   # wait 1 min after startup before first check
+    while True:
+        try:
+            await _send_expiry_reminders()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("Subscription reminder loop error: %s", e)
+        await asyncio.sleep(86400)   # run once every 24 hours
+
+
+async def _send_expiry_reminders() -> None:
+    if _app is None:
+        return
+    from datetime import datetime, timezone
+    expiring = db.get_expiring_subscriptions(days=3)
+    for row in expiring:
+        try:
+            lang = row["lang"] or "ua"
+            expires_dt = datetime.fromisoformat(row["expires_at"])
+            days_left  = (expires_dt.replace(tzinfo=timezone.utc) -
+                          datetime.now(timezone.utc)).days
+            days_left  = max(0, days_left)
+            text = t(lang, "sub_expiry_reminder").format(
+                tier    = row["tier"].upper(),
+                expires = row["expires_at"][:10],
+                days    = days_left,
+            )
+            await _app.bot.send_message(
+                chat_id    = row["telegram_id"],
+                text       = text,
+                parse_mode = ParseMode.HTML,
+            )
+            logger.info("Expiry reminder sent to user %d (tier=%s, expires=%s)",
+                        row["telegram_id"], row["tier"], row["expires_at"][:10])
+            await asyncio.sleep(0.05)
+        except Exception as e:
+            logger.warning("Expiry reminder send error to %d: %s", row["telegram_id"], e)
 
 
 # ── Background: broadcast task ─────────────────────────────────────────────────
@@ -1356,348 +1654,15 @@ async def _process_broadcasts() -> None:
         logger.info("Broadcast #%d sent to %d users.", bcast["id"], sent)
 
 
-# ── Background: subscription reminder ─────────────────────────────────────────
-
-async def _subscription_reminder_loop() -> None:
-    """
-    Runs every 6 hours.
-    Sends a reminder to users whose subscription expires within 3 days.
-    Stub — full logic implemented in STEP 6.
-    """
-    logger.info("Subscription reminder loop started.")
-    while True:
-        await asyncio.sleep(6 * 3600)
-        try:
-            await _check_expiring_subscriptions()
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error("Subscription reminder error: %s", e)
-
-
-async def _check_expiring_subscriptions() -> None:
-    if _app is None:
-        return
-    expiring = db.get_expiring_subscriptions(days=3)
-    for user in expiring:
-        lang = user.get("lang") or "ua"
-        tier = user.get("tier", "basic")
-        try:
-            from lang import t as _t
-            msg = _t(lang, "sub_expiring_soon").format(tier=tier.upper())
-        except Exception:
-            msg = f"Your <b>{tier.upper()}</b> subscription expires in 3 days. Renew to keep receiving signals."
-        try:
-            await _app.bot.send_message(
-                chat_id=user["telegram_id"],
-                text=msg,
-                parse_mode=ParseMode.HTML,
-            )
-            await asyncio.sleep(0.05)
-        except Exception as e:
-            logger.warning("Reminder send error to %d: %s", user["telegram_id"], e)
-
-
-# ── Background: position monitor ───────────────────────────────────────────────
-
-async def _position_monitor_loop() -> None:
-    """
-    Runs every 5 minutes.
-    Evaluates open positions for SL/TP triggers.
-    Stub — full logic implemented in STEP 6.
-    """
-    logger.info("Position monitor loop started.")
-    while True:
-        await asyncio.sleep(5 * 60)
-        try:
-            await _evaluate_open_positions()
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error("Position monitor error: %s", e)
-
-
-async def _evaluate_open_positions() -> None:
-    """
-    Check every open position against current price.
-    Triggers auto-sell if:
-      - PnL% <= -stop_loss_pct   (stop-loss)
-      - auto_take_profit > 0 and PnL% >= auto_take_profit  (take-profit)
-
-    Performance: groups positions by chain and uses batch DexScreener lookup
-    (1 request per chain for up to 30 tokens, vs 1 request per position).
-    """
-    from scanner.dexscreener import get_pairs_batch
-    from scanner.price_cache import get_cached_price, set_cached_price
-
-    positions = db.get_all_open_positions_with_users()
-    if not positions:
-        return
-
-    logger.info("Position monitor: evaluating %d open position(s)", len(positions))
-    session = _get_http()
-
-    # ── Pre-fetch prices in batch per chain ───────────────────────────────────
-    price_map: dict[str, float] = {}  # "chain:address" → price
-
-    from collections import defaultdict as _dd
-    by_chain: dict[str, list[str]] = _dd(list)
-    for pos in positions:
-        key = f"{pos['chain']}:{pos['token_address']}"
-        cached = get_cached_price(pos["chain"], pos["token_address"])
-        if cached is not None:
-            price_map[key] = cached
-        else:
-            by_chain[pos["chain"]].append(pos["token_address"])
-
-    for chain, addresses in by_chain.items():
-        # Batch up to 30 per request; split if more
-        for i in range(0, len(addresses), 30):
-            chunk = addresses[i:i + 30]
-            try:
-                pairs = await asyncio.wait_for(
-                    get_pairs_batch(session, chain, chunk),
-                    timeout=10,
-                )
-                for pair in pairs:
-                    token_addr = (
-                        (pair.get("baseToken") or {}).get("address") or ""
-                    ).lower()
-                    raw = pair.get("priceUsd") or pair.get("priceNative")
-                    liq = float((pair.get("liquidity") or {}).get("usd") or 0)
-                    if raw and token_addr:
-                        # Keep the pair with the highest liquidity per token
-                        key = f"{chain}:{token_addr}"
-                        existing_liq = price_map.get(f"_liq_{key}", 0)
-                        if liq >= existing_liq:
-                            price_map[key] = float(raw)
-                            price_map[f"_liq_{key}"] = liq
-                            set_cached_price(chain, token_addr, float(raw))
-            except (asyncio.TimeoutError, Exception) as e:
-                logger.warning("Batch price fetch error chain=%s: %s", chain, e)
-            await asyncio.sleep(1)  # respect DexScreener rate limit between chunks
-
-    # ── Evaluate each position ────────────────────────────────────────────────
-    for pos in positions:
-        try:
-            key = f"{pos['chain']}:{pos['token_address'].lower()}"
-            current_price = price_map.get(key)
-            await _evaluate_single_position(session, pos, current_price)
-        except Exception as e:
-            logger.error(
-                "Position eval error pos_id=%d: %s",
-                pos["position_id"], e, exc_info=True,
-            )
-
-
-async def _evaluate_single_position(
-    session: aiohttp.ClientSession,
-    pos,              # sqlite3.Row from get_all_open_positions_with_users
-    current_price: float | None = None,
-) -> None:
-    from scanner.dexscreener import get_pairs_by_token
-    from scanner.price_cache import get_cached_price, set_cached_price
-
-    position_id  = pos["position_id"]
-    chain        = pos["chain"]
-    token_addr   = pos["token_address"]
-    token_sym    = pos["token_symbol"] or "?"
-    buy_price    = float(pos["buy_price_usd"] or 0)
-    stop_loss    = float(pos["stop_loss_pct"] or 20)
-    take_profit  = float(pos["auto_take_profit"] or 0)
-    telegram_id  = pos["telegram_id"]
-    lang         = pos["lang"] or "ua"
-
-    # No entry price → can't calculate PnL; skip
-    if buy_price <= 0:
-        return
-
-    # ── Use pre-fetched price or fall back to individual DexScreener call
-    if current_price is None:
-        current_price = get_cached_price(chain, token_addr)
-    if current_price is None:
-        pairs = await get_pairs_by_token(session, chain, token_addr)
-        if not pairs:
-            logger.debug("Position monitor: no pairs found for %s on %s", token_sym, chain)
-            return
-        best = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd") or 0))
-        raw = best.get("priceUsd") or best.get("priceNative")
-        if not raw:
-            return
-        try:
-            current_price = float(raw)
-            set_cached_price(chain, token_addr, current_price)
-        except (ValueError, TypeError):
-            return
-
-    if not current_price or current_price <= 0:
-        return
-
-    pnl_pct = (current_price - buy_price) / buy_price * 100
-
-    logger.debug(
-        "Position %d %s/%s: buy=%.8f cur=%.8f pnl=%.1f%% sl=-%.0f%% tp=+%.0f%%",
-        position_id, chain, token_sym,
-        buy_price, current_price, pnl_pct, stop_loss, take_profit,
-    )
-
-    # ── Check triggers
-    triggered_reason = None
-    if pnl_pct <= -stop_loss:
-        triggered_reason = f"stop_loss (PnL {pnl_pct:.1f}%)"
-    elif take_profit > 0 and pnl_pct >= take_profit:
-        triggered_reason = f"take_profit (PnL +{pnl_pct:.1f}%)"
-
-    if triggered_reason:
-        logger.info(
-            "Position %d %s TRIGGERED %s — selling",
-            position_id, token_sym, triggered_reason,
-        )
-        await _auto_sell_position(session, pos, current_price, pnl_pct, triggered_reason)
-
-
-async def _auto_sell_position(
-    session: aiohttp.ClientSession,
-    pos,
-    current_price: float,
-    pnl_pct: float,
-    reason: str,
-) -> None:
-    """
-    Execute an auto-sell for a triggered position.
-    Closes the DB position first (prevents race condition / double-sell),
-    then executes the on-chain sell.
-    """
-    from trader.wallet import decrypt_pk, get_sol_token_balance_raw, get_bsc_token_balance_raw
-
-    position_id = pos["position_id"]
-    chain       = pos["chain"]
-    token_addr  = pos["token_address"]
-    token_sym   = pos["token_symbol"] or "?"
-    token_name  = pos["token_name"]   or "?"
-    telegram_id = pos["telegram_id"]
-    lang        = pos["lang"] or "ua"
-    user_id     = pos["user_id"]
-
-    wallet_addr  = pos["wallet_address"]
-    encrypted_pk = pos["encrypted_pk"]
-
-    if not wallet_addr or not encrypted_pk:
-        logger.warning("Auto-sell pos %d: no wallet/key", position_id)
-        return
-
-    pk = decrypt_pk(encrypted_pk)
-    if not pk:
-        logger.warning("Auto-sell pos %d: decrypt failed", position_id)
-        return
-
-    # ── Close position in DB immediately to prevent double-sell
-    db.close_position_with_sell(position_id, current_price, pnl_pct, reason)
-
-    # ── Get actual on-chain token balance
-    if chain == "solana":
-        raw_balance, decimals = await get_sol_token_balance_raw(wallet_addr, token_addr)
-    else:
-        raw_balance, decimals = await get_bsc_token_balance_raw(wallet_addr, token_addr)
-
-    if raw_balance <= 0:
-        logger.info("Auto-sell pos %d: zero balance on-chain, position closed without TX", position_id)
-        await _notify_auto(
-            telegram_id,
-            f"Position <b>{token_sym}</b> closed ({reason}) — no tokens found in wallet.",
-            lang,
-        )
-        return
-
-    # ── Execute sell with up to 2 retries
-    result = None
-    for attempt in range(1, 3):
-        try:
-            if chain == "solana":
-                from trader.jupiter import get_sell_quote, execute_swap
-                quote = await asyncio.wait_for(
-                    get_sell_quote(session, token_addr, raw_balance, slippage_bps=500),
-                    timeout=30,
-                )
-                if not quote:
-                    logger.warning("Auto-sell pos %d attempt %d: no quote", position_id, attempt)
-                    await asyncio.sleep(5)
-                    continue
-                result = await asyncio.wait_for(
-                    execute_swap(session, quote, wallet_addr, pk),
-                    timeout=30,
-                )
-            else:
-                from trader.bsc import execute_sell as bsc_sell
-                result = await asyncio.wait_for(
-                    asyncio.to_thread(bsc_sell, token_addr, raw_balance, pk, 10.0),
-                    timeout=60,
-                )
-        except asyncio.TimeoutError:
-            result = {"success": False, "tx_hash": None, "error": "timeout"}
-
-        if result and result.get("success"):
-            break
-        if attempt < 2:
-            await asyncio.sleep(5)
-
-    tx_hash = (result or {}).get("tx_hash")
-    sell_ok  = bool(result and result.get("success"))
-
-    # ── Save trade record
-    ui_amount = raw_balance / (10 ** decimals) if decimals else raw_balance
-    db.save_trade(
-        user_id=user_id, chain=chain,
-        token_address=token_addr, token_symbol=token_sym,
-        trade_type="sell", amount_in=ui_amount,
-        amount_out=ui_amount * current_price,
-        price_usd=current_price,
-        tx_hash=tx_hash, status="confirmed" if sell_ok else "failed",
-        mode="auto",
-    )
-
-    logger.info(
-        "Auto-sell pos %d %s/%s: reason=%s pnl=%.1f%% success=%s tx=%s",
-        position_id, chain, token_sym, reason, pnl_pct, sell_ok, tx_hash,
-    )
-
-    # ── Notify user
-    sign   = "+" if pnl_pct >= 0 else ""
-    native = "SOL" if chain == "solana" else "BNB"
-    if sell_ok and tx_hash:
-        tx_link = (
-            f'<a href="https://solscan.io/tx/{tx_hash}">Solscan</a>'
-            if chain == "solana"
-            else f'<a href="https://bscscan.com/tx/{tx_hash}">BscScan</a>'
-        )
-        emoji = "" if pnl_pct >= 0 else ""
-        msg = (
-            f"{emoji} Auto-sell executed — <b>{reason}</b>\n"
-            f"Token: <b>{token_name}</b> (${token_sym})\n"
-            f"PnL: <b>{sign}{pnl_pct:.1f}%</b>\n"
-            f"Sell price: ${current_price:.8f}\n"
-            f"TX: {tx_link}"
-        )
-    else:
-        err = (result or {}).get("error", "unknown")
-        msg = (
-            f"Auto-sell triggered ({reason}) for <b>{token_sym}</b> "
-            f"(PnL {sign}{pnl_pct:.1f}%) but TX failed: {err}\n"
-            f"Position is closed in the bot. Please check your wallet."
-        )
-    await _notify_auto(telegram_id, msg, lang)
-
-
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
 async def post_init(app: Application) -> None:
-    global _app, _http
+    global _app
     _app = app
-    _http = aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=30, ttl_dns_cache=300),
-        timeout=aiohttp.ClientTimeout(total=30),
-    )
-    logger.info("Shared aiohttp session created.")
+
+    # Remove any active webhook so polling doesn't conflict
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook deleted, pending updates dropped.")
 
     await app.bot.set_my_commands([
         BotCommand("start",    "Головне меню / Main menu"),
@@ -1716,13 +1681,6 @@ async def post_init(app: Application) -> None:
     logger.info("All background tasks started.")
 
 
-async def _post_shutdown(app: Application) -> None:
-    global _http
-    if _http and not _http.closed:
-        await _http.close()
-        logger.info("Shared aiohttp session closed.")
-
-
 def main() -> None:
     if not TELEGRAM_TOKEN:
         raise ValueError("TELEGRAM_TOKEN is not set")
@@ -1730,25 +1688,25 @@ def main() -> None:
     db.init_db()
     logger.info("Database initialized.")
 
-    port = int(os.getenv("PORT", "5000"))
+    port = int(os.getenv("PORT", "8080"))
     try:
         from admin.app import app as admin_app
         import threading
         threading.Thread(
-            target=lambda: admin_app.run(host="0.0.0.0", port=port, debug=False),
+            target=lambda: admin_app.run(
+                host="0.0.0.0",
+                port=port,
+                debug=False,
+                threaded=True,
+                use_reloader=False,
+            ),
             daemon=True,
         ).start()
         logger.info("Admin panel started on port %d", port)
     except Exception as e:
         logger.warning("Admin panel not started: %s", e)
 
-    app = (
-        Application.builder()
-        .token(TELEGRAM_TOKEN)
-        .post_init(post_init)
-        .post_shutdown(_post_shutdown)
-        .build()
-    )
+    app = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
     global _app
     _app = app
 
@@ -1772,19 +1730,33 @@ def main() -> None:
     app.add_handler(CommandHandler("help",     cmd_help))
     app.add_handler(CommandHandler("plans",    cmd_plans))
     app.add_handler(CommandHandler("language", cmd_language))
+    app.add_handler(CommandHandler("results",  cmd_results))
     app.add_handler(wallet_conv)
     app.add_handler(CallbackQueryHandler(cb_menu,      pattern=r"^menu:"))
     app.add_handler(CallbackQueryHandler(cb_language,  pattern=r"^lang:"))
     app.add_handler(CallbackQueryHandler(cb_buy,       pattern=r"^buy:"))
     app.add_handler(CallbackQueryHandler(cb_skip,      pattern=r"^skip$"))
+    app.add_handler(CallbackQueryHandler(cb_notif,     pattern=r"^notif:"))
     app.add_handler(CallbackQueryHandler(cb_auto,      pattern=r"^auto:"))
     app.add_handler(CallbackQueryHandler(cb_pos,       pattern=r"^pos:"))
     app.add_handler(CallbackQueryHandler(cb_sell,      pattern=r"^sell:"))
     app.add_handler(CallbackQueryHandler(cb_plans_buy, pattern=r"^plans_buy:"))
     app.add_handler(CallbackQueryHandler(cb_pay_check, pattern=r"^pay_check:"))
 
+    # Graceful shutdown on SIGTERM/SIGINT (Railway sends SIGTERM on redeploy)
+    def _handle_stop(signum, frame):
+        logger.info("Received signal %s — stopping bot...", signum)
+        app.stop_running()
+
+    signal.signal(signal.SIGTERM, _handle_stop)
+    signal.signal(signal.SIGINT,  _handle_stop)
+
     logger.info("Crypto Sniper Bot is running...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True,
+        close_loop=False,
+    )
 
 
 if __name__ == "__main__":

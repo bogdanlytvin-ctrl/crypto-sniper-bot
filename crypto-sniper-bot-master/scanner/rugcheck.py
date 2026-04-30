@@ -65,14 +65,11 @@ async def check_solana_token(session: aiohttp.ClientSession, token_address: str)
             lp_locked = True
             lp_locked_pct = max(lp_locked_pct, float(lp.get("lpLockedPct", 0)))
 
-    # Top holders
-    # RugCheck returns pct as 0-1 fraction (e.g. 0.05 = 5%).
-    # Guard: if raw sum > 1, values are already percentages — don't multiply.
+    # Top holders — pct is already 0-100 percentage, no multiplication needed
     top_holders = data.get("topHolders") or []
     top10_pct = None
     if top_holders:
-        raw_sum = sum(float(h.get("pct", 0)) for h in top_holders[:10])
-        top10_pct = raw_sum * 100 if raw_sum <= 1.0 else raw_sum
+        top10_pct = min(sum(float(h.get("pct", 0)) for h in top_holders[:10]), 100.0)
 
     total_holders = data.get("totalHolders") or data.get("holders")
 
@@ -87,12 +84,10 @@ async def check_solana_token(session: aiohttp.ClientSession, token_address: str)
         "holders":            total_holders,
         "risks":              risk_names,
         "is_honeypot":        False,
-        "has_data":           True,
     }
 
 
 def _empty() -> dict:
-    """Returned when API is unavailable. has_data=False prevents false scoring."""
     return {
         "rugcheck_score":     0,
         "mint_authority":     False,
@@ -104,5 +99,4 @@ def _empty() -> dict:
         "holders":            None,
         "risks":              [],
         "is_honeypot":        False,
-        "has_data":           False,
     }

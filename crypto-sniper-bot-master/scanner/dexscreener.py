@@ -56,21 +56,20 @@ async def get_latest_boosted_tokens(session: aiohttp.ClientSession) -> list[dict
 
 async def get_pairs_by_token(session: aiohttp.ClientSession,
                               chain: str, token_address: str) -> list[dict]:
-    """Get trading pairs for a single token address."""
+    """Get trading pairs for a token. Uses /latest/dex/tokens/ endpoint."""
     data = await _get(session, f"{BASE}/latest/dex/tokens/{token_address}")
     if not data or "pairs" not in data:
         return []
-    return [p for p in (data["pairs"] or []) if p.get("chainId") == chain]
+    pairs = data["pairs"] or []
+    return [p for p in pairs if p.get("chainId") == chain]
 
 
 async def get_pairs_batch(session: aiohttp.ClientSession,
                            chain: str, addresses: list[str]) -> list[dict]:
-    """
-    Batch lookup — up to 30 token addresses in a single request.
-    Replaces 30 sequential get_pairs_by_token calls with one HTTP request.
-    """
+    """Batch lookup — up to 30 token addresses in a single request."""
     if not addresses:
         return []
+    # API accepts comma-separated addresses, max 30
     chunk = ",".join(addresses[:30])
     data = await _get(session, f"{BASE}/latest/dex/tokens/{chunk}")
     if not data or "pairs" not in data:
@@ -80,15 +79,14 @@ async def get_pairs_batch(session: aiohttp.ClientSession,
 
 async def search_new_pairs(session: aiohttp.ClientSession, chain: str) -> list[dict]:
     """
-    Find candidate pairs from DexScreener:
-      - Token profiles (newest token meta entries)
-      - Boosted tokens (paid promotions — slow to change but worth monitoring)
-    Both are batch-fetched in 2 HTTP requests total.
-    Note: GeckoTerminal is the primary new-pool discovery source.
-    DexScreener here catches tokens that appear in profiles/boosts but not gecko.
+    Find candidate pairs using two strategies:
+      1. Token profiles + boosts  — batch lookup (2 API calls total)
+      2. Direct trending search   — volume-sorted pairs for the chain
     """
     all_pairs: list[dict] = []
 
+    # ── Strategy 1: latest profiles + boosts (batch, 2 HTTP calls) ────────────
+    profiles, boosted = [], []
     profiles = await get_latest_token_profiles(session)
     boosted  = await get_latest_boosted_tokens(session)
 
@@ -99,11 +97,24 @@ async def search_new_pairs(session: aiohttp.ClientSession, chain: str) -> list[d
     })
 
     if addresses:
-        batch = await get_pairs_batch(session, chain, addresses[:30])
-        all_pairs.extend(batch)
+        # Single batch request instead of 20+ sequential calls
+        batch_pairs = await get_pairs_batch(session, chain, addresses[:30])
+        all_pairs.extend(batch_pairs)
+        # If > 30 addresses, fetch the rest in a second batch
         if len(addresses) > 30:
-            batch2 = await get_pairs_batch(session, chain, addresses[30:60])
-            all_pairs.extend(batch2)
+            batch_pairs2 = await get_pairs_batch(session, chain, addresses[30:60])
+            all_pairs.extend(batch_pairs2)
+
+    # ── Strategy 2: trending search — tokens with recent volume spikes ─────────
+    trending_data = await _get(
+        session,
+        f"{BASE}/latest/dex/search",
+        params={"q": "new"},
+    )
+    if trending_data and "pairs" in trending_data:
+        for p in (trending_data["pairs"] or []):
+            if p.get("chainId") == chain:
+                all_pairs.append(p)
 
     # Deduplicate by pairAddress
     seen: set[str] = set()

@@ -12,7 +12,11 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
-SUBGRAPH_URL = "https://api.thegraph.com/subgraphs/name/pancakeswap/exchange-v2"
+# The Graph Hosted Service was deprecated; try PancakeSwap self-hosted subgraph first
+_SUBGRAPH_URLS = [
+    "https://bsc.subgraph.pancakeswap.com/",                                        # self-hosted (primary)
+    "https://api.thegraph.com/subgraphs/name/pancakeswap/exchange-v2",             # legacy fallback
+]
 
 MIN_LIQ_USD  = 5_000
 MIN_VOL_1H   = 100
@@ -66,21 +70,24 @@ async def get_new_pairs(session: aiohttp.ClientSession) -> list[dict]:
         },
     }
 
-    try:
-        async with session.post(
-            SUBGRAPH_URL,
-            json=payload,
-            timeout=aiohttp.ClientTimeout(total=15),
-        ) as r:
-            if r.status != 200:
-                logger.warning("PancakeSwap subgraph → %s", r.status)
-                return []
-            data = await r.json()
-    except asyncio.TimeoutError:
-        logger.warning("PancakeSwap subgraph timeout")
-        return []
-    except Exception as e:
-        logger.warning("PancakeSwap subgraph error: %s", e)
+    data = None
+    for url in _SUBGRAPH_URLS:
+        try:
+            async with session.post(
+                url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as r:
+                if r.status != 200:
+                    logger.warning("PancakeSwap subgraph %s → %s", url, r.status)
+                    continue
+                data = await r.json()
+                break  # success
+        except asyncio.TimeoutError:
+            logger.warning("PancakeSwap subgraph timeout: %s", url)
+        except Exception as e:
+            logger.warning("PancakeSwap subgraph error: %s", e)
+    if data is None:
         return []
 
     errors = data.get("errors")

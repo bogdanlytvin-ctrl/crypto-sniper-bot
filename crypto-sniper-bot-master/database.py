@@ -13,14 +13,10 @@ if _db_dir:
 
 
 def get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute("PRAGMA synchronous=NORMAL")      # safe with WAL, faster than FULL
-    conn.execute("PRAGMA busy_timeout=5000")        # wait up to 5s instead of failing
-    conn.execute("PRAGMA cache_size=-32000")        # 32 MB page cache
-    conn.execute("PRAGMA temp_store=MEMORY")        # temp tables in RAM
     return conn
 
 
@@ -109,6 +105,9 @@ def init_db() -> None:
                 amount_in     REAL,
                 amount_out    REAL,
                 price_usd     REAL,
+                sell_price    REAL,
+                pnl_usd       REAL,
+                pnl_percent   REAL,
                 tx_hash       TEXT,
                 status        TEXT NOT NULL DEFAULT 'pending',
                 mode          TEXT NOT NULL DEFAULT 'manual',
@@ -126,6 +125,8 @@ def init_db() -> None:
                 buy_price_usd    REAL,
                 buy_amount_native REAL,
                 stop_loss_pct    REAL DEFAULT 20,
+                take_profit_pct  REAL DEFAULT 0,
+                exit_reason      TEXT,
                 status           TEXT NOT NULL DEFAULT 'open',
                 opened_at        TEXT NOT NULL DEFAULT (datetime('now')),
                 closed_at        TEXT,
@@ -134,13 +135,27 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_id           INTEGER PRIMARY KEY REFERENCES users(id),
-                auto_mode         INTEGER DEFAULT 0,
-                auto_min_score    INTEGER DEFAULT 80,
-                auto_max_buy_sol  REAL DEFAULT 0.1,
-                auto_max_buy_bnb  REAL DEFAULT 0.01,
-                auto_stop_loss    REAL DEFAULT 20,
-                notify_all_tokens INTEGER DEFAULT 0,
-                updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+                auto_mode              INTEGER DEFAULT 0,
+                auto_min_score         INTEGER DEFAULT 80,
+                auto_max_buy_sol       REAL DEFAULT 0.1,
+                auto_max_buy_bnb       REAL DEFAULT 0.01,
+                auto_stop_loss         REAL DEFAULT 20,
+                auto_take_profit       REAL DEFAULT 0,
+                notify_all_tokens      INTEGER DEFAULT 0,
+                signals_push           INTEGER DEFAULT 1,
+                signal_chain           TEXT DEFAULT 'all',
+                signal_min_score_user  INTEGER DEFAULT 0,
+                safe_mode              INTEGER DEFAULT 0,
+                updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS token_blacklist (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                chain         TEXT NOT NULL,
+                token_address TEXT NOT NULL,
+                reason        TEXT,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(token_address)
             );
 
             CREATE TABLE IF NOT EXISTS payments (
@@ -198,10 +213,26 @@ def init_db() -> None:
             ("banned",          "ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0"),
             ("pair_created_at", "ALTER TABLE signals ADD COLUMN pair_created_at INTEGER"),
             ("pair_url",        "ALTER TABLE signals ADD COLUMN pair_url TEXT"),
-            ("sell_price_usd",  "ALTER TABLE positions ADD COLUMN sell_price_usd REAL"),
-            ("pnl_pct",         "ALTER TABLE positions ADD COLUMN pnl_pct REAL"),
-            ("close_reason",    "ALTER TABLE positions ADD COLUMN close_reason TEXT"),
-            ("auto_take_profit","ALTER TABLE user_settings ADD COLUMN auto_take_profit REAL DEFAULT 0"),
+            ("signal_date",     "ALTER TABLE signals ADD COLUMN signal_date TEXT NOT NULL DEFAULT (date('now'))"),
+            ("extra_json",      "ALTER TABLE signals ADD COLUMN extra_json TEXT"),
+            # subscriptions columns added in v2
+            ("expires_at",      "ALTER TABLE subscriptions ADD COLUMN expires_at TEXT"),
+            ("updated_at",      "ALTER TABLE subscriptions ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))"),
+            # user_settings columns added in v3
+            ("auto_take_profit",       "ALTER TABLE user_settings ADD COLUMN auto_take_profit REAL DEFAULT 0"),
+            # user_settings columns added in v4 (notification filters)
+            ("signals_push",           "ALTER TABLE user_settings ADD COLUMN signals_push INTEGER DEFAULT 1"),
+            ("signal_chain",           "ALTER TABLE user_settings ADD COLUMN signal_chain TEXT DEFAULT 'all'"),
+            ("signal_min_score_user",  "ALTER TABLE user_settings ADD COLUMN signal_min_score_user INTEGER DEFAULT 0"),
+            # positions columns added in v3
+            ("take_profit_pct", "ALTER TABLE positions ADD COLUMN take_profit_pct REAL DEFAULT 0"),
+            ("exit_reason",     "ALTER TABLE positions ADD COLUMN exit_reason TEXT"),
+            # trades columns added in v5 (P&L tracking)
+            ("sell_price",      "ALTER TABLE trades ADD COLUMN sell_price REAL"),
+            ("pnl_usd",         "ALTER TABLE trades ADD COLUMN pnl_usd REAL"),
+            ("pnl_percent",     "ALTER TABLE trades ADD COLUMN pnl_percent REAL"),
+            # user_settings columns added in v5 (safe_mode)
+            ("safe_mode",       "ALTER TABLE user_settings ADD COLUMN safe_mode INTEGER DEFAULT 0"),
         ]:
             try:
                 conn.execute(ddl)
@@ -210,17 +241,13 @@ def init_db() -> None:
 
         # Default bot settings
         defaults = {
-            # Score thresholds — must match MIN_SIGNAL_SCORE (35) so signals
-            # saved to DB are actually dispatched to users
-            "min_signal_score":    "35",
-            "free_min_score":      "35",
-            "basic_min_score":     "35",
-            "pro_min_score":       "35",
-            # Daily signal limits per tier
-            "free_daily_signals":  "3",
-            "basic_daily_signals": "20",
-            "pro_daily_signals":   "0",   # 0 = unlimited
-            # Subscription prices
+            "min_signal_score":    "35",   # global floor (save to DB only)
+            "free_min_score":      "35",   # min score to dispatch to free users
+            "basic_min_score":     "35",   # same quality, more per day
+            "pro_min_score":       "35",   # same quality, unlimited
+            "free_daily_signals":  "10",
+            "basic_daily_signals": "0",
+            "pro_daily_signals":   "0",
             "basic_price_usd":     "29",
             "pro_price_usd":       "79",
             "basic_duration_days": "30",
@@ -232,6 +259,25 @@ def init_db() -> None:
                 conn.execute(
                     "INSERT OR IGNORE INTO bot_settings (key, value) VALUES (?, ?)",
                     (key, val)
+                )
+            except Exception:
+                pass
+
+        # Migration v4: force free users to get all signals (unconditional reset)
+        # Subscriptions are disabled — all users are equal, no reason to filter free tier
+        _force_reset = {
+            "free_min_score":      "35",   # low enough to see all real signals
+            "free_daily_signals":  "0",    # 0 = unlimited
+            "basic_min_score":     "35",
+            "pro_min_score":       "35",
+            "min_signal_score":    "35",
+        }
+        for key, val in _force_reset.items():
+            try:
+                conn.execute(
+                    "INSERT INTO bot_settings (key, value) VALUES (?, ?)"
+                    " ON CONFLICT(key) DO UPDATE SET value=?, updated_at=datetime('now')",
+                    (key, val, val)
                 )
             except Exception:
                 pass
@@ -307,55 +353,44 @@ def get_all_active_users_with_tier() -> list[sqlite3.Row]:
             SELECT u.id, u.telegram_id, u.first_name,
                    COALESCE(u.lang,'ua') as lang,
                    COALESCE(s.tier,'free') as tier,
-                   COALESCE(s.status,'active') as status,
-                   s.expires_at,
+                   s.status, s.expires_at,
                    COALESCE(us.auto_mode, 0) as auto_mode,
                    COALESCE(us.auto_min_score, 80) as auto_min_score,
                    COALESCE(us.auto_max_buy_sol, 0.1) as auto_max_buy_sol,
                    COALESCE(us.auto_max_buy_bnb, 0.01) as auto_max_buy_bnb,
-                   COALESCE(us.auto_stop_loss, 20) as auto_stop_loss,
-                   COALESCE(us.auto_take_profit, 0) as auto_take_profit,
-                   COALESCE(us.notify_all_tokens, 0) as notify_all_tokens
+                   COALESCE(us.auto_stop_loss, 20)         as auto_stop_loss,
+                   COALESCE(us.auto_take_profit, 0)        as auto_take_profit,
+                   COALESCE(us.notify_all_tokens, 0)       as notify_all_tokens,
+                   COALESCE(us.signals_push, 1)            as signals_push,
+                   COALESCE(us.signal_chain, 'all')        as signal_chain,
+                   COALESCE(us.signal_min_score_user, 0)   as signal_min_score_user,
+                   COALESCE(us.safe_mode, 0)              as safe_mode
             FROM users u
-            LEFT JOIN subscriptions s ON s.user_id = u.id
-            LEFT JOIN user_settings us ON us.user_id = u.id
-            WHERE u.banned = 0
-              AND (
-                s.id IS NULL              -- no subscription row → treat as free
-                OR s.tier = 'free'        -- explicitly free tier
-                OR s.status = 'active'    -- paid and active
-              )
+            LEFT JOIN (
+                SELECT user_id, tier, status, expires_at
+                FROM subscriptions
+                WHERE id IN (SELECT MAX(id) FROM subscriptions GROUP BY user_id)
+            ) s ON s.user_id = u.id
+            LEFT JOIN user_settings us ON us.user_id=u.id
+            WHERE (COALESCE(s.status,'active')='active' OR COALESCE(s.tier,'free')='free')
+              AND u.banned=0
         """).fetchall()
-
-
-def get_expiring_subscriptions(days: int = 3) -> list[sqlite3.Row]:
-    """Return active subscribers whose subscription expires within `days` days."""
-    with get_conn() as conn:
-        return conn.execute("""
-            SELECT u.id, u.telegram_id, COALESCE(u.lang,'ua') as lang,
-                   COALESCE(s.tier,'free') as tier, s.expires_at
-            FROM users u
-            JOIN subscriptions s ON s.user_id = u.id
-            WHERE s.status = 'active'
-              AND s.tier != 'free'
-              AND s.expires_at IS NOT NULL
-              AND datetime(s.expires_at) <= datetime('now', '+' || ? || ' days')
-              AND datetime(s.expires_at) > datetime('now')
-              AND u.banned = 0
-        """, (days,)).fetchall()
 
 
 # ── Subscriptions ──────────────────────────────────────────────────────────────
 
 def get_subscription(user_id: int) -> sqlite3.Row | None:
     with get_conn() as conn:
-        return conn.execute("SELECT * FROM subscriptions WHERE user_id=?", (user_id,)).fetchone()
+        return conn.execute(
+            "SELECT * FROM subscriptions WHERE user_id=? ORDER BY id DESC LIMIT 1",
+            (user_id,)).fetchone()
 
 
 def get_user_tier(user_id: int) -> str:
     with get_conn() as conn:
-        row = conn.execute("SELECT tier, status, expires_at FROM subscriptions WHERE user_id=?",
-                           (user_id,)).fetchone()
+        row = conn.execute(
+            "SELECT tier, status, expires_at FROM subscriptions WHERE user_id=? ORDER BY id DESC LIMIT 1",
+            (user_id,)).fetchone()
     if not row or row["tier"] == "free":
         return "free"
     if row["status"] != "active":
@@ -372,25 +407,57 @@ def get_user_tier(user_id: int) -> str:
 
 def set_user_tier(user_id: int, tier: str) -> None:
     with get_conn() as conn:
-        conn.execute("""
-            UPDATE subscriptions SET tier=?, status='active', updated_at=datetime('now')
-            WHERE user_id=?
-        """, (tier, user_id))
+        exists = conn.execute("SELECT id FROM subscriptions WHERE user_id=?", (user_id,)).fetchone()
+        if exists:
+            conn.execute(
+                "UPDATE subscriptions SET tier=?, status='active', updated_at=datetime('now') WHERE user_id=?",
+                (tier, user_id))
+        else:
+            conn.execute(
+                "INSERT INTO subscriptions (user_id, tier, status) VALUES (?, ?, 'active')",
+                (user_id, tier))
+
+
+def get_expiring_subscriptions(days: int = 3) -> list[sqlite3.Row]:
+    """Return active paid subscriptions expiring within `days` days."""
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT s.user_id, s.tier, s.expires_at,
+                   u.telegram_id, u.first_name, COALESCE(u.lang, 'ua') as lang
+            FROM subscriptions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.status = 'active'
+              AND s.tier != 'free'
+              AND s.expires_at IS NOT NULL
+              AND date(s.expires_at) BETWEEN date('now') AND date('now', ? || ' days')
+              AND u.banned = 0
+        """, (f"+{days}",)).fetchall()
 
 
 def set_user_tier_with_expiry(user_id: int, tier: str, expires_at: str) -> None:
     with get_conn() as conn:
-        conn.execute("""
-            UPDATE subscriptions
-            SET tier=?, status='active', expires_at=?, updated_at=datetime('now')
-            WHERE user_id=?
-        """, (tier, expires_at, user_id))
+        exists = conn.execute("SELECT id FROM subscriptions WHERE user_id=?", (user_id,)).fetchone()
+        if exists:
+            conn.execute(
+                "UPDATE subscriptions SET tier=?, status='active', expires_at=?, updated_at=datetime('now') WHERE user_id=?",
+                (tier, expires_at, user_id))
+        else:
+            conn.execute(
+                "INSERT INTO subscriptions (user_id, tier, status, expires_at) VALUES (?, ?, 'active', ?)",
+                (user_id, tier, expires_at))
 
 
 # ── Signals ────────────────────────────────────────────────────────────────────
 
 def save_signal(data: dict) -> int | None:
     with get_conn() as conn:
+        # Explicit dedup check — UNIQUE constraint may not exist on old (migrated) DBs
+        existing = conn.execute(
+            "SELECT id FROM signals WHERE chain=? AND token_address=? AND signal_date=date('now')",
+            (data.get("chain"), data.get("token_address"))
+        ).fetchone()
+        if existing:
+            return None
         try:
             cur = conn.execute("""
                 INSERT INTO signals (
@@ -497,15 +564,20 @@ def delete_wallet(user_id: int, chain: str) -> None:
 def save_trade(user_id: int, chain: str, token_address: str, token_symbol: str,
                trade_type: str, amount_in: float, amount_out: float,
                price_usd: float, tx_hash: str | None, status: str,
-               mode: str = "manual", signal_id: int | None = None) -> int:
+               mode: str = "manual", signal_id: int | None = None,
+               sell_price: float | None = None, pnl_usd: float | None = None,
+               pnl_percent: float | None = None) -> int:
     with get_conn() as conn:
         cur = conn.execute("""
             INSERT INTO trades (user_id, signal_id, chain, token_address, token_symbol,
                                 trade_type, amount_in, amount_out, price_usd,
+                                sell_price, pnl_usd, pnl_percent,
                                 tx_hash, status, mode)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (user_id, signal_id, chain, token_address, token_symbol,
-              trade_type, amount_in, amount_out, price_usd, tx_hash, status, mode))
+              trade_type, amount_in, amount_out, price_usd,
+              sell_price, pnl_usd, pnl_percent,
+              tx_hash, status, mode))
         return cur.lastrowid
 
 
@@ -526,7 +598,8 @@ def update_trade_status(trade_id: int, status: str, tx_hash: str | None = None) 
 
 def upsert_position(user_id: int, chain: str, token_address: str, token_symbol: str,
                     token_name: str, amount: float, buy_price_usd: float,
-                    buy_amount_native: float, stop_loss_pct: float = 20) -> None:
+                    buy_amount_native: float, stop_loss_pct: float = 20,
+                    take_profit_pct: float = 0) -> None:
     with get_conn() as conn:
         existing = conn.execute(
             "SELECT id, amount FROM positions WHERE user_id=? AND chain=? AND token_address=? AND status='open'",
@@ -538,10 +611,12 @@ def upsert_position(user_id: int, chain: str, token_address: str, token_symbol: 
         else:
             conn.execute("""
                 INSERT INTO positions (user_id, chain, token_address, token_symbol, token_name,
-                                       amount, buy_price_usd, buy_amount_native, stop_loss_pct)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                                       amount, buy_price_usd, buy_amount_native,
+                                       stop_loss_pct, take_profit_pct)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
             """, (user_id, chain, token_address, token_symbol, token_name,
-                  amount, buy_price_usd, buy_amount_native, stop_loss_pct))
+                  amount, buy_price_usd, buy_amount_native,
+                  stop_loss_pct, take_profit_pct))
 
 
 def get_open_positions(user_id: int) -> list[sqlite3.Row]:
@@ -551,6 +626,30 @@ def get_open_positions(user_id: int) -> list[sqlite3.Row]:
             (user_id,)).fetchall()
 
 
+def get_all_open_positions_with_users() -> list[sqlite3.Row]:
+    """Return all open positions joined with user info + settings — used by position monitor."""
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT p.*,
+                   u.telegram_id,
+                   COALESCE(u.lang, 'ua')        AS lang,
+                   COALESCE(s.tier, 'free')      AS tier,
+                   COALESCE(us.auto_stop_loss, 20)   AS eff_sl,
+                   COALESCE(us.auto_take_profit, 0)  AS eff_tp,
+                   COALESCE(us.auto_mode, 0)         AS auto_mode,
+                   w.encrypted_pk,
+                   w.address AS wallet_address
+            FROM positions p
+            JOIN users u ON u.id = p.user_id
+            LEFT JOIN subscriptions  s  ON s.user_id  = p.user_id
+            LEFT JOIN user_settings  us ON us.user_id = p.user_id
+            LEFT JOIN wallets        w  ON w.user_id  = p.user_id AND w.chain = p.chain
+            WHERE p.status = 'open'
+              AND p.buy_price_usd > 0
+              AND u.banned = 0
+        """).fetchall()
+
+
 def close_position(position_id: int) -> None:
     with get_conn() as conn:
         conn.execute(
@@ -558,69 +657,11 @@ def close_position(position_id: int) -> None:
             (position_id,))
 
 
-def count_open_positions(user_id: int) -> int:
+def close_position_with_reason(position_id: int, reason: str) -> None:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM positions WHERE user_id=? AND status='open'",
-            (user_id,)).fetchone()
-        return row[0] if row else 0
-
-
-def has_open_position(user_id: int, chain: str, token_address: str) -> bool:
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT 1 FROM positions WHERE user_id=? AND chain=? AND token_address=? AND status='open'",
-            (user_id, chain, token_address)).fetchone()
-        return row is not None
-
-
-def get_all_open_positions_with_users() -> list[sqlite3.Row]:
-    """
-    Returns all open positions joined with user telegram_id, lang, wallet address/key,
-    and auto_stop_loss / auto_take_profit from user_settings.
-    Used by the position monitor loop.
-    """
-    with get_conn() as conn:
-        return conn.execute("""
-            SELECT
-                p.id            AS position_id,
-                p.user_id,
-                p.chain,
-                p.token_address,
-                p.token_symbol,
-                p.token_name,
-                p.amount        AS buy_amount_native,
-                p.buy_price_usd,
-                p.stop_loss_pct,
-                p.opened_at,
-                u.telegram_id,
-                COALESCE(u.lang, 'ua')            AS lang,
-                w.address                          AS wallet_address,
-                w.encrypted_pk,
-                COALESCE(us.auto_stop_loss,  20)  AS auto_stop_loss,
-                COALESCE(us.auto_take_profit, 0)  AS auto_take_profit
-            FROM positions p
-            JOIN users u ON u.id = p.user_id
-            LEFT JOIN wallets w ON w.user_id = p.user_id AND w.chain = p.chain
-            LEFT JOIN user_settings us ON us.user_id = p.user_id
-            WHERE p.status = 'open'
-              AND u.banned = 0
-        """).fetchall()
-
-
-def close_position_with_sell(position_id: int, sell_price_usd: float,
-                              pnl_pct: float, reason: str) -> None:
-    """Close a position and record the sell price + PnL."""
-    with get_conn() as conn:
-        conn.execute("""
-            UPDATE positions
-            SET status='closed',
-                closed_at=datetime('now'),
-                sell_price_usd=?,
-                pnl_pct=?,
-                close_reason=?
-            WHERE id=?
-        """, (sell_price_usd, pnl_pct, reason, position_id))
+        conn.execute(
+            "UPDATE positions SET status='closed', exit_reason=?, closed_at=datetime('now') WHERE id=?",
+            (reason, position_id))
 
 
 # ── User Settings ──────────────────────────────────────────────────────────────
@@ -638,7 +679,9 @@ def get_user_settings(user_id: int) -> sqlite3.Row | None:
 
 def update_user_settings(user_id: int, **kwargs) -> None:
     allowed = {"auto_mode", "auto_min_score", "auto_max_buy_sol",
-               "auto_max_buy_bnb", "auto_stop_loss", "notify_all_tokens"}
+               "auto_max_buy_bnb", "auto_stop_loss", "auto_take_profit",
+               "notify_all_tokens", "signals_push", "signal_chain",
+               "signal_min_score_user", "safe_mode"}
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
         return
@@ -779,3 +822,69 @@ def get_audit_log(limit: int = 100) -> list[sqlite3.Row]:
         return conn.execute(
             "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()
+
+
+# ── Token Blacklist ─────────────────────────────────────────────────────────────
+
+def is_blacklisted(chain: str, addr: str) -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM token_blacklist WHERE token_address=? AND (chain=? OR chain='all')",
+            (addr, chain)
+        ).fetchone()
+    return bool(row)
+
+
+def add_to_blacklist(chain: str, addr: str, reason: str = "") -> None:
+    with get_conn() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO token_blacklist (chain, token_address, reason) VALUES (?,?,?)",
+                (chain, addr, reason)
+            )
+        except sqlite3.IntegrityError:
+            # Already blacklisted — update reason
+            conn.execute(
+                "UPDATE token_blacklist SET reason=?, chain=? WHERE token_address=?",
+                (reason, chain, addr)
+            )
+
+
+def get_blacklist() -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM token_blacklist ORDER BY created_at DESC"
+        ).fetchall()
+
+
+def remove_from_blacklist(addr: str) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM token_blacklist WHERE token_address=?", (addr,))
+
+
+# ── Bot Performance ─────────────────────────────────────────────────────────────
+
+def get_bot_performance() -> dict:
+    with get_conn() as conn:
+        sells = conn.execute(
+            "SELECT COUNT(*) FROM trades WHERE trade_type='sell' AND pnl_usd IS NOT NULL"
+        ).fetchone()[0]
+        wins = conn.execute(
+            "SELECT COUNT(*) FROM trades WHERE trade_type='sell' AND pnl_usd > 0"
+        ).fetchone()[0]
+        total_pnl = conn.execute(
+            "SELECT COALESCE(SUM(pnl_usd),0) FROM trades WHERE trade_type='sell'"
+        ).fetchone()[0]
+        recent = conn.execute("""
+            SELECT t.token_symbol, t.chain, t.price_usd as buy_price,
+                   t.sell_price, t.pnl_usd, t.pnl_percent, t.created_at
+            FROM trades t WHERE t.trade_type='sell' AND t.sell_price IS NOT NULL
+            ORDER BY t.created_at DESC LIMIT 10
+        """).fetchall()
+    return {
+        "total_trades": sells,
+        "wins":         wins,
+        "total_pnl":    total_pnl,
+        "winrate":      round(wins / sells * 100) if sells else 0,
+        "recent":       recent,
+    }

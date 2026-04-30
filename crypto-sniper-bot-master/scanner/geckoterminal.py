@@ -23,15 +23,14 @@ _HEADERS = {
     "Accept": "application/json;version=20230302",
 }
 
-MIN_LIQ_USD     = 5_000   # raised: pools < $5k rarely score above threshold
-MIN_VOL_1H_USD  = 200
+MIN_LIQ_USD     = 3_000
+MIN_VOL_1H_USD  = 300
 MAX_AGE_H       = 48
 MIN_AGE_MIN     = 3
 
 
 async def _get(session: aiohttp.ClientSession, url: str,
                params: dict | None = None) -> dict | None:
-    """GET with retry on 429 (rate limit). Up to 3 attempts with backoff."""
     for attempt in range(3):
         try:
             async with session.get(
@@ -41,19 +40,17 @@ async def _get(session: aiohttp.ClientSession, url: str,
                 if r.status == 200:
                     return await r.json()
                 if r.status == 429:
-                    wait = 10 * (attempt + 1)  # 10s, 20s, 30s
-                    logger.warning(
-                        "GeckoTerminal 429 — retry %d/3 in %ds: %s", attempt + 1, wait, url
-                    )
+                    wait = 10 * (attempt + 1)
+                    logger.warning("GeckoTerminal %s → 429, retry in %ds (attempt %d/3)", url, wait, attempt + 1)
                     await asyncio.sleep(wait)
                     continue
                 logger.warning("GeckoTerminal %s → %s", url, r.status)
                 return None
         except asyncio.TimeoutError:
-            logger.warning("GeckoTerminal timeout: %s", url)
+            logger.warning("GeckoTerminal timeout (attempt %d/3): %s", attempt + 1, url)
         except Exception as e:
-            logger.warning("GeckoTerminal error: %s", e)
-        return None
+            logger.warning("GeckoTerminal error (attempt %d/3): %s", attempt + 1, e)
+        # timeout/error — loop to next attempt
     return None
 
 
@@ -64,7 +61,7 @@ async def get_new_pools(session: aiohttp.ClientSession, chain: str) -> list[dict
         return []
 
     all_pools: list[dict] = []
-    for page in (1, 2, 3):
+    for page in (1, 2):
         data = await _get(
             session,
             f"{BASE}/networks/{gecko_chain}/new_pools",
@@ -81,7 +78,6 @@ async def get_new_pools(session: aiohttp.ClientSession, chain: str) -> list[dict
             pair = _parse_pool(pool, included, chain)
             if pair:
                 all_pools.append(pair)
-        await asyncio.sleep(2)  # stay within 30 req/min free tier
 
     return _prefilter(all_pools)
 
@@ -115,32 +111,38 @@ def _parse_pool(pool: dict, included: dict, chain: str) -> dict | None:
     attrs = pool.get("attributes") or {}
     rels  = pool.get("relationships") or {}
 
+    # Token addresses
     base_rel = (rels.get("base_token") or {}).get("data") or {}
-    base_id  = base_rel.get("id", "")
+    base_id  = base_rel.get("id", "")  # e.g. "solana_TOKENADDRESS"
     token_address = base_id.split("_", 1)[-1] if "_" in base_id else base_id
 
-    dex_rel = (rels.get("dex") or {}).get("data") or {}
-    dex_id  = dex_rel.get("id", "")
+    dex_rel  = (rels.get("dex") or {}).get("data") or {}
+    dex_id   = dex_rel.get("id", "")
 
     pair_address = pool.get("id", "").split("_", 1)[-1]
 
+    # Token info from included
     base_token_info = included.get(base_id) or {}
     base_attrs      = base_token_info.get("attributes") or {}
     token_name      = base_attrs.get("name") or attrs.get("name", "?")
     token_symbol    = base_attrs.get("symbol") or "?"
+    # Strip "/SOL" or "/WBNB" from pool name if symbol not set
     if token_symbol == "?" and attrs.get("name"):
         token_symbol = attrs["name"].split("/")[0].strip()
 
+    # Price
     try:
         price_usd = float(attrs.get("base_token_price_usd") or 0)
     except (ValueError, TypeError):
         price_usd = 0.0
 
+    # Liquidity
     try:
         liq_usd = float(attrs.get("reserve_in_usd") or 0)
     except (ValueError, TypeError):
         liq_usd = 0.0
 
+    # Volume
     vol_info = attrs.get("volume_usd") or {}
     try:
         vol_1h  = float(vol_info.get("h1")  or 0)
@@ -149,6 +151,7 @@ def _parse_pool(pool: dict, included: dict, chain: str) -> dict | None:
     except (ValueError, TypeError):
         vol_1h = vol_6h = vol_24h = 0.0
 
+    # Price change
     pct = attrs.get("price_change_percentage") or {}
     try:
         chg_1h  = float(pct.get("h1")  or 0)
@@ -157,15 +160,18 @@ def _parse_pool(pool: dict, included: dict, chain: str) -> dict | None:
     except (ValueError, TypeError):
         chg_1h = chg_6h = chg_24h = 0.0
 
+    # Market cap
     try:
         mcap = float(attrs.get("fdv_usd") or attrs.get("market_cap_usd") or 0)
     except (ValueError, TypeError):
         mcap = 0.0
 
-    txns  = (attrs.get("transactions") or {}).get("h1") or {}
+    # Transactions
+    txns = (attrs.get("transactions") or {}).get("h1") or {}
     buys  = txns.get("buys",  0) or 0
     sells = txns.get("sells", 0) or 0
 
+    # Creation time
     created_str = attrs.get("pool_created_at")
     created_ms  = None
     if created_str:
@@ -176,6 +182,7 @@ def _parse_pool(pool: dict, included: dict, chain: str) -> dict | None:
         except Exception:
             pass
 
+    # DexScreener-like URL
     dex_screen_url = f"https://dexscreener.com/{chain}/{pair_address}" if pair_address else ""
 
     return {

@@ -102,8 +102,8 @@ async def create_invoice(tier: str, user_id: int) -> dict | None:
     if not result:
         return None
 
-    invoice_id  = str(result["invoice_id"])
-    pay_url     = result["bot_invoice_url"]
+    invoice_id  = str(result.get("invoice_id", ""))
+    pay_url     = result.get("bot_invoice_url") or result.get("miniapp_invoice_url", "")
 
     db.save_payment(user_id, tier, amount_usd, invoice_id, pay_url)
     return {"invoice_id": invoice_id, "pay_url": pay_url, "amount_usd": amount_usd}
@@ -154,8 +154,14 @@ async def _process_pending(send_fn) -> None:
             continue
 
         # Auto-expire after 25 hours (invoice lifetime is 24h)
-        created = datetime.fromisoformat(payment["created_at"])
-        if (datetime.utcnow() - created) > timedelta(hours=25):
+        try:
+            created = datetime.fromisoformat(payment["created_at"])
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            age = datetime.now(timezone.utc) - created
+        except (ValueError, TypeError):
+            age = timedelta(0)
+        if age > timedelta(hours=25):
             db.update_payment_status(payment["id"], "expired")
             continue
 

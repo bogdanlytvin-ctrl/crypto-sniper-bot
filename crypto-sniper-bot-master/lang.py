@@ -101,30 +101,40 @@ _T: dict[str, dict[str, str]] = {
         UA: (
             "<b>Тарифи Crypto Sniper Bot</b>\n\n"
             "🆓 <b>Free</b> — безкоштовно\n"
-            "  • Тільки STRONG BUY (score 85+)\n"
-            "  • Максимум 3 сигнали/день\n\n"
+            "  • Всі сигнали (score 35+)\n"
+            "  • Необмежено сигналів/день\n"
+            "  • ❌ Авто-трейдинг недоступний\n\n"
             "💳 <b>Basic</b> — ${basic_price}/{basic_days}д\n"
-            "  • STRONG BUY + BUY (score 70+)\n"
-            "  • 20 сигналів/день\n\n"
+            "  • Всі сигнали (score 35+)\n"
+            "  • Необмежено сигналів/день\n"
+            "  • ✅ Авто-трейдинг (макс. 3 позиції)\n"
+            "  • ✅ Stop-loss / Take-profit\n\n"
             "🚀 <b>Pro</b> — ${pro_price}/{pro_days}д\n"
-            "  • Всі сигнали (score 55+)\n"
-            "  • Необмежено сигналів\n"
-            "  • Пріоритетна доставка\n\n"
+            "  • Всі сигнали (score 35+)\n"
+            "  • Необмежено сигналів/день\n"
+            "  • ✅ Авто-трейдинг (макс. 10 позицій)\n"
+            "  • ✅ Stop-loss / Take-profit\n"
+            "  • ✅ Пріоритетна підтримка\n\n"
             "📌 Ваш тариф: <b>{current_tier}</b>\n\n"
             "💰 Приймаємо: USDT, TON, BTC, ETH"
         ),
         EN: (
             "<b>Crypto Sniper Bot Plans</b>\n\n"
             "🆓 <b>Free</b> — free forever\n"
-            "  • STRONG BUY only (score 85+)\n"
-            "  • Max 3 signals/day\n\n"
+            "  • All signals (score 35+)\n"
+            "  • Unlimited signals/day\n"
+            "  • ❌ No auto-trading\n\n"
             "💳 <b>Basic</b> — ${basic_price}/{basic_days}d\n"
-            "  • STRONG BUY + BUY (score 70+)\n"
-            "  • 20 signals/day\n\n"
+            "  • All signals (score 35+)\n"
+            "  • Unlimited signals/day\n"
+            "  • ✅ Auto-trading (max 3 positions)\n"
+            "  • ✅ Stop-loss / Take-profit\n\n"
             "🚀 <b>Pro</b> — ${pro_price}/{pro_days}d\n"
-            "  • All signals (score 55+)\n"
-            "  • Unlimited signals\n"
-            "  • Priority delivery\n\n"
+            "  • All signals (score 35+)\n"
+            "  • Unlimited signals/day\n"
+            "  • ✅ Auto-trading (max 10 positions)\n"
+            "  • ✅ Stop-loss / Take-profit\n"
+            "  • ✅ Priority support\n\n"
             "📌 Your plan: <b>{current_tier}</b>\n\n"
             "💰 Accepted: USDT, TON, BTC, ETH"
         ),
@@ -212,6 +222,20 @@ _T: dict[str, dict[str, str]] = {
         UA: '📋 <b>Твої платежі:</b>',
         EN: '📋 <b>Your payments:</b>',
     },
+    'sub_expiry_reminder': {
+        UA: (
+            '⚠️ <b>Нагадування про підписку</b>\n\n'
+            'Твій тариф <b>{tier}</b> закінчується <b>{expires}</b> '
+            '(через {days} дн.).\n\n'
+            'Щоб продовжити підписку — /plans 🚀'
+        ),
+        EN: (
+            '⚠️ <b>Subscription reminder</b>\n\n'
+            'Your <b>{tier}</b> plan expires on <b>{expires}</b> '
+            '({days} days left).\n\n'
+            'To renew — /plans 🚀'
+        ),
+    },
 
     # ── Main menu buttons ────────────────────────────────────────────────────
     'menu_wallet':    {UA: '👛 Гаманець',    EN: '👛 Wallet'},
@@ -284,10 +308,6 @@ _T: dict[str, dict[str, str]] = {
         UA: '❌ Помилка шифрування. Переконайся що ENCRYPTION_KEY налаштовано на сервері.',
         EN: '❌ Encryption failed. Make sure ENCRYPTION_KEY is set on the server.',
     },
-    'wallet_pk_invalid': {
-        UA: '❌ Невалідний формат ключа.\n\nSOL: base58-рядок 43–88 символів.\nBNB: hex-рядок 64 символи (з або без 0x).',
-        EN: '❌ Invalid private key format.\n\nSOL: base58 string, 43–88 chars.\nBNB: hex string, 64 chars (with or without 0x).',
-    },
 
     # ── Balance ───────────────────────────────────────────────────────────────
     'balance_no_wallet': {
@@ -323,48 +343,185 @@ _T: dict[str, dict[str, str]] = {
     # ── Auto mode ──────────────────────────────────────────────────────────────
     'auto_on':  {UA: '✅ УВІМКНЕНО', EN: '✅ ON'},
     'auto_off': {UA: '❌ ВИМКНЕНО',  EN: '❌ OFF'},
-    'auto_status': {
+
+    'auto_tier_required': {
         UA: (
             "🤖 <b>Авто-трейдинг</b>\n\n"
-            "Статус: <b>{status}</b>\n"
-            "Мін. score: <b>{score}/100</b>\n"
-            "Макс. покупка: <b>{sol} SOL / {bnb} BNB</b>\n"
-            "Stop-loss: <b>-{sl}%</b>\n\n"
-            "⚠️ Потрібен приватний ключ гаманця."
+            "❌ Авто-трейдинг доступний тільки для тарифів <b>Basic</b> і <b>Pro</b>.\n\n"
+            "🆓 Free — тільки ручна торгівля за сигналами.\n"
+            "💳 Basic — авто-трейд, макс. 3 позиції.\n"
+            "🚀 Pro   — авто-трейд, макс. 10 позицій.\n\n"
+            "Оформи підписку щоб розблокувати авто-торгівлю 👇"
         ),
         EN: (
             "🤖 <b>Auto-trading</b>\n\n"
+            "❌ Auto-trading is available for <b>Basic</b> and <b>Pro</b> plans only.\n\n"
+            "🆓 Free  — manual trading by signals only.\n"
+            "💳 Basic — auto-trade, max 3 positions.\n"
+            "🚀 Pro   — auto-trade, max 10 positions.\n\n"
+            "Subscribe to unlock auto-trading 👇"
+        ),
+    },
+    'auto_tier_required_short': {
+        UA: '🔒 Авто-трейд тільки для Basic / Pro. Оформи підписку: /plans',
+        EN: '🔒 Auto-trade only for Basic / Pro. Subscribe: /plans',
+    },
+    'auto_no_wallet': {
+        UA: '👛 Спочатку додай гаманець і приватний ключ.',
+        EN: '👛 First add a wallet and private key.',
+    },
+
+    'auto_status': {
+        UA: (
+            "🤖 <b>Авто-трейдинг</b>  [{tier}]\n\n"
+            "Статус: <b>{status}</b>\n"
+            "Мін. score: <b>{score}/100</b>\n"
+            "Макс. покупка: <b>{sol} SOL / {bnb} BNB</b>\n"
+            "Stop-loss: <b>-{sl}%</b>  |  Take-profit: <b>{tp}</b>\n"
+            "Відкриті позиції: <b>{positions}</b>\n\n"
+            "⚠️ Для роботи потрібен приватний ключ гаманця.\n"
+            "SL / TP змінюй кнопками нижче ↓"
+        ),
+        EN: (
+            "🤖 <b>Auto-trading</b>  [{tier}]\n\n"
             "Status: <b>{status}</b>\n"
             "Min score: <b>{score}/100</b>\n"
             "Max buy: <b>{sol} SOL / {bnb} BNB</b>\n"
-            "Stop-loss: <b>-{sl}%</b>\n\n"
-            "⚠️ Private key required."
+            "Stop-loss: <b>-{sl}%</b>  |  Take-profit: <b>{tp}</b>\n"
+            "Open positions: <b>{positions}</b>\n\n"
+            "⚠️ Private key required for execution.\n"
+            "Change SL / TP with the buttons below ↓"
         ),
     },
     'auto_toggle_on':  {UA: '✅ Увімкнути', EN: '✅ Enable'},
     'auto_toggle_off': {UA: '❌ Вимкнути',  EN: '❌ Disable'},
     'auto_config':     {UA: '⚙️ Налаштувати', EN: '⚙️ Configure'},
+
     'auto_enabled': {
-        UA: '✅ <b>Авто-трейдинг увімкнено!</b>\n\nБот буде автоматично купувати токени за score ≥ 80.',
-        EN: '✅ <b>Auto-trading enabled!</b>\n\nBot will auto-buy tokens with score ≥ 80.',
-    },
-    'auto_disabled':    {UA: '❌ Авто-трейдинг вимкнено.', EN: '❌ Auto-trading disabled.'},
-    'auto_config_help': {
         UA: (
-            "⚙️ <b>Параметри авто-трейдингу</b>\n\n"
-            "Поточні значення за замовчуванням:\n"
-            "• Мін. score: 80\n"
-            "• Макс. покупка: 0.1 SOL / 0.01 BNB\n"
-            "• Stop-loss: -20%\n\n"
-            "Кастомне налаштування — незабаром."
+            "✅ <b>Авто-трейдинг увімкнено!</b>  [{tier}]\n\n"
+            "• Мін. score: <b>{score}/100</b>\n"
+            "• Макс. позицій: <b>{max_pos}</b>\n\n"
+            "Бот автоматично купуватиме токени що відповідають твоїм критеріям.\n"
+            "⚠️ Переконайся що є гаманець з приватним ключем."
         ),
         EN: (
-            "⚙️ <b>Auto-trading settings</b>\n\n"
-            "Current defaults:\n"
-            "• Min score: 80\n"
-            "• Max buy: 0.1 SOL / 0.01 BNB\n"
-            "• Stop-loss: -20%\n\n"
-            "Custom configuration coming soon."
+            "✅ <b>Auto-trading enabled!</b>  [{tier}]\n\n"
+            "• Min score: <b>{score}/100</b>\n"
+            "• Max positions: <b>{max_pos}</b>\n\n"
+            "Bot will automatically buy tokens matching your criteria.\n"
+            "⚠️ Make sure a wallet with private key is added."
+        ),
+    },
+    'auto_disabled': {UA: '❌ Авто-трейдинг вимкнено.', EN: '❌ Auto-trading disabled.'},
+    'auto_config_help': {
+        UA: (
+            "⚙️ <b>Налаштування авто-трейдингу</b>\n\n"
+            "<b>Stop-Loss (SL)</b> — авто-продаж якщо ціна впала на X%\n"
+            "<b>Take-Profit (TP)</b> — авто-продаж якщо ціна зросла на X%\n\n"
+            "Встанови SL і TP кнопками в меню авто-трейду.\n\n"
+            "Для зміни score і суми покупки — напиши /start і зайди в "
+            "🤖 Авто-трейд.\n\n"
+            "💡 <b>Рекомендовані налаштування:</b>\n"
+            "• SL 20–30% (захист від великих збитків)\n"
+            "• TP 50–100% (фіксація прибутку при 2x)"
+        ),
+        EN: (
+            "⚙️ <b>Auto-trading configuration</b>\n\n"
+            "<b>Stop-Loss (SL)</b> — auto-sell when price drops X%\n"
+            "<b>Take-Profit (TP)</b> — auto-sell when price rises X%\n\n"
+            "Set SL and TP using the buttons in the auto-trade menu.\n\n"
+            "To change score threshold and buy amount use /start → "
+            "🤖 Auto-trade.\n\n"
+            "💡 <b>Recommended settings:</b>\n"
+            "• SL 20–30% (protection from big losses)\n"
+            "• TP 50–100% (take profit at 2x)"
+        ),
+    },
+
+    # ── Auto-trade execution notifications ─────────────────────────────────────
+    'auto_buying': {
+        UA: (
+            "🤖 <b>Авто-купівля...</b>\n\n"
+            "Токен: <b>{symbol}</b>\n"
+            "Сума: <b>{amount} {chain}</b>\n"
+            "Score: <b>{score}/100</b>\n"
+            "SL: <b>-{sl}%</b>  |  TP: <b>{tp}</b>\n\n"
+            "⏳ Виконую транзакцію..."
+        ),
+        EN: (
+            "🤖 <b>Auto-buying...</b>\n\n"
+            "Token: <b>{symbol}</b>\n"
+            "Amount: <b>{amount} {chain}</b>\n"
+            "Score: <b>{score}/100</b>\n"
+            "SL: <b>-{sl}%</b>  |  TP: <b>{tp}</b>\n\n"
+            "⏳ Executing transaction..."
+        ),
+    },
+    'auto_buy_success': {
+        UA: (
+            "✅ <b>Авто-купівля виконана!</b>\n\n"
+            "Токен: <b>{symbol}</b>\n"
+            "Куплено: <b>{amount} {chain}</b>\n"
+            "SL: <b>-{sl}%</b>  |  TP: <b>{tp}</b>\n"
+            "🔗 Tx: <code>{tx}</code>\n\n"
+            "Позиція відстежується автоматично."
+        ),
+        EN: (
+            "✅ <b>Auto-buy executed!</b>\n\n"
+            "Token: <b>{symbol}</b>\n"
+            "Bought: <b>{amount} {chain}</b>\n"
+            "SL: <b>-{sl}%</b>  |  TP: <b>{tp}</b>\n"
+            "🔗 Tx: <code>{tx}</code>\n\n"
+            "Position is being tracked automatically."
+        ),
+    },
+    'auto_buy_failed': {
+        UA: '⚠️ <b>Авто-купівля невдала</b>\n\nТокен: <b>{symbol}</b>\nПричина: <code>{error}</code>',
+        EN: '⚠️ <b>Auto-buy failed</b>\n\nToken: <b>{symbol}</b>\nReason: <code>{error}</code>',
+    },
+    'auto_max_positions': {
+        UA: (
+            "⚠️ <b>Ліміт позицій досягнуто</b>\n\n"
+            "Тариф <b>{tier}</b> дозволяє максимум <b>{max}</b> відкритих позицій.\n"
+            "Закрий існуючі позиції або перейди на Pro."
+        ),
+        EN: (
+            "⚠️ <b>Position limit reached</b>\n\n"
+            "<b>{tier}</b> plan allows max <b>{max}</b> open positions.\n"
+            "Close existing positions or upgrade to Pro."
+        ),
+    },
+    'auto_sl_hit': {
+        UA: (
+            "🔴 <b>Stop-Loss спрацював!</b>\n\n"
+            "Токен: <b>{symbol}</b>\n"
+            "P&L: <b>{pnl}%</b>  (SL: -{sl}%)\n"
+            "Продаж: {sold}\n"
+            "🔗 Tx: <code>{tx}</code>"
+        ),
+        EN: (
+            "🔴 <b>Stop-Loss triggered!</b>\n\n"
+            "Token: <b>{symbol}</b>\n"
+            "P&L: <b>{pnl}%</b>  (SL: -{sl}%)\n"
+            "Sell: {sold}\n"
+            "🔗 Tx: <code>{tx}</code>"
+        ),
+    },
+    'auto_tp_hit': {
+        UA: (
+            "🟢 <b>Take-Profit спрацював!</b>\n\n"
+            "Токен: <b>{symbol}</b>\n"
+            "P&L: <b>{pnl}%</b>  (TP: +{tp}%)\n"
+            "Продаж: {sold}\n"
+            "🔗 Tx: <code>{tx}</code>"
+        ),
+        EN: (
+            "🟢 <b>Take-Profit triggered!</b>\n\n"
+            "Token: <b>{symbol}</b>\n"
+            "P&L: <b>{pnl}%</b>  (TP: +{tp}%)\n"
+            "Sell: {sold}\n"
+            "🔗 Tx: <code>{tx}</code>"
         ),
     },
 
@@ -435,6 +592,42 @@ _T: dict[str, dict[str, str]] = {
     'sig_disc':    {
         UA: '⚠️ <i>Не є фінансовою порадою. DYOR.</i>',
         EN: '⚠️ <i>Not financial advice. DYOR.</i>',
+    },
+    'sig_contract': {UA: '📋 <b>Контракт:</b>', EN: '📋 <b>Contract:</b>'},
+    'sig_dex_link': {UA: 'Переглянути на DexScreener', EN: 'View on DexScreener'},
+    'sig_created':  {UA: 'Створено', EN: 'Created'},
+    'sig_ago':      {UA: 'тому',     EN: 'ago'},
+
+    # ── Main menu extra button ────────────────────────────────────────────────
+    'menu_notif': {UA: '🔔 Сповіщення', EN: '🔔 Notifications'},
+
+    # ── Notification settings ─────────────────────────────────────────────────
+    'notif_menu': {
+        UA: (
+            "🔔 <b>Налаштування сповіщень</b>\n\n"
+            "Авто-пуш: <b>{push}</b>\n"
+            "Мережа: <b>{chain}</b>\n"
+            "Мін. score: <b>{score}</b>\n"
+            "Тариф: <b>{tier}</b>\n\n"
+            "📡 Сигнали надходять <b>автоматично</b> щойно бот знаходить нову монету.\n"
+            "Також отримуєш <b>нові монети з pump.fun</b> відразу при запуску."
+        ),
+        EN: (
+            "🔔 <b>Notification Settings</b>\n\n"
+            "Auto-push: <b>{push}</b>\n"
+            "Network: <b>{chain}</b>\n"
+            "Min score: <b>{score}</b>\n"
+            "Plan: <b>{tier}</b>\n\n"
+            "📡 Signals are pushed <b>automatically</b> as soon as the bot finds a new coin.\n"
+            "You also receive <b>new pump.fun coins</b> instantly at launch."
+        ),
+    },
+    'notif_push':         {UA: 'Авто-сповіщення',                   EN: 'Auto-push'},
+    'notif_chain_all':    {UA: 'Всі мережі',                         EN: 'All networks'},
+    'notif_score_auto':   {UA: 'Авто',                               EN: 'Auto'},
+    'notif_upgrade_hint': {
+        UA: '🔓 Фільтри доступні на Basic/Pro → /plans',
+        EN: '🔓 Filters available on Basic/Pro → /plans',
     },
 }
 
