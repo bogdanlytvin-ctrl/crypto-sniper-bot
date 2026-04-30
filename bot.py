@@ -12,6 +12,7 @@ from telegram import (
     InlineKeyboardButton, InlineKeyboardMarkup,
 )
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ConversationHandler, filters, ContextTypes,
@@ -71,22 +72,44 @@ def _main_keyboard(lang: str) -> InlineKeyboardMarkup:
     ])
 
 
-def _buy_keyboard(chain: str, token_address: str) -> InlineKeyboardMarkup | None:
-    """Inline buy buttons for signal messages. Returns None if address missing."""
+def _buy_keyboard(chain: str, token_address: str,
+                  user_settings: dict | None = None) -> InlineKeyboardMarkup | None:
+    """Inline buy buttons for signal messages. Returns None if address missing.
+    If user_settings provided — first row is a ⚡ Quick Buy with the user's configured amount."""
     if not token_address:
         return None
+
     if chain == "solana":
-        amounts = [("0.1 SOL", "0.1"), ("0.5 SOL", "0.5"), ("1 SOL", "1.0")]
+        std = [("0.1 SOL", "0.1"), ("0.5 SOL", "0.5"), ("1 SOL", "1.0")]
     else:
-        amounts = [("0.01 BNB", "0.01"), ("0.05 BNB", "0.05"), ("0.1 BNB", "0.1")]
-    buttons = [
-        InlineKeyboardButton(
-            f"💰 {label}",
-            callback_data=f"buy:{chain}:{token_address}:{amt}",
-        )
-        for label, amt in amounts
-    ]
-    return InlineKeyboardMarkup([buttons, [InlineKeyboardButton("❌ Skip", callback_data="skip")]])
+        std = [("0.01 BNB", "0.01"), ("0.05 BNB", "0.05"), ("0.1 BNB", "0.1")]
+
+    rows = []
+
+    # Quick Buy row — user's configured amount (one-tap)
+    if user_settings:
+        if chain == "solana":
+            qa  = float(user_settings.get("auto_max_buy_sol") or 0.1)
+            lbl = f"{qa:g}"  # strips trailing zeros: 0.10000 → 0.1
+            rows.append([InlineKeyboardButton(
+                f"⚡ Quick Buy {lbl} SOL",
+                callback_data=f"buy:{chain}:{token_address}:{lbl}",
+            )])
+        else:
+            qa  = float(user_settings.get("auto_max_buy_bnb") or 0.01)
+            lbl = f"{qa:g}"
+            rows.append([InlineKeyboardButton(
+                f"⚡ Quick Buy {lbl} BNB",
+                callback_data=f"buy:{chain}:{token_address}:{lbl}",
+            )])
+
+    # Standard amounts row
+    rows.append([
+        InlineKeyboardButton(f"💰 {lbl}", callback_data=f"buy:{chain}:{token_address}:{amt}")
+        for lbl, amt in std
+    ])
+    rows.append([InlineKeyboardButton("❌ Skip", callback_data="skip")])
+    return InlineKeyboardMarkup(rows)
 
 
 def _plans_keyboard(lang: str, current_tier: str) -> InlineKeyboardMarkup:
@@ -124,9 +147,11 @@ async def _send_signal(telegram_id: int, message: str,
 
     keyboard = None
     if pair_data and not auto_on:
+        user_settings = signal_meta.get("user_settings") if signal_meta else None
         keyboard = _buy_keyboard(
             pair_data.get("chain", ""),
             pair_data.get("token_address", ""),
+            user_settings=user_settings,
         )
 
     await _app.bot.send_message(
@@ -405,6 +430,58 @@ async def cb_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await query.edit_message_text(t(new_lang, key))
 
 
+async def cmd_results(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if _check_banned(user.id):
+        return
+    user_id = db.upsert_user(user.id, user.first_name, user.username)
+    perf = db.get_bot_performance()
+
+    pnl_sign = "+" if perf["total_pnl"] >= 0 else ""
+    lines = [
+        "📊 <b>Bot Performance</b>",
+        "",
+        f"✅ Total trades: {perf['total_trades']}",
+        f"🏆 Winrate: {perf['winrate']}%",
+        f"💰 Total P&L: {pnl_sign}${perf['total_pnl']:,.2f}",
+    ]
+
+    if perf["recent"]:
+        lines += ["", "📋 <b>Recent 10 trades:</b>", ""]
+        for row in perf["recent"]:
+            symbol    = row["token_symbol"] or "?"
+            chain     = (row["chain"] or "").upper()
+            buy_price = row["buy_price"] or 0
+            sell_price = row["sell_price"] or 0
+            pnl_usd   = row["pnl_usd"] or 0
+            pnl_pct   = row["pnl_percent"] or 0
+            pnl_sign2 = "+" if pnl_usd >= 0 else ""
+            pnl_pct_sign = "+" if pnl_pct >= 0 else ""
+            lines.append(f"<b>${symbol}</b> ({chain})")
+            lines.append(f"  BUY: ${buy_price:.6g}  SELL: ${sell_price:.6g}")
+            lines.append(f"  P&L: {pnl_pct_sign}{pnl_pct:.1f}% ({pnl_sign2}${pnl_usd:.2f})")
+            lines.append("")
+    else:
+        lines += ["", "📭 Немає закритих угод."]
+
+    lines.append("⚠️ Not financial advice. Past results ≠ future performance.")
+
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
+async def _menu_main(query, user_id: int, lang: str) -> None:
+    """Re-render the main menu in-place (used by back buttons)."""
+    try:
+        await query.edit_message_text(
+            t(lang, 'start', name=query.from_user.first_name),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_main_keyboard(lang),
+        )
+    except BadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
+
+
 # ── Main menu callbacks ────────────────────────────────────────────────────────
 
 async def cb_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -429,6 +506,7 @@ async def cb_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "trades":    _menu_trades,
         "notif":     _menu_notif,
         "plans":     lambda q, uid, lng: cmd_plans_via_callback(q, uid, lng),
+        "main":      _menu_main,
     }
     handler = dispatch.get(action)
     if handler:
@@ -551,21 +629,87 @@ async def _menu_positions(query, user_id: int, lang: str) -> None:
         await query.edit_message_text(t(lang, 'positions_empty'))
         return
 
-    await query.edit_message_text(
-        t(lang, 'positions_header', count=len(positions)),
-        parse_mode=ParseMode.HTML,
-    )
+    await query.edit_message_text("⏳ Завантаження позицій...")
 
+    # Fetch current prices via DexScreener (batch per chain)
+    prices: dict[str, float] = {}
+    try:
+        from scanner.dexscreener import get_pairs_batch
+        sol_addrs = [p["token_address"] for p in positions if p["chain"] == "solana"]
+        bsc_addrs = [p["token_address"] for p in positions if p["chain"] == "bsc"]
+        async with aiohttp.ClientSession() as session:
+            if sol_addrs:
+                pairs = await get_pairs_batch(session, "solana", sol_addrs)
+                for pair in pairs:
+                    addr  = (pair.get("baseToken") or {}).get("address", "")
+                    price = float(pair.get("priceUsd") or 0)
+                    if addr and price and addr not in prices:
+                        prices[addr] = price
+            if bsc_addrs:
+                pairs = await get_pairs_batch(session, "bsc", bsc_addrs)
+                for pair in pairs:
+                    addr  = (pair.get("baseToken") or {}).get("address", "")
+                    price = float(pair.get("priceUsd") or 0)
+                    if addr and price and addr not in prices:
+                        prices[addr] = price
+    except Exception:
+        pass  # show positions without live prices if API fails
+
+    # Calculate totals
+    total_invested = 0.0
+    total_current  = 0.0
     for pos in positions:
-        icon = "◎" if pos["chain"] == "solana" else "🔶"
+        bp  = float(pos["buy_price_usd"] or 0)
+        amt = float(pos["amount"] or 0)
+        cur = prices.get(pos["token_address"], 0)
+        total_invested += amt * bp
+        total_current  += amt * cur if cur else amt * bp  # fallback: no change
+
+    total_pnl     = total_current - total_invested
+    total_pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0.0
+    pnl_emoji     = "📈" if total_pnl >= 0 else "📉"
+    sign          = "+" if total_pnl >= 0 else ""
+
+    ua = lang == "ua"
+    header = (
+        f"📂 <b>{'Позиції' if ua else 'Positions'}: {len(positions)}</b>\n"
+        f"💼 {'Вкладено' if ua else 'Invested'}: <b>${total_invested:,.4f}</b>\n"
+        f"💰 {'Поточна вартість' if ua else 'Current value'}: <b>${total_current:,.4f}</b>\n"
+        f"{pnl_emoji} P&amp;L: <b>{sign}${total_pnl:,.4f}</b> ({sign}{total_pnl_pct:.1f}%)"
+    )
+    await query.edit_message_text(header, parse_mode=ParseMode.HTML)
+
+    # Individual position cards
+    for pos in positions:
+        icon      = "◎" if pos["chain"] == "solana" else "🔶"
+        bp        = float(pos["buy_price_usd"] or 0)
+        amt       = float(pos["amount"] or 0)
+        cur_price = prices.get(pos["token_address"], 0)
+        sl_pct    = pos["stop_loss_pct"] or 20
+        tp_pct    = pos["take_profit_pct"] or 0
+
+        if bp > 0 and cur_price > 0:
+            pnl_pct = (cur_price - bp) / bp * 100
+            pnl_usd = (cur_price - bp) * amt
+            p_sign  = "+" if pnl_pct >= 0 else ""
+            p_emoji = "📈" if pnl_pct >= 0 else "📉"
+            pnl_line = f"{p_emoji} P&amp;L: <b>{p_sign}{pnl_pct:.1f}%</b> ({p_sign}${pnl_usd:,.4f})"
+            cur_line = f"💵 {'Поточна' if ua else 'Current'}: ${cur_price:,.8f}"
+        else:
+            pnl_line = f"📊 P&amp;L: {'немає ціни' if ua else 'no price data'}"
+            cur_line = ""
+
+        tp_str = f"+{int(tp_pct)}%" if tp_pct > 0 else ("—" if ua else "—")
         msg = (
-            f"{icon} <b>{pos['token_symbol'] or '?'}</b> ({pos['token_name'] or '?'})\n"
-            f"📦 {pos['amount']:,.4f} токенів\n"
-            f"💵 Куплено по: ${pos['buy_price_usd'] or 0:,.8f}\n"
-            f"🛑 Stop-loss: -{pos['stop_loss_pct']}%\n"
+            f"{icon} <b>{pos['token_symbol'] or '?'}</b>  {pos['token_name'] or ''}\n"
+            f"📦 {amt:,.4f}  @  ${bp:,.8f}\n"
+            + (cur_line + "\n" if cur_line else "")
+            + f"{pnl_line}\n"
+            f"🛑 SL: -{int(sl_pct)}%  |  🎯 TP: {tp_str}\n"
             f"📅 {pos['opened_at'][:10]}\n"
             f"<code>{pos['token_address']}</code>"
         )
+
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🔴 Sell 50%",  callback_data=f"sell:{pos['id']}:50"),
             InlineKeyboardButton("🔴 Sell 100%", callback_data=f"sell:{pos['id']}:100"),
@@ -627,6 +771,8 @@ async def _menu_automode(query, user_id: int, lang: str) -> None:
          InlineKeyboardButton(f"TP {tp_active(200)} 200%",callback_data="auto:tp:200")],
         [InlineKeyboardButton(pump_btn,                   callback_data="auto:pump_toggle")],
         [InlineKeyboardButton(t(lang, 'auto_config'),     callback_data="auto:config")],
+        [InlineKeyboardButton("⚙️ Рекомендовані",        callback_data="auto:recommended"),
+         InlineKeyboardButton("🛡 Safe Mode",             callback_data="auto:safe_mode")],
     ])
     await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
@@ -650,20 +796,23 @@ async def _menu_notif(query, user_id: int, lang: str) -> None:
              push=push_icon, chain=f"{chain_icon} {chain_name}",
              score=score_display, tier=tier.upper())
 
-    # Chain filter buttons (only paid can pick)
+    # Chain filter buttons (all tiers)
     chain_row = []
-    if tier in ("basic", "pro"):
-        for c, lbl in [("all", f"🌍 {t(lang,'notif_chain_all')}"), ("solana", "◎ SOL"), ("bsc", "🔶 BSC")]:
-            active = "●" if chain == c else "○"
-            chain_row.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:chain:{c}"))
+    for c, lbl in [("all", f"🌍 {t(lang,'notif_chain_all')}"), ("solana", "◎ SOL"), ("bsc", "🔶 BSC")]:
+        active = "●" if chain == c else "○"
+        chain_row.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:chain:{c}"))
 
-    # Score filter buttons (only paid can pick)
-    score_row = []
-    if tier in ("basic", "pro"):
-        for sc, lbl in [(0, t(lang,"notif_score_auto")), (35, "35+"), (55, "55+"), (70, "70+"), (85, "85+")]:
-            active = "●" if mscore == sc else "○"
-            score_row.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:score:{sc}"))
+    # Score filter buttons — split into 2 rows (5 buttons → too narrow in one row on mobile)
+    score_row1, score_row2 = [], []
+    score_opts = [(0, t(lang,"notif_score_auto")), (35, "35+"), (55, "55+"), (70, "70+"), (85, "85+")]
+    for sc, lbl in score_opts[:3]:
+        active = "●" if mscore == sc else "○"
+        score_row1.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:score:{sc}"))
+    for sc, lbl in score_opts[3:]:
+        active = "●" if mscore == sc else "○"
+        score_row2.append(InlineKeyboardButton(f"{active} {lbl}", callback_data=f"notif:score:{sc}"))
 
+    back_lbl = "← Назад" if lang == "ua" else "← Back"
     rows = [
         [InlineKeyboardButton(
             f"🔔 {t(lang,'notif_push')}: {push_icon}",
@@ -672,15 +821,18 @@ async def _menu_notif(query, user_id: int, lang: str) -> None:
     ]
     if chain_row:
         rows.append(chain_row)
-    if score_row:
-        rows.append(score_row)
-    if tier == "free":
-        rows.append([InlineKeyboardButton(
-            t(lang, "notif_upgrade_hint"), callback_data="menu:plans"
-        )])
+    if score_row1:
+        rows.append(score_row1)
+    if score_row2:
+        rows.append(score_row2)
+    rows.append([InlineKeyboardButton(back_lbl, callback_data="menu:main")])
 
     keyboard = InlineKeyboardMarkup(rows)
-    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    try:
+        await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    except BadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
 
 
 async def _menu_trades(query, user_id: int, lang: str) -> None:
@@ -1103,9 +1255,22 @@ async def cb_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         result = execute_sell(pos["token_address"], amount_raw, pk)
 
     if result["success"]:
+        # Calculate sell price and P&L
+        buy_price_usd = pos["buy_price_usd"] or 0
+        # Estimate sell price from quote output / sell_amount or fallback to buy price
+        try:
+            amount_out_native = float(result.get("amount_out") or 0)
+            sell_price_usd = amount_out_native / sell_amount if sell_amount > 0 and amount_out_native > 0 else 0.0
+        except Exception:
+            sell_price_usd = 0.0
+        pnl_usd_val     = (sell_price_usd - buy_price_usd) * sell_amount if buy_price_usd > 0 and sell_price_usd > 0 else None
+        pnl_percent_val = ((sell_price_usd - buy_price_usd) / buy_price_usd * 100) if buy_price_usd > 0 and sell_price_usd > 0 else None
         db.save_trade(user_id, chain, pos["token_address"],
                       pos["token_symbol"] or "?", "sell",
-                      sell_amount, 0, 0, result["tx_hash"], "pending")
+                      sell_amount, 0, buy_price_usd, result["tx_hash"], "pending",
+                      sell_price=sell_price_usd if sell_price_usd > 0 else None,
+                      pnl_usd=pnl_usd_val,
+                      pnl_percent=pnl_percent_val)
         if sell_pct == 100:
             db.close_position(pos_id)
         else:
@@ -1143,12 +1308,12 @@ async def cb_notif(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         curr = bool(s["signals_push"]) if s and "signals_push" in s.keys() else True
         db.update_user_settings(user_id, signals_push=0 if curr else 1)
 
-    elif action == "chain" and tier in ("basic", "pro"):
+    elif action == "chain":
         new_chain = parts[2] if len(parts) > 2 else "all"
         if new_chain in ("all", "solana", "bsc"):
             db.update_user_settings(user_id, signal_chain=new_chain)
 
-    elif action == "score" and tier in ("basic", "pro"):
+    elif action == "score":
         try:
             new_score = int(parts[2]) if len(parts) > 2 else 0
         except ValueError:
@@ -1223,6 +1388,47 @@ async def cb_auto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await query.edit_message_text("🟣 pump.fun сповіщення <b>вимкнено</b>.", parse_mode=ParseMode.HTML)
         else:
             await query.edit_message_text("🟣 pump.fun сповіщення <b>увімкнено</b>!\n\nБот надсилатиме кожен новий токен з pump.fun.", parse_mode=ParseMode.HTML)
+    elif action == "recommended":
+        tier = db.get_user_tier(user_id)
+        if tier == "free":
+            await query.answer(t(lang, 'auto_tier_required_short'), show_alert=True)
+            return
+        db.update_user_settings(
+            user_id,
+            auto_mode=1,
+            auto_min_score=80,
+            auto_max_buy_sol=0.1,
+            auto_max_buy_bnb=0.01,
+            auto_stop_loss=20,
+            auto_take_profit=80,
+        )
+        await query.edit_message_text(
+            "⚙️ <b>Рекомендовані налаштування застосовано!</b>\n\n"
+            "✅ Auto-mode: ON\n"
+            "📊 Min score: 80\n"
+            "◎ Max buy SOL: 0.1\n"
+            "🔶 Max buy BNB: 0.01\n"
+            "🛑 Stop-loss: 20%\n"
+            "🎯 Take-profit: 80%",
+            parse_mode=ParseMode.HTML,
+        )
+    elif action == "safe_mode":
+        s    = db.get_user_settings(user_id)
+        curr = bool(s["safe_mode"]) if s and "safe_mode" in s.keys() else False
+        db.update_user_settings(user_id, safe_mode=0 if curr else 1)
+        if curr:
+            await query.edit_message_text(
+                "🛡 <b>Safe Mode вимкнено.</b>\n\nБот буде використовувати стандартні фільтри.",
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            await query.edit_message_text(
+                "🛡 <b>Safe Mode увімкнено!</b>\n\n"
+                "✅ Мінімальний score: 85\n"
+                "❌ pump.fun токени — виключені\n\n"
+                "Тільки найбезпечніші сигнали.",
+                parse_mode=ParseMode.HTML,
+            )
 
 
 # ── Background: position monitor (stop-loss / take-profit) ────────────────────
@@ -1524,6 +1730,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help",     cmd_help))
     app.add_handler(CommandHandler("plans",    cmd_plans))
     app.add_handler(CommandHandler("language", cmd_language))
+    app.add_handler(CommandHandler("results",  cmd_results))
     app.add_handler(wallet_conv)
     app.add_handler(CallbackQueryHandler(cb_menu,      pattern=r"^menu:"))
     app.add_handler(CallbackQueryHandler(cb_language,  pattern=r"^lang:"))

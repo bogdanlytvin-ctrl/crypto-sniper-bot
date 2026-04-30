@@ -247,6 +247,14 @@ async def _ai_analyze_token(
         f"Дай коротку оцінку: чи варто входити, з яким ризиком, на що звернути увагу. Тільки суть."
     )
 
+    system_role = (
+        "Ти — досвідчений крипто-аналітик мем-коїнів. "
+        "Відповідай ВИКЛЮЧНО українською мовою. "
+        "Формат відповіді: 2-3 речення. "
+        "Структура: (1) загальна оцінка потенціалу, (2) ключовий ризик, (3) чітка рекомендація — входити чи ні. "
+        "Будь конкретним і прямим. Не вживай вступних фраз типо 'Звичайно' або 'Ось аналіз'."
+    )
+
     try:
         async with session.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -256,7 +264,10 @@ async def _ai_analyze_token(
             },
             json={
                 "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [
+                    {"role": "system", "content": system_role},
+                    {"role": "user", "content": prompt},
+                ],
                 "temperature": 0.4,
                 "max_tokens": 180,
             },
@@ -566,11 +577,6 @@ async def _pump_cycle(session: aiohttp.ClientSession, send_fn: SendCallback) -> 
     pump_users = [
         u for u in users
         if _row(u, "signals_push", 1)
-        and (
-            _row(u, "tier", "free") in ("basic", "pro")
-            or _row(u, "auto_mode", 0)
-            or _row(u, "notify_all_tokens", 0)
-        )
         and _row(u, "signal_chain", "all") in ("all", "solana")
         # LAUNCH signals have score=0 — skip users who set an explicit min-score filter
         and _row(u, "signal_min_score_user", 0) == 0
