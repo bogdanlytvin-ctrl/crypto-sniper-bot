@@ -307,6 +307,13 @@ _PAGE = """<!doctype html>
       <button class="btn-sm" id="tpl-save">💾 Зберегти</button>
     </div>
 
+    <div class="tpl-bar" style="margin-top:6px">
+      <span style="font-weight:600;font-size:13px">Готові приклади:</span>
+      <button class="btn-sm" id="ex-books" type="button">📚 books.toscrape</button>
+      <button class="btn-sm" id="ex-off" type="button">🍫 Open Food Facts</button>
+      <span class="tip" style="font-size:12px">— перевірені конфіги, підставлять YAML у поле нижче</span>
+    </div>
+
     <div class="fld">
       <label>Назва постачальника <span class="tip">(будь-яка — піде в назву файлів)</span></label>
       <input type="text" id="b-name" placeholder="my-supplier">
@@ -426,6 +433,62 @@ const $ = id => document.getElementById(id);
 let timer = null;
 
 document.getElementById('tmpl').onclick = () => { $('cfg').value = TEMPLATE; };
+
+// ---------- Готові приклади (перевірені на реальних сайтах) ----------
+const PRESETS = {
+books: `name: 'books_toscrape'
+base_url: 'https://books.toscrape.com/catalogue/'
+start_urls:
+  - 'https://books.toscrape.com/catalogue/page-1.html'
+product_link_selector: 'article.product_pod h3 a'
+
+pagination:
+  type: 'none'
+
+fields:
+  name:        { selector: 'div.product_main h1' }
+  product_id:  { selector: 'table.table.table-striped td' }
+  images:      { selector: '#product_gallery img', attr: src }
+
+params:
+  price:        { selector: 'div.product_main p.price_color' }
+  availability: { selector: 'p.instock.availability' }
+
+render_js: false
+download_images: false
+delay_seconds: 0.3
+concurrency: 4`,
+off: `name: 'openfoodfacts'
+base_url: 'https://world.openfoodfacts.org/'
+start_urls:
+  - 'https://world.openfoodfacts.org/product/3017620422003'
+  - 'https://world.openfoodfacts.org/product/5449000000996'
+  - 'https://world.openfoodfacts.org/product/7622210449283'
+  - 'https://world.openfoodfacts.org/product/3046920029759'
+  - 'https://world.openfoodfacts.org/product/8000500037560'
+product_link_selector: 'link[rel="canonical"]'
+
+pagination:
+  type: 'none'
+
+fields:
+  name:        { selector: 'h1' }
+  product_id:  { selector: '#barcode' }
+  barcode:     { selector: '#barcode', multiple: true }
+  images:      { selector: '#og_image', attr: src }
+
+params:
+  brand:    { selector: '#field_brands_value' }
+  category: { selector: '#field_categories_value' }
+
+render_js: false
+download_images: false
+delay_seconds: 1.0
+concurrency: 2`
+};
+function loadPreset(k) { $('cfg').value = PRESETS[k]; $('cfg').scrollIntoView({behavior:'smooth', block:'center'}); }
+$('ex-books').onclick = () => loadPreset('books');
+$('ex-off').onclick = () => loadPreset('off');
 
 // ---------- Конструктор конфігу ----------
 const FIELD_IDS = ['b-name','b-urls','b-link','b-pgtype','b-pgval','b-f-name','b-f-id','b-f-id-re','b-f-bc','b-f-img','b-f-img-attr','b-p1k','b-p1s','b-p2k','b-p2s','b-img-dl','b-delay','b-conc'];
