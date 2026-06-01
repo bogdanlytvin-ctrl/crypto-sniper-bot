@@ -1,0 +1,12 @@
+.git
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+output/*.xlsx
+output/*.csv
+images/*
+config/*.local.yaml
+.DS_Store
+Thumbs.db

@@ -1,4 +1,20 @@
+---
+title: Парсер даних
+emoji: 📦
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Парсер даних — збір бази товарів з сайтів постачальників
+
+> **Веб-версія (FastAPI):** локально — `uvicorn web.app:app --reload` →
+> http://127.0.0.1:8000 . У Docker / на Hugging Face Spaces слухає порт `7860`.
+> Завантаж/встав YAML-конфіг постачальника, натисни «Запустити» — отримаєш
+> XLSX + CSV (+ zip фото). Деплой — див. кінець файлу.
+
 
 Конфіг-кероване ядро для збору каталогу товарів з кількох сайтів
 постачальників і вивантаження у **Excel (XLSX)** та **CSV**.
@@ -92,3 +108,41 @@ python main.py config/example_supplier.yaml --limit 20 --download-images
 - **Дедуплікація** за `(supplier, product_id)` — без дублів у базі.
 - **Валідація штрихкодів** — лишаються лише коректні GTIN-довжини.
 - **utf-8-sig** у CSV — коректно відкривається в Excel з кирилицею.
+
+---
+
+## Веб-версія та деплой
+
+`web/app.py` — FastAPI-обгортка над ядром. Одна сторінка: вставити/завантажити
+YAML-конфіг(и) → опції (ліміт, фото) → «Запустити». Парс іде фоновою задачею,
+сторінка показує лог у реальному часі, у кінці — кнопки завантаження
+`XLSX / CSV / images.zip`.
+
+```bash
+# локально
+pip install -r requirements.txt -r web/requirements.txt
+uvicorn web.app:app --reload         # http://127.0.0.1:8000
+```
+
+### Хостинг (безкоштовно)
+
+Vercel **не підходить** (serverless: ліміт часу, ефемерна ФС, немає довгих
+задач). Підходять платформи з Docker і довгими процесами:
+
+**Hugging Face Spaces (рекомендовано — без картки):**
+1. huggingface.co → **New Space** → SDK = **Docker**, Blank.
+2. У створений Space-репозиторій залити вміст цієї папки:
+   ```bash
+   git clone https://huggingface.co/spaces/<user>/<space> hf-space
+   # скопіювати сюди файли проєкту (web/, src/, Dockerfile, README.md, requirements.txt, config/)
+   cd hf-space && git add . && git commit -m "deploy parser web" && git push
+   ```
+   HF підхопить `Dockerfile` і `app_port: 7860` із заголовка README і збере образ.
+3. Через ~2-3 хв застосунок живий на `https://<user>-<space>.hf.space`.
+
+**Render / Railway / Fly.io** — той самий `Dockerfile`: New → Web Service →
+Docker, Root Directory = `парсер даних`, порт `7860`. На free-тарифах сервіс
+засинає в простої (перший запит після паузи — повільніший).
+
+> Вихідні файли на безкоштовних хостах **ефемерні** (живуть до перезапуску
+> контейнера) — завантажуй результат одразу після прогону.
