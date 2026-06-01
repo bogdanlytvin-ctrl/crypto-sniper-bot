@@ -216,6 +216,13 @@ _PAGE = """<!doctype html>
   .files a { display:inline-block; margin:6px 10px 0 0; padding:8px 14px; background:#16331f; color:var(--ok); border-radius:8px; text-decoration:none; font-weight:600; }
   .hint { color:var(--mut); font-size:13px; margin-top:8px; }
   a.tmpl { color:var(--acc); cursor:pointer; }
+  details.help { margin-top:14px; background:#0c0e12; border:1px solid var(--line); border-radius:8px; padding:0 14px; }
+  details.help summary { cursor:pointer; padding:12px 0; font-weight:600; color:var(--acc); list-style:none; }
+  details.help[open] summary { border-bottom:1px solid var(--line); }
+  details.help ol { margin:12px 0 16px; padding-left:20px; color:var(--mut); font-size:13.5px; line-height:1.7; }
+  details.help li { margin-bottom:6px; }
+  details.help code, details.help kbd { background:#1a1d24; border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:12px; color:#cdd3dd; }
+  details.help b { color:var(--fg); }
 </style>
 </head>
 <body>
@@ -225,8 +232,22 @@ _PAGE = """<!doctype html>
 
   <div class="card">
     <label for="cfg">YAML-конфіг постачальника <a class="tmpl" id="tmpl">↳ вставити шаблон</a></label>
-    <textarea id="cfg" placeholder="Встав сюди YAML-конфіг (один постачальник) або завантаж файл нижче"></textarea>
+    <textarea id="cfg" placeholder="Натисни «вставити шаблон» вгорі — потім заміни селектори під свій сайт. Або завантаж готовий .yaml файл нижче."></textarea>
     <div class="hint">Один конфіг = один постачальник. Кілька постачальників — завантаж кілька .yaml файлів (буде ще зведений all_products).</div>
+
+    <details class="help">
+      <summary>📋 Як заповнити — рекомендації</summary>
+      <ol>
+        <li><b>Натисни «вставити шаблон»</b> — це готовий каркас, треба лише підмінити селектори під свій сайт.</li>
+        <li><b><code>name:</code> вгорі — це назва ПОСТАЧАЛЬНИКА</b> (для назв файлів), а не товару. Назву товару бере селектор <code>fields → name</code>.</li>
+        <li><b>Де взяти CSS-селектор:</b> на сайті натисни <kbd>F12</kbd> → стрілка вгорі панелі → клікни по елементу (назві, ціні…) → правою → <i>Copy → Copy selector</i>. Або візьми клас елемента (напр. <code>.product-title</code>).</li>
+        <li><b><code>product_link_selector</code></b> має вказувати на посилання <code>&lt;a&gt;</code> картки товару в каталозі.</li>
+        <li><b>Спочатку тест:</b> постав «ліміт товарів» = <b>20</b>, перевір результат у файлі, і лише потім прибери ліміт на повний обсяг.</li>
+        <li><b>Великий обсяг (2000–3000):</b> краще ганяти локально через CLI — безкоштовний хостинг для повної бази не призначений.</li>
+        <li><b>Сайт на JS</b> (товари підвантажуються після відкриття) тут не побачить вміст — напиши, додам режим рендеру (Playwright).</li>
+        <li><b>Фото:</b> прямі посилання збираються завжди; галочка «завантажувати фото» — щоб отримати ще й самі файли в <code>images.zip</code>.</li>
+      </ol>
+    </details>
     <div class="row">
       <div><input type="file" id="files" accept=".yaml,.yml" multiple></div>
       <div><input type="checkbox" id="imgs"><label style="margin:0">завантажувати фото</label></div>
@@ -243,26 +264,30 @@ _PAGE = """<!doctype html>
 </div>
 
 <script>
-const TEMPLATE = `name: example
-base_url: https://example.com
-start_urls:
+const TEMPLATE = `name: my-supplier          # назва ПОСТАЧАЛЬНИКА (будь-яка) — піде в назву файлів
+base_url: https://example.com      # головний домен сайту
+start_urls:                        # сторінка каталогу, звідки почати обхід
   - https://example.com/catalog
-product_link_selector: a.product-card
-pagination:
-  type: query        # query | next_link | none
+product_link_selector: a.product-card   # CSS-селектор посилань на картки товарів
+
+pagination:                        # як гортати сторінки каталогу
+  type: query        # query (?page=2) | next_link (кнопка «далі») | none (одна сторінка)
   param: page
   max_pages: 50
-fields:
-  name:        { selector: "h1.product-title" }
-  product_id:  { selector: ".sku", regex: "([A-Z0-9-]+)" }
-  barcode:     { selector: ".barcode", multiple: true }
-  images:      { selector: ".gallery img", attr: src, multiple: true }
-params:
+
+fields:                            # ЩО брати з картки товару (CSS-селектори)
+  name:        { selector: "h1.product-title" }            # назва товару
+  product_id:  { selector: ".sku", regex: "([A-Z0-9-]+)" } # артикул (regex необов'язково)
+  barcode:     { selector: ".barcode", multiple: true }    # штрихкод(и) — бере всі
+  images:      { selector: ".gallery img", attr: src, multiple: true }  # фото
+
+params:                            # 1-2 додаткові поля (на вибір)
   brand:  { selector: ".brand" }
   weight: { selector: ".weight" }
-download_images: false
-delay_seconds: 1.0
-concurrency: 5`;
+
+download_images: false   # true — ще й завантажити самі фото (у images.zip)
+delay_seconds: 1.0       # пауза між запитами (щоб не навантажувати сайт)
+concurrency: 5           # скільки сторінок тягнути паралельно`;
 
 document.getElementById('tmpl').onclick = () => { document.getElementById('cfg').value = TEMPLATE; };
 
