@@ -1,0 +1,7 @@
+httpx>=0.27
+selectolax>=0.3.21
+openpyxl>=3.1
+pydantic>=2.6
+PyYAML>=6.0
+# Опційно — лише для render_js: true (JS/SPA-сайти):
+# playwright>=1.44   →  після встановлення: playwright install chromium

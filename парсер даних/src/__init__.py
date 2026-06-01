@@ -1,0 +1,1 @@
+"""Supplier product-catalogue parser."""

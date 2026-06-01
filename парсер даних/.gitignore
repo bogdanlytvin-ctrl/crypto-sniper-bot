@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Output artefacts (generated data — not for the repo)
+output/*.xlsx
+output/*.csv
+images/*
+!output/.gitkeep
+!images/.gitkeep
+
+# Local supplier configs may contain private URLs / access notes
+config/*.local.yaml
+
+# OS
+.DS_Store
+Thumbs.db

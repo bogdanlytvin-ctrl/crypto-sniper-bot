@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────
+# Приклад конфігурації постачальника.
+# Скопіюйте цей файл (config/<назва>.yaml) і підставте реальні
+# CSS-селектори після отримання доступу до сайту.
+# ─────────────────────────────────────────────────────────────
+
+name: example_supplier            # ім'я → output/example_supplier.xlsx
+base_url: "https://example-supplier.com"
+
+# Звідки починати обхід каталогу (одна або кілька стартових сторінок)
+start_urls:
+  - "https://example-supplier.com/catalog"
+
+# Як перегортати сторінки каталогу:
+#   type: query      → ?page=1, ?page=2 … (param задає назву параметра)
+#   type: next_link  → брати href кнопки "наступна" (next_link_selector)
+#   type: none       → одна сторінка без пагінації
+pagination:
+  type: "query"
+  param: "page"
+  start: 1
+  max_pages: 200
+
+# Селектор посилань на картки товарів у списку каталогу
+product_link_selector: "a.product-card__link"
+
+# Рендер JS-сайтів через Playwright (для SPA / динамічної підгрузки)
+render_js: false
+
+# Завантажувати фото локально в images/ (true) чи лишити лише посилання (false)
+download_images: false
+
+# Ввічливість до сайту
+delay_seconds: 1.0
+concurrency: 5
+# max_products: 20                # розкоментуйте для тестового прогону
+
+# ── Поля товару (CSS-селектори зі сторінки товару) ──
+# attr     — взяти атрибут замість тексту (напр. src, href, content)
+# regex    — лишити лише першу групу збігу
+# multiple — зібрати всі збіги (для штрихкодів / галереї фото)
+fields:
+  name:
+    selector: "h1.product-title"
+  product_id:
+    selector: ".product-sku .value"
+    regex: "([A-Za-z0-9._-]+)"
+  barcode:
+    selector: ".product-barcode"
+    multiple: true
+  images:
+    selector: ".product-gallery img"
+    attr: "src"
+    multiple: true
+
+# ── Додаткові 1–2 параметри (обговорюються окремо) ──
+params:
+  brand:
+    selector: ".attr-brand .value"
+  weight:
+    selector: ".attr-weight .value"
