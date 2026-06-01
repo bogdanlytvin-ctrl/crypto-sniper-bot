@@ -311,6 +311,7 @@ _PAGE = """<!doctype html>
       <span style="font-weight:600;font-size:13px">Готові приклади:</span>
       <button class="btn-sm" id="ex-books" type="button">📚 books.toscrape</button>
       <button class="btn-sm" id="ex-off" type="button">🍫 Open Food Facts</button>
+      <button class="btn-sm" id="ex-prom" type="button">🛒 Prom.ua</button>
       <span class="tip" style="font-size:12px">— перевірені конфіги, підставлять YAML у поле нижче</span>
     </div>
 
@@ -484,11 +485,33 @@ params:
 render_js: false
 download_images: false
 delay_seconds: 1.0
-concurrency: 2`
+concurrency: 2`,
+prom: `name: 'prom_ua'
+base_url: 'https://prom.ua'
+start_urls:
+  - 'https://prom.ua/ua/Mobilnye-telefony-i-smartfony.html'
+product_link_selector: '[data-qaid="product_link"]'
+
+pagination:
+  type: 'none'   # Prom paginates via JS; static fetch yields ~20 products per category page
+
+fields:
+  name:        { selector: 'h1' }
+  product_id:  { selector: '[data-qaid="product-sku"]', regex: '([0-9]+)' }
+  images:      { selector: 'img[data-qaid="image_preview"]', attr: src, multiple: true }
+
+params:
+  price: { selector: '[data-qaid="product_price"]' }
+
+render_js: false
+download_images: false
+delay_seconds: 1.0
+concurrency: 3`
 };
 function loadPreset(k) { $('cfg').value = PRESETS[k]; $('cfg').scrollIntoView({behavior:'smooth', block:'center'}); }
 $('ex-books').onclick = () => loadPreset('books');
 $('ex-off').onclick = () => loadPreset('off');
+$('ex-prom').onclick = () => loadPreset('prom');
 
 // ---------- Конструктор конфігу ----------
 const FIELD_IDS = ['b-name','b-urls','b-link','b-pgtype','b-pgval','b-f-name','b-f-id','b-f-id-re','b-f-bc','b-f-img','b-f-img-attr','b-p1k','b-p1s','b-p2k','b-p2s','b-img-dl','b-delay','b-conc'];
