@@ -23,11 +23,23 @@ async def _discover(fetcher: Fetcher, cfg: SupplierConfig) -> list[str]:
     pg = cfg.pagination
     for start in cfg.start_urls:
         if pg.type == "query":
+            empty_streak = 0
             for page in range(pg.start, pg.start + pg.max_pages):
                 html = await fetcher.get(_with_page(start, pg.param, page))
-                links = extract_links(html, cfg.product_link_selector, cfg.base_url) if html else []
+                if html is None:
+                    # fetch failure (timeout / 5xx) — could be transient, not
+                    # the end of the catalogue; tolerate a couple in a row.
+                    empty_streak += 1
+                    if empty_streak >= 3:
+                        break
+                    continue
+                links = extract_links(html, cfg.product_link_selector, cfg.base_url)
                 if not links:
-                    break  # empty page → end of catalogue
+                    empty_streak += 1
+                    if empty_streak >= 2:
+                        break  # two genuinely empty pages → end of catalogue
+                    continue
+                empty_streak = 0
                 found.extend(links)
         elif pg.type == "next_link":
             url: str | None = start

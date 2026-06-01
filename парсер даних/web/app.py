@@ -12,11 +12,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import ipaddress
+import os
 import re
+import socket
 import uuid
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from fastapi import FastAPI, Form, HTTPException, UploadFile
@@ -37,6 +41,47 @@ JOBS_DIR.mkdir(parents=True, exist_ok=True)
 # and avoids hammering a single free host's CPU/network.
 _run_lock = asyncio.Lock()
 _jobs: dict[str, "Job"] = {}
+
+# On a public deployment (PUBLIC_DEPLOY=1, set in the Dockerfile) we lock the
+# app down: block SSRF to internal hosts and cap crawl size so anonymous users
+# can't abuse the free host. Locally these limits are off (full CLI power).
+PUBLIC = os.environ.get("PUBLIC_DEPLOY") == "1"
+MAX_PAGES = 30
+MAX_CONCURRENCY = 6
+MAX_PRODUCTS = 300
+
+
+def _host_is_blocked(host: str) -> bool:
+    """True if a hostname resolves to a private/loopback/reserved address."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return True  # unresolvable → refuse
+    for info in infos:
+        addr = ipaddress.ip_address(info[4][0])
+        if (
+            addr.is_private or addr.is_loopback or addr.is_link_local
+            or addr.is_reserved or addr.is_multicast or addr.is_unspecified
+        ):
+            return True
+    return False
+
+
+def _harden_for_public(configs: list[SupplierConfig]) -> None:
+    """SSRF guard + size caps applied only when PUBLIC. Raises ValueError."""
+    if not PUBLIC:
+        return
+    for cfg in configs:
+        cfg.render_js = False  # Playwright isn't in the hosted image
+        cfg.pagination.max_pages = min(cfg.pagination.max_pages, MAX_PAGES)
+        cfg.concurrency = min(cfg.concurrency, MAX_CONCURRENCY)
+        cfg.max_products = min(cfg.max_products or MAX_PRODUCTS, MAX_PRODUCTS)
+        for url in [cfg.base_url, *cfg.start_urls]:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError(f"Дозволені лише http/https адреси: {url}")
+            if not parsed.hostname or _host_is_blocked(parsed.hostname):
+                raise ValueError(f"Заблокований або недоступний хост: {url}")
 
 
 @dataclass
@@ -146,10 +191,13 @@ async def run(
 
     try:
         configs = _parse_configs(raw_texts)
+        await asyncio.to_thread(_harden_for_public, configs)
     except (ValidationError, ValueError, yaml.YAMLError) as exc:
         raise HTTPException(400, f"Помилка в конфізі: {exc}")
 
     limit_val = int(limit) if limit.strip().isdigit() else None
+    if PUBLIC and (limit_val is None or limit_val > MAX_PRODUCTS):
+        limit_val = MAX_PRODUCTS
     force_images = download_images_opt == "on"
 
     job = Job(id=uuid.uuid4().hex[:12])
@@ -223,12 +271,97 @@ _PAGE = """<!doctype html>
   details.help li { margin-bottom:6px; }
   details.help code, details.help kbd { background:#1a1d24; border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:12px; color:#cdd3dd; }
   details.help b { color:var(--fg); }
+  .card h2 { font-size:17px; margin:0 0 4px; }
+  .card .sub2 { color:var(--mut); font-size:13px; margin:0 0 16px; }
+  .fld { margin-bottom:13px; }
+  .fld > label { font-weight:600; font-size:13.5px; margin-bottom:5px; }
+  .fld .tip { color:var(--mut); font-weight:400; font-size:12px; }
+  .fld input[type=text], .fld textarea, .fld select { width:100%; background:#0c0e12; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font:13px/1.4 ui-monospace,Consolas,monospace; }
+  .fld textarea { min-height:54px; resize:vertical; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+  .grid2 .fld { margin-bottom:0; }
+  @media (max-width:560px){ .grid2 { grid-template-columns:1fr; } }
+  .tpl-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:#0c0e12; border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:16px; }
+  .tpl-bar select, .tpl-bar input { background:#1a1d24; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px; }
+  .tpl-bar button, .btn-sm { margin:0; padding:7px 12px; font-size:13px; background:#243049; }
+  .btn-ghost { background:transparent; border:1px solid var(--line); color:var(--fg); }
+  .row-btns { display:flex; gap:10px; flex-wrap:wrap; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Парсер даних</h1>
   <p class="sub">Збір бази товарів із сайтів постачальників → Excel (XLSX) + CSV</p>
+
+  <div class="card">
+    <h2>🔧 Конструктор конфігу</h2>
+    <p class="sub2">Встав посилання на сайт і CSS-селектори полів — згенерую YAML. Збережи як шаблон, щоб не вводити вдруге.</p>
+
+    <div class="tpl-bar">
+      <span style="font-weight:600;font-size:13px">Шаблони:</span>
+      <select id="tpl-list"><option value="">— збережені —</option></select>
+      <button class="btn-sm" id="tpl-load">Завантажити</button>
+      <button class="btn-sm btn-ghost" id="tpl-del">Видалити</button>
+      <span style="flex:1"></span>
+      <input type="text" id="tpl-name" placeholder="назва шаблону" style="width:150px">
+      <button class="btn-sm" id="tpl-save">💾 Зберегти</button>
+    </div>
+
+    <div class="fld">
+      <label>Назва постачальника <span class="tip">(будь-яка — піде в назву файлів)</span></label>
+      <input type="text" id="b-name" placeholder="my-supplier">
+    </div>
+    <div class="fld">
+      <label>Посилання на каталог <span class="tip">(по одному в рядку — звідки починати обхід)</span></label>
+      <textarea id="b-urls" placeholder="https://site.com/catalog"></textarea>
+    </div>
+    <div class="fld">
+      <label>Селектор посилань на товар <span class="tip">(CSS до &lt;a&gt; картки товару в каталозі)</span></label>
+      <input type="text" id="b-link" placeholder="a.product-card">
+    </div>
+
+    <div class="grid2">
+      <div class="fld">
+        <label>Пагінація</label>
+        <select id="b-pgtype">
+          <option value="query">query — ?page=2</option>
+          <option value="next_link">next_link — кнопка «далі»</option>
+          <option value="none">none — одна сторінка</option>
+        </select>
+      </div>
+      <div class="fld" id="b-pg-extra">
+        <label id="b-pg-lbl">Параметр сторінки</label>
+        <input type="text" id="b-pgval" placeholder="page">
+      </div>
+    </div>
+
+    <p class="sub2" style="margin:18px 0 8px;font-weight:600;color:var(--fg)">Поля товару (CSS-селектори):</p>
+    <div class="grid2">
+      <div class="fld"><label>Назва товару <span class="tip">*обов'язково</span></label><input type="text" id="b-f-name" placeholder="h1.product-title"></div>
+      <div class="fld"><label>Артикул / ID</label><input type="text" id="b-f-id" placeholder=".sku"></div>
+      <div class="fld"><label>Regex для артикулу <span class="tip">(необов'язково)</span></label><input type="text" id="b-f-id-re" placeholder="([A-Z0-9-]+)"></div>
+      <div class="fld"><label>Штрихкод(и) <span class="tip">(бере всі)</span></label><input type="text" id="b-f-bc" placeholder=".barcode"></div>
+      <div class="fld"><label>Фото <span class="tip">(img у галереї)</span></label><input type="text" id="b-f-img" placeholder=".gallery img"></div>
+      <div class="fld"><label>Атрибут фото</label><input type="text" id="b-f-img-attr" placeholder="src" value="src"></div>
+    </div>
+
+    <p class="sub2" style="margin:18px 0 8px;font-weight:600;color:var(--fg)">Додаткові параметри (1–2):</p>
+    <div class="grid2">
+      <div class="fld"><label>Параметр 1 — назва / селектор</label><div style="display:flex;gap:8px"><input type="text" id="b-p1k" placeholder="brand" style="width:40%"><input type="text" id="b-p1s" placeholder=".brand"></div></div>
+      <div class="fld"><label>Параметр 2 — назва / селектор</label><div style="display:flex;gap:8px"><input type="text" id="b-p2k" placeholder="weight" style="width:40%"><input type="text" id="b-p2s" placeholder=".weight"></div></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <div><input type="checkbox" id="b-img-dl"><label style="margin:0">завантажувати самі фото</label></div>
+      <div><label style="margin:0">пауза, c</label><input type="number" id="b-delay" min="0" step="0.5" value="1" style="width:70px"></div>
+      <div><label style="margin:0">паралельність</label><input type="number" id="b-conc" min="1" max="20" value="5" style="width:70px"></div>
+    </div>
+
+    <div class="row-btns">
+      <button id="b-gen">Згенерувати конфіг ↓</button>
+      <button id="b-dl" class="btn-ghost" style="margin-top:18px">⬇ Завантажити .yaml</button>
+    </div>
+  </div>
 
   <div class="card">
     <label for="cfg">YAML-конфіг постачальника <a class="tmpl" id="tmpl">↳ вставити шаблон</a></label>
@@ -289,10 +422,102 @@ download_images: false   # true — ще й завантажити самі фо
 delay_seconds: 1.0       # пауза між запитами (щоб не навантажувати сайт)
 concurrency: 5           # скільки сторінок тягнути паралельно`;
 
-document.getElementById('tmpl').onclick = () => { document.getElementById('cfg').value = TEMPLATE; };
-
 const $ = id => document.getElementById(id);
 let timer = null;
+
+document.getElementById('tmpl').onclick = () => { $('cfg').value = TEMPLATE; };
+
+// ---------- Конструктор конфігу ----------
+const FIELD_IDS = ['b-name','b-urls','b-link','b-pgtype','b-pgval','b-f-name','b-f-id','b-f-id-re','b-f-bc','b-f-img','b-f-img-attr','b-p1k','b-p1s','b-p2k','b-p2s','b-img-dl','b-delay','b-conc'];
+
+function pgLabelUpdate() {
+  const t = $('b-pgtype').value, extra = $('b-pg-extra'), lbl = $('b-pg-lbl'), val = $('b-pgval');
+  if (t === 'query') { extra.style.display=''; lbl.textContent='Параметр сторінки'; val.placeholder='page'; }
+  else if (t === 'next_link') { extra.style.display=''; lbl.textContent='Селектор кнопки «далі»'; val.placeholder='a.next'; }
+  else { extra.style.display='none'; }
+}
+$('b-pgtype').onchange = pgLabelUpdate; pgLabelUpdate();
+
+function formToObj() {
+  const o = {};
+  for (const id of FIELD_IDS) { const el = $(id); o[id] = el.type === 'checkbox' ? el.checked : el.value; }
+  return o;
+}
+function objToForm(o) {
+  for (const id of FIELD_IDS) { if (!(id in o)) continue; const el = $(id);
+    if (el.type === 'checkbox') el.checked = !!o[id]; else el.value = o[id]; }
+  pgLabelUpdate();
+}
+
+// YAML single-quoted scalar (doubles any embedded single quote — no backslashes needed)
+const q = s => "'" + String(s).split("'").join("''") + "'";
+
+function buildYaml(o) {
+  const urls = (o['b-urls']||'').split('\\n').map(s=>s.trim()).filter(Boolean);
+  if (!o['b-name'] || !urls.length || !o['b-link'] || !o['b-f-name']) {
+    alert('Заповни: назву постачальника, хоча б одне посилання, селектор посилань на товар і селектор назви товару.');
+    return null;
+  }
+  let base; try { base = new URL(urls[0]).origin; } catch(e) { base = urls[0]; }
+  const L = [];
+  L.push('name: ' + o['b-name']);
+  L.push('base_url: ' + base);
+  L.push('start_urls:');
+  urls.forEach(u => L.push('  - ' + u));
+  L.push('product_link_selector: ' + q(o['b-link']));
+  L.push('');
+  L.push('pagination:');
+  const pt = o['b-pgtype'];
+  L.push('  type: ' + pt);
+  if (pt === 'query') { L.push('  param: ' + (o['b-pgval']||'page')); L.push('  max_pages: 50'); }
+  else if (pt === 'next_link') { L.push('  next_link_selector: ' + q(o['b-pgval']||'a.next')); L.push('  max_pages: 200'); }
+  L.push('');
+  L.push('fields:');
+  L.push('  name: { selector: ' + q(o['b-f-name']) + ' }');
+  if (o['b-f-id']) { let ln = '  product_id: { selector: ' + q(o['b-f-id']);
+    if (o['b-f-id-re']) ln += ', regex: ' + q(o['b-f-id-re']); L.push(ln + ' }'); }
+  if (o['b-f-bc']) L.push('  barcode: { selector: ' + q(o['b-f-bc']) + ', multiple: true }');
+  if (o['b-f-img']) L.push('  images: { selector: ' + q(o['b-f-img']) + ', attr: ' + (o['b-f-img-attr']||'src') + ', multiple: true }');
+  const ps = [];
+  if (o['b-p1k'] && o['b-p1s']) ps.push('  ' + o['b-p1k'] + ': { selector: ' + q(o['b-p1s']) + ' }');
+  if (o['b-p2k'] && o['b-p2s']) ps.push('  ' + o['b-p2k'] + ': { selector: ' + q(o['b-p2s']) + ' }');
+  if (ps.length) { L.push(''); L.push('params:'); ps.forEach(x=>L.push(x)); }
+  L.push('');
+  L.push('download_images: ' + (o['b-img-dl'] ? 'true' : 'false'));
+  L.push('delay_seconds: ' + (o['b-delay']||'1'));
+  L.push('concurrency: ' + (o['b-conc']||'5'));
+  return L.join('\\n');
+}
+
+$('b-gen').onclick = () => { const y = buildYaml(formToObj());
+  if (y) { $('cfg').value = y; $('cfg').scrollIntoView({behavior:'smooth', block:'center'}); } };
+$('b-dl').onclick = () => { const y = buildYaml(formToObj()); if (!y) return;
+  const fn = (formToObj()['b-name'] || 'supplier').replace(/[^A-Za-z0-9_.-]+/g,'_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([y], {type:'text/yaml'})); a.download = fn + '.yaml'; a.click();
+  URL.revokeObjectURL(a.href); };
+
+// ---------- Шаблони (localStorage) ----------
+const TPL_KEY = 'parser_templates';
+const tplAll = () => JSON.parse(localStorage.getItem(TPL_KEY) || '{}');
+function tplRefresh() {
+  const all = tplAll(), sel = $('tpl-list');
+  sel.innerHTML = '<option value="">— збережені —</option>';
+  Object.keys(all).forEach(n => { const op=document.createElement('option'); op.value=n; op.textContent=n; sel.appendChild(op); });
+}
+$('tpl-save').onclick = () => {
+  const name = ($('tpl-name').value || $('b-name').value || '').trim();
+  if (!name) { alert('Введи назву шаблону.'); return; }
+  const all = tplAll(); all[name] = formToObj();
+  localStorage.setItem(TPL_KEY, JSON.stringify(all));
+  $('tpl-name').value=''; tplRefresh(); $('tpl-list').value = name;
+};
+$('tpl-load').onclick = () => { const n = $('tpl-list').value; if (!n) return;
+  const all = tplAll(); if (all[n]) objToForm(all[n]); };
+$('tpl-del').onclick = () => { const n = $('tpl-list').value; if (!n) return;
+  if (!confirm('Видалити шаблон «'+n+'»?')) return;
+  const all = tplAll(); delete all[n]; localStorage.setItem(TPL_KEY, JSON.stringify(all)); tplRefresh(); };
+tplRefresh();
 
 $('go').onclick = async () => {
   const fd = new FormData();

@@ -50,22 +50,25 @@ class Fetcher:
 
     async def get(self, url: str) -> str | None:
         """Return page HTML, or None after exhausting retries."""
-        async with self._sem:
-            for attempt in range(1, RETRIES + 1):
-                try:
+        for attempt in range(1, RETRIES + 1):
+            try:
+                # Hold a concurrency slot only for the actual fetch …
+                async with self._sem:
                     html = (
                         await self._render(url)
                         if self.render_js
                         else await self._http(url)
                     )
-                    await asyncio.sleep(self.delay + random.uniform(0, 0.4))
-                    return html
-                except Exception as exc:  # noqa: BLE001 - retry on any transport error
-                    if attempt == RETRIES:
-                        print(f"  [fetch] giving up on {url}: {exc}")
-                        return None
-                    await asyncio.sleep(2 ** attempt)
-            return None
+            except Exception as exc:  # noqa: BLE001 - retry on any transport error
+                if attempt == RETRIES:
+                    print(f"  [fetch] giving up on {url}: {exc}")
+                    return None
+                await asyncio.sleep(2 ** attempt)  # backoff, slot released
+                continue
+            # … then space out requests without blocking other workers.
+            await asyncio.sleep(self.delay + random.uniform(0, 0.4))
+            return html
+        return None
 
     async def _http(self, url: str) -> str:
         assert self._client is not None
