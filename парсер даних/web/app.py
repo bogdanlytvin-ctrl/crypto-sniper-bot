@@ -291,7 +291,6 @@ _PAGE = """<!doctype html>
 <body>
 <div class="wrap">
   <h1>Парсер даних</h1>
-  <p class="sub">Збір бази товарів із сайтів постачальників → Excel (XLSX) + CSV</p>
 
   <div class="card">
     <h2>🔧 Конструктор конфігу</h2>
