@@ -15,22 +15,29 @@ from .models import FieldRule, Product, SupplierConfig
 
 
 def _extract(tree: HTMLParser, rule: FieldRule, base_url: str) -> list[str]:
-    """Apply one FieldRule and return every cleaned value it matched."""
-    out: list[str] = []
-    for node in tree.css(rule.selector):
-        raw = node.attributes.get(rule.attr, "") if rule.attr else node.text()
-        value = (raw or "").strip()
-        if rule.attr in {"src", "href", "data-src"} and value:
-            value = urljoin(base_url, value)
-        if rule.regex and value:
-            m = re.search(rule.regex, value)
-            value = m.group(1) if m else ""
-        if value:
-            out.append(value)
-        if not rule.multiple and out:
-            break
-    # de-dup while preserving order
-    return list(dict.fromkeys(out))
+    """Apply a FieldRule and return cleaned values.
+
+    With several selectors (a list) they are tried in order and the first one
+    that yields any value wins — handy when a site changes its markup.
+    """
+    for selector in rule.selectors:
+        out: list[str] = []
+        for node in tree.css(selector):
+            raw = node.attributes.get(rule.attr, "") if rule.attr else node.text()
+            value = (raw or "").strip()
+            if rule.attr in {"src", "href", "data-src"} and value:
+                value = urljoin(base_url, value)
+            if rule.regex and value:
+                m = re.search(rule.regex, value)
+                value = m.group(1) if m else ""
+            if value:
+                out.append(value)
+            if not rule.multiple and out:
+                break
+        out = list(dict.fromkeys(out))  # de-dup, preserve order
+        if out:
+            return out
+    return []
 
 
 def parse_product(html: str, url: str, cfg: SupplierConfig) -> Product | None:

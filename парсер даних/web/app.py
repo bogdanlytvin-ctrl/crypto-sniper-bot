@@ -426,7 +426,7 @@ pagination:                        # як гортати сторінки кат
   max_pages: 50
 
 fields:                            # ЩО брати з картки товару (CSS-селектори)
-  name:        { selector: "h1.product-title" }            # назва товару
+  name:        { selector: ["h1.product-title", "h1"] }    # список = fallback: пробує по черзі
   product_id:  { selector: ".sku", regex: "([A-Z0-9-]+)" } # артикул (regex необов'язково)
   barcode:     { selector: ".barcode", multiple: true }    # штрихкод(и) — бере всі
   images:      { selector: ".gallery img", attr: src, multiple: true }  # фото

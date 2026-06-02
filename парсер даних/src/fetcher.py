@@ -81,6 +81,20 @@ class Fetcher:
         page = await self._browser.new_page(user_agent=USER_AGENT)
         try:
             await page.goto(url, wait_until="networkidle", timeout=TIMEOUT * 1000)
+            await self._autoscroll(page)
             return await page.content()
         finally:
             await page.close()
+
+    @staticmethod
+    async def _autoscroll(page, max_rounds: int = 15, pause: float = 0.8) -> None:
+        """Scroll to the bottom repeatedly so lazy-loaded / infinite-scroll
+        content appears, stopping once the page height stops growing."""
+        prev = -1
+        for _ in range(max_rounds):
+            height = await page.evaluate("document.body.scrollHeight")
+            if height == prev:
+                break
+            prev = height
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(pause)

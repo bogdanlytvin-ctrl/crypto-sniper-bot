@@ -7,10 +7,14 @@ from pydantic import BaseModel, Field
 class FieldRule(BaseModel):
     """How to extract one field from a product page."""
 
-    selector: str                      # CSS selector
+    selector: str | list[str]         # CSS selector, or several tried in order (fallback)
     attr: str | None = None            # read this attribute instead of text (e.g. "src")
     regex: str | None = None           # keep only the first regex group of the value
     multiple: bool = False             # collect every match, not just the first
+
+    @property
+    def selectors(self) -> list[str]:
+        return self.selector if isinstance(self.selector, list) else [self.selector]
 
 
 class Pagination(BaseModel):
