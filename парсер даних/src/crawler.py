@@ -23,11 +23,14 @@ async def _discover(fetcher: Fetcher, cfg: SupplierConfig) -> list[str]:
     # product pages (paste individual item links instead of a catalogue).
     if not cfg.product_link_selector.strip():
         urls = list(dict.fromkeys(cfg.start_urls))
-        return urls[: cfg.max_products] if cfg.max_products else urls
+        cap = cfg.max_total or cfg.max_products
+        return urls[:cap] if cap else urls
 
+    per_listing = cfg.max_products  # cap applied to EACH category separately
     found: list[str] = []
     pg = cfg.pagination
     for start in cfg.start_urls:
+        listing: list[str] = []
         if pg.type == "query":
             empty_streak = 0
             for page in range(pg.start, pg.start + pg.max_pages):
@@ -46,14 +49,18 @@ async def _discover(fetcher: Fetcher, cfg: SupplierConfig) -> list[str]:
                         break  # two genuinely empty pages → end of catalogue
                     continue
                 empty_streak = 0
-                found.extend(links)
+                listing.extend(links)
+                if per_listing and len(set(listing)) >= per_listing:
+                    break
         elif pg.type == "next_link":
             url: str | None = start
             for _ in range(pg.max_pages):
                 html = await fetcher.get(url) if url else None
                 if not html:
                     break
-                found.extend(extract_links(html, cfg.product_link_selector, cfg.base_url))
+                listing.extend(extract_links(html, cfg.product_link_selector, cfg.base_url))
+                if per_listing and len(set(listing)) >= per_listing:
+                    break
                 nxt = extract_links(html, pg.next_link_selector or "", cfg.base_url)
                 url = nxt[0] if nxt else None
                 if not url:
@@ -61,11 +68,16 @@ async def _discover(fetcher: Fetcher, cfg: SupplierConfig) -> list[str]:
         else:  # no pagination
             html = await fetcher.get(start)
             if html:
-                found.extend(extract_links(html, cfg.product_link_selector, cfg.base_url))
+                listing.extend(extract_links(html, cfg.product_link_selector, cfg.base_url))
+
+        listing = list(dict.fromkeys(listing))
+        if per_listing:
+            listing = listing[:per_listing]
+        found.extend(listing)
 
     urls = list(dict.fromkeys(found))
-    if cfg.max_products:
-        urls = urls[: cfg.max_products]
+    if cfg.max_total:
+        urls = urls[: cfg.max_total]
     return urls
 
 

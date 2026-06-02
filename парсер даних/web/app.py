@@ -76,6 +76,7 @@ def _harden_for_public(configs: list[SupplierConfig]) -> None:
         cfg.pagination.max_pages = min(cfg.pagination.max_pages, MAX_PAGES)
         cfg.concurrency = min(cfg.concurrency, MAX_CONCURRENCY)
         cfg.max_products = min(cfg.max_products or MAX_PRODUCTS, MAX_PRODUCTS)
+        cfg.max_total = min(cfg.max_total or MAX_PRODUCTS, MAX_PRODUCTS)
         for url in [cfg.base_url, *cfg.start_urls]:
             parsed = urlparse(url)
             if parsed.scheme not in ("http", "https"):
@@ -400,7 +401,7 @@ _PAGE = """<!doctype html>
     <div class="row">
       <div><input type="file" id="files" accept=".yaml,.yml" multiple></div>
       <div><input type="checkbox" id="imgs"><label style="margin:0">завантажувати фото</label></div>
-      <div><label style="margin:0">ліміт товарів</label><input type="number" id="limit" min="1" placeholder="всі"></div>
+      <div><label style="margin:0">ліміт на категорію</label><input type="number" id="limit" min="1" placeholder="всі"></div>
     </div>
     <button id="go">Запустити</button>
   </div>
@@ -497,11 +498,12 @@ delay_seconds: 1.0
 concurrency: 2`,
 prom: `name: 'prom_ua'
 base_url: 'https://prom.ua'
-# Категорії Prom. Розкоментуй потрібні або встав свої посилання (по одному в рядок) - буде будь-який товар, не лише телефони.
+# Категорії Prom. Рядок з # на початку = ВИМКНЕНО. Прибери # щоб увімкнути, або встав свої посилання.
+# "ліміт на категорію" внизу береться окремо для КОЖНОЇ категорії.
 start_urls:
   - 'https://prom.ua/ua/Mobilnye-telefony-i-smartfony.html'   # телефони
-  # - 'https://prom.ua/ua/Noutbuki.html'                       # ноутбуки
-  # - 'https://prom.ua/ua/Televizory.html'                     # телевізори
+  - 'https://prom.ua/ua/Noutbuki.html'                        # ноутбуки
+  - 'https://prom.ua/ua/Televizory.html'                      # телевізори
   # - 'https://prom.ua/ua/Naushniki.html'                      # навушники
   # - 'https://prom.ua/ua/Holodilniki.html'                    # холодильники
   # - 'https://prom.ua/ua/Krossovki.html'                      # кросівки

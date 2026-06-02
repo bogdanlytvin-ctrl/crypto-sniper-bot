@@ -38,7 +38,8 @@ class SupplierConfig(BaseModel):
     download_images: bool = False      # save image files locally
     delay_seconds: float = 1.0         # politeness delay between requests
     concurrency: int = 5
-    max_products: int | None = None    # cap (handy for a test run)
+    max_products: int | None = None    # cap PER listing/category (handy for a test run)
+    max_total: int | None = None       # overall hard cap across all categories
 
 
 class Product(BaseModel):
