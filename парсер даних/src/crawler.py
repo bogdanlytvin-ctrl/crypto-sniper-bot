@@ -19,6 +19,12 @@ def _with_page(url: str, param: str, page: int) -> str:
 
 async def _discover(fetcher: Fetcher, cfg: SupplierConfig) -> list[str]:
     """Walk listing pages (via pagination) and collect product links."""
+    # Direct mode: blank product_link_selector means start_urls ARE the
+    # product pages (paste individual item links instead of a catalogue).
+    if not cfg.product_link_selector.strip():
+        urls = list(dict.fromkeys(cfg.start_urls))
+        return urls[: cfg.max_products] if cfg.max_products else urls
+
     found: list[str] = []
     pg = cfg.pagination
     for start in cfg.start_urls:

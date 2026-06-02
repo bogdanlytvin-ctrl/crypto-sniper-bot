@@ -92,6 +92,7 @@ class Job:
     error: str | None = None
     files: list[str] = field(default_factory=list)  # downloadable file names
     products: int = 0
+    preview: list[dict] = field(default_factory=list)  # {name, image, url} per item
 
 
 class _LogWriter(io.TextIOBase):
@@ -150,8 +151,19 @@ async def _run_job(job: Job, configs: list[SupplierConfig], force_images: bool, 
                     write_xlsx(merged, out / "all_products.xlsx")
                     write_csv(merged, out / "all_products.csv")
                     job.products = len(merged)
+                    preview_src = merged
                 else:
                     job.products = len(everything)
+                    preview_src = everything
+
+                job.preview = [
+                    {
+                        "name": p.name,
+                        "image": p.image_urls[0] if p.image_urls else "",
+                        "url": p.source_url,
+                    }
+                    for p in preview_src[:60]
+                ]
 
             images_dir = out / "images"
             if images_dir.is_dir() and any(images_dir.rglob("*")):
@@ -218,6 +230,7 @@ async def status(job_id: str) -> JSONResponse:
             "error": job.error,
             "products": job.products,
             "files": job.files,
+            "preview": job.preview,
         }
     )
 
@@ -262,6 +275,14 @@ _PAGE = """<!doctype html>
   .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:12px; font-weight:600; }
   .b-run { background:#1f2b45; color:var(--acc); } .b-done { background:#16331f; color:var(--ok); } .b-err { background:#3a1a1a; color:var(--err); }
   .files a { display:inline-block; margin:6px 10px 0 0; padding:8px 14px; background:#16331f; color:var(--ok); border-radius:8px; text-decoration:none; font-weight:600; }
+  .preview { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin:16px 0 4px; }
+  .preview .pcard { background:#0c0e12; border:1px solid var(--line); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; }
+  .preview .pcard .ph { width:100%; aspect-ratio:1/1; background:#15181f; display:flex; align-items:center; justify-content:center; }
+  .preview .pcard .ph img { width:100%; height:100%; object-fit:contain; }
+  .preview .pcard .ph .noimg { color:var(--mut); font-size:12px; }
+  .preview .pcard a { display:block; padding:8px 10px; font-size:12.5px; line-height:1.35; color:var(--acc); text-decoration:none; }
+  .preview .pcard a:hover { text-decoration:underline; }
+  .preview-head { font-weight:600; font-size:14px; margin:18px 0 0; }
   .hint { color:var(--mut); font-size:13px; margin-top:8px; }
   a.tmpl { color:var(--acc); cursor:pointer; }
   details.help { margin-top:14px; background:#0c0e12; border:1px solid var(--line); border-radius:8px; padding:0 14px; }
@@ -310,7 +331,8 @@ _PAGE = """<!doctype html>
       <span style="font-weight:600;font-size:13px">Готові приклади:</span>
       <button class="btn-sm" id="ex-books" type="button">📚 books.toscrape</button>
       <button class="btn-sm" id="ex-off" type="button">🍫 Open Food Facts</button>
-      <button class="btn-sm" id="ex-prom" type="button">🛒 Prom.ua</button>
+      <button class="btn-sm" id="ex-prom" type="button">🛒 Prom.ua (категорія)</button>
+      <button class="btn-sm" id="ex-prom-items" type="button">🛒 Prom: свої товари</button>
       <span class="tip" style="font-size:12px">— перевірені конфіги, підставлять YAML у поле нижче</span>
     </div>
 
@@ -386,6 +408,7 @@ _PAGE = """<!doctype html>
   <div class="card" id="result" style="display:none">
     <div style="margin-bottom:10px"><span id="badge" class="badge b-run">running</span> <span id="count" class="hint"></span></div>
     <div class="files" id="files-out"></div>
+    <div id="preview-out"></div>
     <div class="log" id="log"></div>
   </div>
 </div>
@@ -474,12 +497,35 @@ delay_seconds: 1.0
 concurrency: 2`,
 prom: `name: 'prom_ua'
 base_url: 'https://prom.ua'
+# Категорії Prom. Додай свої посилання нижче (по одному в рядок) - буде будь-який товар, не лише телефони.
 start_urls:
   - 'https://prom.ua/ua/Mobilnye-telefony-i-smartfony.html'
+  # - 'https://prom.ua/ua/Noutbuki.html'
+  # - 'https://prom.ua/ua/Televizory.html'
 product_link_selector: '[data-qaid="product_link"]'
 
 pagination:
   type: 'none'   # Prom paginates via JS; static fetch yields ~20 products per category page
+
+fields:
+  name:        { selector: 'h1' }
+  product_id:  { selector: '[data-qaid="product-sku"]', regex: '([0-9]+)' }
+  images:      { selector: 'img[data-qaid="image_preview"]', attr: src, multiple: true }
+
+params:
+  price: { selector: '[data-qaid="product_price"]' }
+
+render_js: false
+download_images: false
+delay_seconds: 1.0
+concurrency: 3`,
+promItems: `name: 'prom_items'
+base_url: 'https://prom.ua'
+# Свої товари: встав сюди прямі посилання на сторінки товарів Prom (по одному в рядок).
+start_urls:
+  - 'https://prom.ua/ua/p1234567890-nazva-tovaru.html'
+  - 'https://prom.ua/ua/p9876543210-inshyj-tovar.html'
+product_link_selector: ''   # порожньо = start_urls вже є товарами (без обходу каталогу)
 
 fields:
   name:        { selector: 'h1' }
@@ -498,6 +544,7 @@ function loadPreset(k) { $('cfg').value = PRESETS[k]; $('cfg').scrollIntoView({b
 $('ex-books').onclick = () => loadPreset('books');
 $('ex-off').onclick = () => loadPreset('off');
 $('ex-prom').onclick = () => loadPreset('prom');
+$('ex-prom-items').onclick = () => loadPreset('promItems');
 
 // ---------- Конструктор конфігу ----------
 const FIELD_IDS = ['b-name','b-urls','b-link','b-pgtype','b-pgval','b-f-name','b-f-id','b-f-id-re','b-f-bc','b-f-img','b-f-img-attr','b-p1k','b-p1s','b-p2k','b-p2s','b-img-dl','b-delay','b-conc'];
@@ -601,6 +648,7 @@ $('go').onclick = async () => {
   $('go').disabled = true;
   $('result').style.display = 'block';
   $('files-out').innerHTML = '';
+  $('preview-out').innerHTML = '';
   $('log').textContent = 'Запуск…';
   setBadge('running');
 
@@ -609,6 +657,26 @@ $('go').onclick = async () => {
   const { job_id } = await r.json();
   poll(job_id);
 };
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function renderPreview(items) {
+  const box = $('preview-out');
+  if (!items.length) { box.innerHTML = ''; return; }
+  const cards = items.map(p => {
+    const img = p.image
+      ? `<img src="${esc(p.image)}" loading="lazy" alt="">`
+      : `<span class="noimg">без фото</span>`;
+    const href = /^https?:\\/\\//i.test(p.url || '') ? p.url : '#';
+    return `<div class="pcard"><div class="ph">${img}</div>`
+      + `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(p.name) || 'товар'}</a></div>`;
+  }).join('');
+  box.innerHTML = `<div class="preview-head">Знайдені товари (${items.length}) — фото + посилання:</div>`
+    + `<div class="preview">${cards}</div>`;
+}
 
 function setBadge(state) {
   const b = $('badge');
@@ -632,6 +700,7 @@ function poll(id) {
         $('count').textContent = s.products + ' товарів';
         $('files-out').innerHTML = s.files.map(f =>
           `<a href="/download/${id}/${encodeURIComponent(f)}">⬇ ${f}</a>`).join('');
+        renderPreview(s.preview || []);
       }
     }
   }, 1200);
