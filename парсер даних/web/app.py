@@ -497,11 +497,17 @@ delay_seconds: 1.0
 concurrency: 2`,
 prom: `name: 'prom_ua'
 base_url: 'https://prom.ua'
-# Категорії Prom. Додай свої посилання нижче (по одному в рядок) - буде будь-який товар, не лише телефони.
+# Категорії Prom. Розкоментуй потрібні або встав свої посилання (по одному в рядок) - буде будь-який товар, не лише телефони.
 start_urls:
-  - 'https://prom.ua/ua/Mobilnye-telefony-i-smartfony.html'
-  # - 'https://prom.ua/ua/Noutbuki.html'
-  # - 'https://prom.ua/ua/Televizory.html'
+  - 'https://prom.ua/ua/Mobilnye-telefony-i-smartfony.html'   # телефони
+  # - 'https://prom.ua/ua/Noutbuki.html'                       # ноутбуки
+  # - 'https://prom.ua/ua/Televizory.html'                     # телевізори
+  # - 'https://prom.ua/ua/Naushniki.html'                      # навушники
+  # - 'https://prom.ua/ua/Holodilniki.html'                    # холодильники
+  # - 'https://prom.ua/ua/Krossovki.html'                      # кросівки
+  # - 'https://prom.ua/ua/Igrushki.html'                       # іграшки
+  # - 'https://prom.ua/ua/Planshety.html'                      # планшети
+  # - 'https://prom.ua/ua/Smart-chasy.html'                    # смарт-годинники
 product_link_selector: '[data-qaid="product_link"]'
 
 pagination:
