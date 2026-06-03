@@ -80,8 +80,16 @@ class Fetcher:
         assert self._browser is not None
         page = await self._browser.new_page(user_agent=USER_AGENT)
         try:
-            await page.goto(url, wait_until="networkidle", timeout=TIMEOUT * 1000)
+            # "domcontentloaded" not "networkidle": ad/analytics-heavy pages
+            # (e.g. Prom) keep firing background requests and never go idle,
+            # so networkidle would time out. Autoscroll then triggers the
+            # lazy-loaded images we actually need.
+            await page.goto(url, wait_until="domcontentloaded", timeout=TIMEOUT * 1000)
             await self._autoscroll(page)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:  # noqa: BLE001 — best-effort settle, fine if it never idles
+                pass
             return await page.content()
         finally:
             await page.close()
