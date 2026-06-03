@@ -517,7 +517,7 @@ pagination:
 
 fields:
   name:        { selector: 'h1' }
-  product_id:  { selector: '[data-qaid="product-sku"]', regex: '([0-9]+)' }
+  product_id:  { selector: '[data-qaid="product-sku"]', regex: ': *(.+)' }   # код Prom буквено-цифровий (напр. RJ40G), беремо все після "Код:"
   images:      { selector: 'img[data-qaid="image_preview"]', attr: src, multiple: true }
 
 params:
@@ -537,7 +537,7 @@ product_link_selector: ''   # порожньо = start_urls вже є товар
 
 fields:
   name:        { selector: 'h1' }
-  product_id:  { selector: '[data-qaid="product-sku"]', regex: '([0-9]+)' }
+  product_id:  { selector: '[data-qaid="product-sku"]', regex: ': *(.+)' }   # код Prom буквено-цифровий (напр. RJ40G), беремо все після "Код:"
   images:      { selector: 'img[data-qaid="image_preview"]', attr: src, multiple: true }
 
 params:
