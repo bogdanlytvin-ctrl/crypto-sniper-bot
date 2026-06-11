@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin.html
+Disallow: /Scripts/config.js
+
+Sitemap: https://saitvizitka.vercel.app/sitemap.xml

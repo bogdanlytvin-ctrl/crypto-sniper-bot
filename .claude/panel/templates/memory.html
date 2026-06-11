@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Пам'ять{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>🧠 Agent Memory</h1>
+  <p>Orchestrator читає це на початку кожної сесії — рішення, контекст, проєкти</p>
+</div>
+
+<div class="grid-6-4">
+  <div class="card">
+    <div class="flex items-center justify-between mb-16">
+      <div class="card-title" style="margin-bottom:0">MEMORY.md</div>
+      <code style="font-size:11px; color:var(--text3)">.claude/agent-memory/</code>
+    </div>
+    <pre style="max-height:60vh; overflow-y:auto">{{ memory.raw }}</pre>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:14px">
+    <div class="card">
+      <div class="card-title">Активні проєкти</div>
+      <div style="font-size:13px; line-height:2">
+        <div class="flex items-center gap-8">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+          <strong>crypto-sniper-bot</strong>
+          <code style="font-size:10px; margin-left:auto">Railway</code>
+        </div>
+        <div class="flex items-center gap-8">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+          <strong>admin panel</strong>
+          <code style="font-size:10px; margin-left:auto">Flask</code>
+        </div>
+        <div class="flex items-center gap-8">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+          <strong>pekar</strong>
+          <code style="font-size:10px; margin-left:auto">Vercel</code>
+        </div>
+        <div class="flex items-center gap-8">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0"></span>
+          <span style="color:var(--text3)">SITESCACER</span>
+          <code style="font-size:10px; margin-left:auto; color:var(--text3)">Done</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚠️ Критичні нотатки</div>
+      <div style="font-size:12px; color:var(--text2); line-height:2">
+        <div><code>pekar/</code> → Prisma, <strong>не</strong> SQLAlchemy</div>
+        <div><code>aiogram 3.x</code> → Router, <strong>не</strong> dp.register</div>
+        <div>Admin auth → сесійна, <strong>не</strong> JWT</div>
+        <div>Railway env vars → вручну в Dashboard</div>
+        <div>Flask debug → тільки через <code>.env</code></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Як використовується</div>
+      <div style="font-size:13px; color:var(--text2); line-height:1.8">
+        <div>1. Orchestrator читає на старті</div>
+        <div>2. Перевіряє схожі задачі</div>
+        <div>3. Реюзає перевірені рішення</div>
+        <div>4. Memory Keeper дописує нові сесії</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

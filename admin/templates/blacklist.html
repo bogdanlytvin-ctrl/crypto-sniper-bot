@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0">🚫 Blacklist</h4>
+  <span class="text-muted small">{{ entries|length }} {{ 'токенів' if lang=='ua' else 'tokens' }}</span>
+</div>
+
+<!-- Add form -->
+<div class="card mb-4">
+  <div class="card-body">
+    <h6 class="mb-3">{{ 'Додати до чорного списку' if lang=='ua' else 'Add to blacklist' }}</h6>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="add">
+      <div class="row g-2">
+        <div class="col-md-2">
+          <select name="chain" class="form-select form-select-sm">
+            <option value="all">All chains</option>
+            <option value="solana">Solana</option>
+            <option value="bsc">BSC</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <input type="text" name="token_address" class="form-control form-control-sm"
+                 placeholder="{{ 'Адреса токена' if lang=='ua' else 'Token address' }}" required>
+        </div>
+        <div class="col-md-4">
+          <input type="text" name="reason" class="form-control form-control-sm"
+                 placeholder="{{ 'Причина (необов\\'язково)' if lang=='ua' else 'Reason (optional)' }}">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-danger btn-sm w-100">🚫 {{ 'Додати' if lang=='ua' else 'Add' }}</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Blacklist table -->
+<div class="card">
+  <table class="table table-hover mb-0" style="font-size:.875rem">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Chain</th>
+        <th>{{ 'Адреса токена' if lang=='ua' else 'Token address' }}</th>
+        <th>{{ 'Причина' if lang=='ua' else 'Reason' }}</th>
+        <th>{{ 'Додано' if lang=='ua' else 'Added' }}</th>
+        <th>{{ 'Дії' if lang=='ua' else 'Actions' }}</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for entry in entries %}
+    <tr>
+      <td class="text-muted small">{{ entry.id }}</td>
+      <td>
+        {% if entry.chain == 'solana' %}
+          <span class="badge" style="background:#9945FF">◎ SOL</span>
+        {% elif entry.chain == 'bsc' %}
+          <span class="badge" style="background:#F0B90B;color:#000">🔶 BSC</span>
+        {% else %}
+          <span class="badge bg-secondary">{{ entry.chain }}</span>
+        {% endif %}
+      </td>
+      <td>
+        <code style="font-size:.8rem" data-copy="{{ entry.token_address }}">{{ entry.token_address[:20] }}…</code>
+      </td>
+      <td class="text-muted small">{{ entry.reason or '—' }}</td>
+      <td class="text-muted small" style="white-space:nowrap">{{ entry.created_at[:16] if entry.created_at else '—' }}</td>
+      <td>
+        <form method="post" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="remove">
+          <input type="hidden" name="token_address" value="{{ entry.token_address }}">
+          <button type="submit" class="btn btn-sm btn-outline-danger"
+                  data-confirm="{{ 'Видалити з чорного списку?' if lang=='ua' else 'Remove from blacklist?' }}">
+            🗑 {{ 'Видалити' if lang=='ua' else 'Remove' }}
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="6" class="text-center text-muted py-4">
+        {{ 'Чорний список порожній' if lang=='ua' else 'Blacklist is empty' }}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

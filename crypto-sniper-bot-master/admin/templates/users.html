@@ -1,33 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="mb-0">👥 Користувачі</h4>
-  <span class="text-muted small">Всього: {{ total }}</span>
+  <h4 class="mb-0">👥 {{ UI.nav_users }}</h4>
+  <span class="text-muted small">{{ 'Всього' if lang=='ua' else 'Total' }}: {{ total }}</span>
 </div>
 
 <!-- Filters -->
 <div class="card p-3 mb-3">
   <form class="row g-2 align-items-end" method="GET">
     <div class="col-md-4">
-      <label class="form-label text-muted small mb-1">Пошук</label>
+      <label class="form-label text-muted small mb-1">{{ UI.search }}</label>
       <input type="text" name="q" class="form-control form-control-sm"
-             placeholder="Ім'я, username або Telegram ID" value="{{ search }}">
+             placeholder="{{ "Ім'я, username або Telegram ID" if lang=='ua' else 'Name, username or Telegram ID' }}" value="{{ search }}">
     </div>
     <div class="col-auto">
-      <label class="form-label text-muted small mb-1">Тариф</label>
+      <label class="form-label text-muted small mb-1">{{ UI.tier }}</label>
       <select name="tier" class="form-select form-select-sm">
-        <option value="" {% if not tier_f %}selected{% endif %}>Всі</option>
+        <option value="" {% if not tier_f %}selected{% endif %}>{{ UI.all_tiers }}</option>
         <option value="free"  {% if tier_f=='free' %}selected{% endif %}>🆓 Free</option>
         <option value="basic" {% if tier_f=='basic' %}selected{% endif %}>💳 Basic</option>
         <option value="pro"   {% if tier_f=='pro' %}selected{% endif %}>🚀 Pro</option>
       </select>
     </div>
     <div class="col-auto">
-      <button type="submit" class="btn btn-sm btn-outline-secondary">Знайти</button>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">{{ UI.search }}</button>
     </div>
     {% if search or tier_f %}
     <div class="col-auto">
-      <a href="{{ url_for('users') }}" class="btn btn-sm btn-outline-secondary">Скинути</a>
+      <a href="{{ url_for('users') }}" class="btn btn-sm btn-outline-secondary">{{ 'Скинути' if lang=='ua' else 'Reset' }}</a>
     </div>
     {% endif %}
   </form>

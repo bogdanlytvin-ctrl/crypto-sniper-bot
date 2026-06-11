@@ -1,0 +1,141 @@
+{
+  "$comment": "DRAFT-дерево. Діагностика, коли FC не з'являється в Betaflight Configurator по USB. Від кабелю до мертвого MCU. НЕ звірено живим ремонтом.",
+  "id": "no-connect",
+  "symptom": "Плата не конектиться до конфігуратора",
+  "summary": "Betaflight не бачить політник по USB. Йдемо від найдешевшого (кабель) до найгіршого (мертвий MCU).",
+  "applies_to": {},
+  "entry": "usb_led",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Installing-Configurator",
+  "nodes": {
+    "usb_led": {
+      "type": "check",
+      "id": "usb_led",
+      "instruction": "Коли під'єднуєш USB — на платі світиться індикатор живлення?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Нічого не світиться", "next": "usb_cable" },
+        { "label": "Світиться, але конфігуратор не бачить", "next": "port_check" },
+        { "label": "Гріється / запах гару", "next": "c_short_usb" }
+      ]
+    },
+    "usb_cable": {
+      "type": "check",
+      "id": "usb_cable",
+      "instruction": "Заміни кабель на завідомо ДАТА-кабель і встав у прямий порт ПК (не хаб)",
+      "method": "swap",
+      "note": "Половина «мертвих» плат — це charge-only кабель або поганий порт. Це перше, що треба виключити.",
+      "outcomes": [
+        { "label": "З іншим кабелем ожила", "next": "c_cable" },
+        { "label": "Усе одно темно", "next": "usb_meas" }
+      ]
+    },
+    "usb_meas": {
+      "type": "check",
+      "id": "usb_meas",
+      "instruction": "Прозвони USB 5V/GND на платі, огляньте роз'єм USB на холодну пайку/відрив",
+      "method": "multimeter",
+      "outcomes": [
+        { "label": "USB-роз'єм відірваний / холодна пайка", "next": "c_usb_connector" },
+        { "label": "Живлення доходить, плата мертва", "next": "c_mcu_dead" }
+      ]
+    },
+    "port_check": {
+      "type": "check",
+      "id": "port_check",
+      "instruction": "У браузері/конфігураторі з'являється COM-порт? Чи пристрій видно як DFU?",
+      "method": "configurator",
+      "note": "Betaflight Configurator у браузері працює через Web Serial — треба дати дозвіл на порт (Chrome/Edge). DFU = режим прошивки, не звичайний конект.",
+      "outcomes": [
+        { "label": "Порт є, але конект не вдається", "next": "c_driver" },
+        { "label": "Пристрій видно як DFU", "next": "c_dfu" },
+        { "label": "Жодного порту / пристрою", "next": "c_driver" }
+      ]
+    },
+
+    "c_short_usb": {
+      "type": "cause",
+      "id": "c_short_usb",
+      "cause": "Коротке замикання — плата гріється від USB",
+      "fix_steps": [
+        "Відключи USB негайно, НЕ підключай батарею.",
+        "Шукай КЗ по живленню (часто пробитий BEC/регулятор або міст припою).",
+        "Без усунення КЗ далі не вмикати."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    },
+    "c_cable": {
+      "type": "cause",
+      "id": "c_cable",
+      "cause": "Був charge-only кабель або поганий USB-порт",
+      "fix_steps": [
+        "Використовуй якісний дата-кабель.",
+        "Втикай у прямий USB порт, не через хаб/подовжувач.",
+        "Готово — плата конектиться."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Installing-Configurator",
+      "est_minutes": 2
+    },
+    "c_usb_connector": {
+      "type": "cause",
+      "id": "c_usb_connector",
+      "cause": "Відірваний або холодно пропаяний USB-роз'єм",
+      "fix_steps": [
+        "Перепай п'ятачки USB-роз'єму (часта механічна поломка від ривків кабелю).",
+        "За відриву доріжок — відновити перемичками.",
+        "Зафіксуй роз'єм клеєм після пайки для міцності."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    },
+    "c_mcu_dead": {
+      "type": "cause",
+      "id": "c_mcu_dead",
+      "cause": "Живлення доходить, MCU не стартує — ймовірно мертвий контролер",
+      "fix_steps": [
+        "Спробуй увійти в DFU (замкнути BOOT) і прошити firmware заново.",
+        "Якщо в DFU не визначається і не прошивається — MCU мертвий.",
+        "Заміна польотного контролера."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Installing-Firmware",
+      "est_minutes": 30
+    },
+    "c_driver": {
+      "type": "cause",
+      "id": "c_driver",
+      "cause": "Проблема драйвера або доступу до порту",
+      "fix_steps": [
+        "У браузері дай дозвіл на COM-порт (кнопка 'Select port' у Configurator).",
+        "Для DFU постав драйвер через Zadig (WinUSB) або ImpulseRC Driver Fixer.",
+        "Перевір Диспетчер пристроїв на невпізнаний пристрій."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Installing-Configurator",
+      "est_minutes": 15
+    },
+    "c_dfu": {
+      "type": "cause",
+      "id": "c_dfu",
+      "cause": "Плата в режимі DFU (bootloader)",
+      "fix_steps": [
+        "Це режим прошивки: або проший firmware у Betaflight (Firmware Flasher).",
+        "Або вийди з DFU — перезавантаж плату без замкнутого BOOT.",
+        "Якщо сама падає в DFU — можливий пошкоджений firmware, переший."
+      ],
+      "fix_action": "reflash",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Installing-Firmware",
+      "est_minutes": 10
+    }
+  }
+}

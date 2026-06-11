@@ -1,0 +1,32 @@
+{
+  "$comment": "DRAFT — типова конфігурація Diatone Mamba F405 MK4. НЕ звірено з мануалом. Звірити перед пайкою.",
+  "id": "diatone-mamba-f405-mk4",
+  "type": "flight_controller",
+  "brand": "Diatone",
+  "model": "Mamba F405",
+  "revision": "MK4",
+  "mcu": "STM32F405",
+  "firmware_target": { "betaflight": "MAMBAF405_2022B", "inav": null },
+  "voltage": {
+    "input_cells": "3S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": "plug", "inverted": false },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART5", "pads": ["T5", "R5"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 8,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
+  "known_issues": [
+    { "issue": "F405 без апаратних інверторів — SBUS напряму не працює", "workaround": "ELRS/CRSF", "source_url": "https://betaflight.com/docs/wiki" }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://www.diatone.us"
+}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Баги{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between page-header" style="margin-bottom:16px">
+  <div>
+    <h1>🔍 Bug Registry</h1>
+    <p>Bug Hunter Agent реєструє всі знайдені проблеми</p>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+    <i class="fa fa-plus"></i> Новий баг
+  </button>
+</div>
+
+<!-- Filter tabs -->
+<div class="flex gap-8 mb-16" id="filters">
+  <button class="btn btn-ghost btn-sm active-filter" data-f="all">Всі ({{ bugs|length }})</button>
+  <button class="btn btn-ghost btn-sm" data-f="OPEN" style="color:var(--red)">
+    Відкриті ({{ bugs|selectattr('status','eq','OPEN')|list|length }})
+  </button>
+  <button class="btn btn-ghost btn-sm" data-f="FIXED" style="color:var(--green)">
+    Виправлені ({{ bugs|selectattr('status','eq','FIXED')|list|length }})
+  </button>
+  <button class="btn btn-ghost btn-sm" data-f="CRITICAL" style="color:var(--red)">Critical</button>
+  <button class="btn btn-ghost btn-sm" data-f="HIGH" style="color:var(--orange)">High</button>
+</div>
+
+<div class="card">
+  {% if bugs %}
+  <table class="data-table" id="bugTable">
+    <thead><tr>
+      <th>ID</th><th>Назва</th><th>Файл</th><th>Тип</th><th>Severity</th><th>Статус</th><th>Дата</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for bug in bugs %}
+      <tr data-status="{{ bug.status }}" data-severity="{{ bug.severity }}">
+        <td><code>{{ bug.id }}</code></td>
+        <td>
+          <div style="font-weight:600">{{ bug.title }}</div>
+          <div style="font-size:11px; color:var(--text3); margin-top:2px">{{ bug.desc[:70] }}{% if bug.desc|length > 70 %}…{% endif %}</div>
+        </td>
+        <td><code style="color:var(--text2); font-size:11px">{{ bug.file }}</code></td>
+        <td style="color:var(--text3); font-size:12px">{{ bug.type }}</td>
+        <td><span class="badge badge-{{ bug.severity|lower }}">{{ bug.severity }}</span></td>
+        <td><span class="badge badge-{{ bug.status|lower }}">{{ bug.status }}</span></td>
+        <td style="color:var(--text3); font-size:12px">{{ bug.date }}</td>
+        <td>
+          {% if bug.status == 'OPEN' %}
+          <form method="POST" action="/bugs/{{ bug.id }}/fix">
+            <button class="btn btn-success btn-sm" type="submit">✓ Fix</button>
+          </form>
+          {% else %}
+          <span style="color:var(--green); font-size:12px">✓</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center; padding:48px; color:var(--text3)">
+    <i class="fa fa-check-double" style="font-size:40px; color:var(--green); display:block; margin-bottom:12px"></i>
+    <div style="font-size:16px; font-weight:600; color:var(--text)">Реєстр порожній</div>
+    <div>Bug Hunter ще не виявив жодних проблем</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">🐛 Зареєструвати баг</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/bugs/add">
+        <div class="modal-body" style="padding:20px">
+          <div class="grid-2" style="gap:12px; margin-bottom:12px">
+            <div style="grid-column:1/-1">
+              <label class="form-label">Назва *</label>
+              <input type="text" name="title" class="form-control" required placeholder="Коротка назва бага">
+            </div>
+            <div>
+              <label class="form-label">Файл</label>
+              <input type="text" name="file" class="form-control" placeholder="path/file.py:42">
+            </div>
+            <div>
+              <label class="form-label">Severity *</label>
+              <select name="severity" class="form-select" required>
+                <option value="CRITICAL">CRITICAL</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM" selected>MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Тип</label>
+              <select name="type" class="form-select">
+                <option>Logic</option><option>SQLi</option><option>XSS</option>
+                <option>Auth</option><option>Performance</option><option>Crash</option>
+                <option>Race Condition</option><option>Async</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Фікс</label>
+              <input type="text" name="fix" class="form-control" placeholder="Як виправити">
+            </div>
+            <div style="grid-column:1/-1">
+              <label class="form-label">Опис *</label>
+              <textarea name="desc" class="form-control" rows="3" required placeholder="Детальний опис проблеми"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Скасувати</button>
+          <button type="submit" class="btn btn-primary">Додати в реєстр</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-f]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-f]').forEach(b => b.classList.remove('active-filter'));
+    btn.classList.add('active-filter');
+    const f = btn.dataset.f;
+    document.querySelectorAll('#bugTable tbody tr').forEach(row => {
+      const show = f === 'all' || row.dataset.status === f || row.dataset.severity === f;
+      row.style.display = show ? '' : 'none';
+    });
+  });
+});
+// Style active filter
+const style = document.createElement('style');
+style.textContent = '.active-filter { background:var(--purple) !important; color:#fff !important; border-color:var(--purple) !important; }';
+document.head.appendChild(style);
+document.querySelector('[data-f="all"]').classList.add('active-filter');
+</script>
+{% endblock %}

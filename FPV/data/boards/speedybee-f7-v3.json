@@ -1,0 +1,32 @@
+{
+  "$comment": "DRAFT — типова конфігурація SpeedyBee F7 V3. НЕ звірено з мануалом. Звірити перед пайкою: https://wiki.speedybee.com",
+  "id": "speedybee-f7-v3",
+  "type": "flight_controller",
+  "brand": "SpeedyBee",
+  "model": "F7",
+  "revision": "V3",
+  "mcu": "STM32F722",
+  "firmware_target": { "betaflight": "SPEEDYBEEF7V3", "inav": "SPEEDYBEEF7V3" },
+  "voltage": {
+    "input_cells": "3S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" },
+      { "voltage": "4V5", "max_current_a": 1.0, "notes": "живиться від USB — для налаштування RX без батареї" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (DJI plug)", "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади + plug", "inverted": false },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
+    { "name": "UART5", "pads": ["T5", "R5"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 8,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "bluetooth"],
+  "known_issues": [],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://wiki.speedybee.com"
+}

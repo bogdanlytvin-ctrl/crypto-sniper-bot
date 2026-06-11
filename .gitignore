@@ -1,8 +1,41 @@
+# === секрети / локальне (НІКОЛИ не комітити) ===
 .env
+.env.*
+!.env.example
+*.key
+*.pem
+id_rsa*
+.claude/settings.local.json
+.claude/panel/.panel_secret
+.claude/scheduled_tasks.lock
+
+# === python ===
 __pycache__/
 *.py[cod]
 *.pyo
 .venv/
 venv/
-# Окремі проекти в цій папці
+.pytest_cache/
+
+# === node / next.js ===
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# === логи / тимчасове ===
+*.log
+.DS_Store
+Thumbs.db
+
+# === окремі проекти зі своїм git (бекапляться окремо, не вкладати сюди) ===
 parser-bot/
+agent/
+mobi/
+pekar/
+scanersaitov/
+seven-src/
+sevenSait/

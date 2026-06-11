@@ -1,0 +1,605 @@
+/* FTOS — візуальна мова друкованої плати:
+   фон = solder mask, акцент = мідні доріжки, план підключення = реальні кольори дротів */
+
+:root {
+  --board: #101d15;        /* глибокий solder mask */
+  --card: #16271c;
+  --card-hover: #19301f;   /* картка під курсором */
+  --inset: #0d1811;        /* втоплені поля (select, answer, padref) */
+  --card-edge: #24402f;
+  --silk: #e6ece5;         /* silkscreen white */
+  --silk-dim: #93a698;
+  --silk-dim2: #b0bdb4;    /* приглушений, але читабельний на сонці */
+  --copper: #c9863b;       /* мідь */
+  --copper-soft: #8a6230;
+
+  --wire-signal: #e3c44b;  /* жовтий сигнальний дріт */
+  --wire-power: #d4584a;   /* червоний живлення */
+  --wire-ground: #7c8a80;  /* чорний/сірий GND */
+  --wire-i2c: #5b9bd5;     /* синій I2C */
+
+  --warn: #e0a93e;
+  --ok: #6fbf73;
+  --mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace;
+  --sans: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--board);
+  /* ледь помітна сітка отворів, як на платі */
+  background-image: radial-gradient(circle, #1a2e21 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--silk);
+  font-family: var(--sans);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.wrap { max-width: 1060px; margin: 0 auto; padding: 28px 18px 80px; }
+
+/* ===== Шапка ===== */
+.masthead { margin-bottom: 26px; }
+.masthead .ref {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--copper);
+  text-transform: uppercase;
+}
+.masthead h1 {
+  font-family: var(--mono);
+  font-size: clamp(26px, 5vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+.masthead h1 .cursor { color: var(--copper); }
+.masthead p { color: var(--silk-dim); max-width: 56ch; margin-top: 8px; font-size: 15px; }
+
+/* ===== Сітка ===== */
+.grid { display: grid; grid-template-columns: 340px 1fr; gap: 22px; align-items: start; }
+@media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+/* ===== Панель вибору ===== */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  padding: 18px;
+}
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--copper);
+  margin-bottom: 6px;
+}
+.field select,
+.field input,
+.field textarea {
+  width: 100%;
+  background: var(--inset);
+  border: 1px solid var(--card-edge);
+  border-radius: 6px;
+  color: var(--silk);
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 10px 12px;
+  appearance: none;
+}
+.field textarea { font-family: var(--sans); resize: vertical; line-height: 1.45; }
+.field select:focus,
+.field input:focus,
+.field textarea:focus { outline: 2px solid var(--copper); outline-offset: 1px; }
+.field .hint { font-size: 12px; color: var(--silk-dim); margin-top: 5px; }
+
+/* ===== План підключення ===== */
+.plan { display: flex; flex-direction: column; gap: 16px; }
+
+.plan-head {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; justify-content: space-between;
+}
+.plan-head h2 { font-family: var(--mono); font-size: 18px; }
+.badge {
+  font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid;
+}
+.badge.draft { color: var(--warn); border-color: var(--warn); }
+.badge.checked { color: var(--ok); border-color: var(--ok); }
+
+.assignment {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.assignment > header {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--card-edge);
+}
+.assignment h3 { font-size: 15px; font-weight: 600; }
+.assignment .proto { font-family: var(--mono); font-size: 12px; color: var(--silk-dim); }
+.assignment .port {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  color: var(--copper);
+}
+.assignment .port.conflict { color: var(--wire-power); }
+
+/* Сигнатура: рядок-«дріт» — кольорова жила з конекторами-падами */
+.wires { padding: 10px 16px; }
+.wire {
+  display: grid;
+  grid-template-columns: minmax(90px, max-content) 1fr minmax(120px, max-content);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.wire .pin, .wire .pad {
+  background: #0d1811;
+  border: 1px solid var(--card-edge);
+  border-radius: 4px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.wire .pad { justify-self: start; }
+.wire .lead { position: relative; height: 3px; border-radius: 2px; min-width: 30px; }
+.wire .lead::after {
+  /* припій на кінці дроту */
+  content: ''; position: absolute; right: -2px; top: 50%;
+  width: 7px; height: 7px; border-radius: 50%;
+  transform: translateY(-50%);
+  background: inherit;
+}
+.wire.signal .lead { background: var(--wire-signal); }
+.wire.power  .lead { background: var(--wire-power); }
+.wire.ground .lead { background: var(--wire-ground); }
+.wire.i2c    .lead { background: var(--wire-i2c); }
+
+.fwnote {
+  padding: 10px 16px;
+  border-top: 1px dashed var(--card-edge);
+  font-size: 13px; color: var(--silk-dim);
+}
+.fwnote b { color: var(--silk); font-weight: 600; }
+
+.warnbox {
+  margin: 0 16px 14px;
+  border-left: 3px solid var(--warn);
+  background: rgba(224, 169, 62, 0.07);
+  padding: 8px 12px;
+  font-size: 13px; color: var(--warn);
+  border-radius: 0 6px 6px 0;
+}
+.warnbox + .warnbox { margin-top: -6px; }
+
+.global-warn {
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+  background: rgba(224, 169, 62, 0.06);
+  color: var(--warn);
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.empty {
+  border: 1px dashed var(--card-edge);
+  border-radius: 10px;
+  padding: 36px 22px;
+  text-align: center;
+  color: var(--silk-dim);
+  font-size: 14px;
+}
+
+.source { font-size: 12px; color: var(--silk-dim); }
+.source a { color: var(--copper); }
+
+footer.colophon {
+  margin-top: 36px; padding-top: 14px;
+  border-top: 1px solid var(--card-edge);
+  font-family: var(--mono); font-size: 11px; color: var(--silk-dim);
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .assignment { animation: rise 0.25s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
+/* ===== Навігація назад ===== */
+.masthead .ref .back {
+  color: var(--silk-dim);
+  text-decoration: none;
+}
+.masthead .ref .back:hover { color: var(--copper); }
+
+/* ===== Хаб (головна) ===== */
+.hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+@media (max-width: 520px) { .hub { grid-template-columns: 1fr; } }
+
+.tool {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-left: 3px solid var(--card-edge);
+  border-radius: 12px;
+  padding: 22px 20px 20px;
+  text-decoration: none;
+  color: var(--silk);
+  min-height: 168px;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+.tool:hover { transform: translateY(-3px); background: var(--card-hover); }
+.tool.signal { border-left-color: var(--wire-signal); }
+.tool.power { border-left-color: var(--wire-power); }
+.tool.i2c { border-left-color: var(--wire-i2c); }
+.tool.ground { border-left-color: var(--wire-ground); }
+.tool .tool-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--copper);
+}
+.tool h2 { font-family: var(--mono); font-size: 22px; margin-top: 6px; }
+.tool p { color: var(--silk-dim); font-size: 14px; margin-top: 8px; flex: 1; }
+.tool .tool-cta {
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--copper);
+}
+
+/* ===== Вибір плати в діагностиці ===== */
+.dx-board { max-width: 420px; margin-bottom: 22px; }
+
+/* ===== Фільтр «що на борту» ===== */
+.caps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 18px; }
+.caps-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--silk-dim); margin-right: 2px;
+}
+.cap {
+  background: var(--inset);
+  border: 1px solid var(--card-edge);
+  border-radius: 999px;
+  color: var(--silk-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 7px 14px;
+  min-height: 38px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.cap.on { color: var(--board); background: var(--ok); border-color: var(--ok); font-weight: 700; }
+.cap:not(.on) { opacity: 0.7; }
+.cap:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+
+/* ===== Список симптомів ===== */
+.symptoms { display: flex; flex-direction: column; gap: 12px; }
+.symptom {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-left: 3px solid var(--wire-signal);
+  border-radius: 10px;
+  padding: 16px 18px;
+  color: var(--silk);
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+.symptom:hover { transform: translateY(-2px); background: var(--card-hover); }
+.symptom:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+.symptom-name { font-family: var(--mono); font-size: 17px; font-weight: 700; }
+.symptom-sum { font-size: 14px; color: var(--silk-dim); }
+
+/* ===== Проходження дерева ===== */
+.dx { display: flex; flex-direction: column; gap: 16px; }
+.dx-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dx-head h2 { font-family: var(--mono); font-size: 19px; }
+.dx-reset {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--card-edge);
+  border-radius: 999px;
+  color: var(--silk-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.dx-reset:hover { color: var(--copper); border-color: var(--copper); }
+
+/* Хлібні крихти пройдених кроків */
+.dx-trail { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.dx-trail li {
+  display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+  font-size: 12px; color: var(--silk-dim2);
+  border-left: 2px solid var(--card-edge);
+  padding: 2px 0 2px 10px;
+}
+.dx-trail .trail-q { color: var(--silk-dim2); }
+.dx-trail .trail-a {
+  font-family: var(--mono); color: var(--ok);
+  background: rgba(111, 191, 115, 0.08);
+  border-radius: 4px; padding: 0 6px;
+}
+
+/* Поточна перевірка */
+.check {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-radius: 12px;
+  padding: 20px;
+}
+.check-method {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--copper);
+}
+.check-method::before {
+  content: '▸'; color: var(--copper);
+}
+.check-q { font-size: 19px; font-weight: 600; margin-top: 10px; line-height: 1.35; }
+
+.padref {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 14px; padding: 12px 14px;
+  background: var(--inset);
+  border: 1px solid var(--copper-soft);
+  border-radius: 8px;
+}
+.padref-label { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--copper); }
+.padref-detail { font-size: 12px; color: var(--silk-dim); }
+.padref.missing { border-color: var(--warn); }
+.padref.missing .padref-label { color: var(--warn); }
+
+.check-expected {
+  margin-top: 12px; font-size: 14px; color: var(--silk-dim);
+}
+.check-expected b { color: var(--ok); font-weight: 600; }
+.check-note {
+  margin-top: 12px;
+  border-left: 3px solid var(--warn);
+  background: rgba(224, 169, 62, 0.07);
+  padding: 9px 12px; border-radius: 0 6px 6px 0;
+  font-size: 14px; color: var(--warn);
+}
+
+/* Кнопки-відповіді — великі тап-зони для поля (одна рука, паяльник поряд) */
+.answers { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+.answer {
+  text-align: left;
+  background: var(--inset);
+  border: 1px solid var(--card-edge);
+  border-radius: 8px;
+  color: var(--silk);
+  font-size: 16px;
+  padding: 16px 18px;
+  min-height: 60px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.answer:hover { border-color: var(--copper); background: var(--card-hover); }
+.answer:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+
+/* Причина + фікс — головна цінність екрана, має домінувати над перевіркою */
+.cause {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-top: 4px solid var(--ok);
+  border-radius: 12px;
+  padding: 22px 20px;
+  box-shadow: inset 0 0 0 1px rgba(111, 191, 115, 0.22), 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.cause-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.conf {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 3px 10px; border-radius: 999px; border: 1px solid;
+}
+.conf.likely { color: var(--ok); border-color: var(--ok); }
+.conf.possible { color: var(--warn); border-color: var(--warn); }
+.fix-tag {
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  color: var(--copper); border: 1px solid var(--copper-soft);
+  border-radius: 999px; padding: 3px 10px;
+}
+.est { font-family: var(--mono); font-size: 12px; color: var(--silk-dim); margin-left: auto; }
+.cause-title { font-size: 23px; font-weight: 700; margin-top: 12px; line-height: 1.25; }
+.cause-warn {
+  margin-top: 10px;
+  border-left: 3px solid var(--warn);
+  background: rgba(224, 169, 62, 0.07);
+  padding: 8px 12px; border-radius: 0 6px 6px 0;
+  font-size: 13px; color: var(--warn);
+}
+.fix-steps { margin: 16px 0 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 9px; }
+.fix-steps li { font-size: 16px; line-height: 1.45; }
+
+/* Контролі — sticky внизу, щоб «назад» був під великим пальцем у полі */
+.dx-controls {
+  display: flex; gap: 10px;
+  position: sticky; bottom: 0;
+  padding: 12px 0;
+  background: linear-gradient(to top, var(--board) 70%, transparent);
+}
+.ghost {
+  background: transparent;
+  border: 1px solid var(--card-edge);
+  border-radius: 8px;
+  color: var(--silk);
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.ghost:hover { border-color: var(--copper); color: var(--copper); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .check, .cause { animation: rise 0.25s ease both; }
+}
+
+/* ===== Кнопка «записати в журнал» (з картки причини) ===== */
+.save-repair {
+  margin-top: 14px;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--copper-soft);
+  border-radius: 8px;
+  color: var(--copper);
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 12px 16px;
+  min-height: 48px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.save-repair:hover { border-color: var(--copper); background: rgba(201, 134, 59, 0.08); }
+
+/* ===== Спільні кнопки дій ===== */
+.primary {
+  background: var(--copper);
+  border: 1px solid var(--copper);
+  border-radius: 8px;
+  color: #0d1811;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 11px 18px;
+  min-height: 48px;
+  cursor: pointer;
+}
+.primary:hover { background: #d8954a; }
+.ghost.danger { color: var(--wire-power); }
+.ghost.danger:hover { border-color: var(--wire-power); color: var(--wire-power); }
+
+/* ===== Журнал ремонту ===== */
+.jr-stats {
+  display: flex; flex-wrap: wrap; gap: 8px 18px;
+  font-family: var(--mono); font-size: 13px; color: var(--silk-dim);
+  margin-bottom: 18px;
+}
+.jr-stats .open { color: var(--warn); }
+.jr-stats .fixed { color: var(--ok); }
+
+.jr-controls {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; align-items: center;
+}
+.jr-controls select {
+  background: var(--inset); border: 1px solid var(--card-edge); border-radius: 6px;
+  color: var(--silk); font-family: var(--mono); font-size: 13px; padding: 9px 12px;
+}
+
+.jr-io { display: flex; gap: 8px; margin-left: auto; }
+.jr-io .ghost { padding: 9px 12px; min-height: 0; font-size: 13px; }
+
+.jr-form {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-top: 3px solid var(--copper);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 18px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.jr-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 620px) { .jr-form-grid { grid-template-columns: 1fr; } }
+.jr-form .field { margin-bottom: 0; }
+.jr-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.jr-list { display: flex; flex-direction: column; gap: 12px; }
+.jr-card {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-left: 3px solid var(--card-edge);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.jr-card > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.jr-card h3 { font-family: var(--mono); font-size: 16px; font-weight: 700; }
+.jr-status {
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid;
+}
+.jr-status.open { color: var(--warn); border-color: var(--warn); }
+.jr-status.fixed { color: var(--ok); border-color: var(--ok); }
+.jr-status.scrapped { color: var(--wire-power); border-color: var(--wire-power); }
+.jr-date { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--silk-dim); }
+.jr-board { font-family: var(--mono); font-size: 13px; color: var(--copper); margin-top: 6px; }
+.jr-diag { margin-top: 6px; font-size: 14px; }
+.jr-diag .jr-symptom { color: var(--silk); }
+.jr-diag .jr-cause { color: var(--silk-dim); }
+.jr-parts { margin-top: 6px; font-size: 13px; color: var(--silk-dim); }
+.jr-parts b { color: var(--silk); }
+.jr-notes { margin-top: 6px; font-size: 14px; color: var(--silk-dim2); line-height: 1.45; }
+.jr-card-actions { display: flex; gap: 8px; margin-top: 12px; }
+.jr-card-actions .ghost { padding: 7px 12px; min-height: 0; font-size: 13px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .jr-card { animation: rise 0.25s ease both; }
+}
+
+/* ===== Довідник прошивок ===== */
+.fw-targets {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--card); border: 1px solid var(--card-edge);
+  border-radius: 12px; padding: 18px; margin-bottom: 18px;
+}
+.fw-target { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.fw-target .fw-fw {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--copper); min-width: 90px;
+}
+.fw-target code {
+  font-family: var(--mono); font-size: 14px; color: var(--silk);
+  background: var(--inset); border: 1px solid var(--card-edge);
+  border-radius: 6px; padding: 6px 10px;
+}
+.fw-none { font-size: 13px; color: var(--silk-dim); }
+.fw-mcu { font-size: 13px; color: var(--silk-dim); padding-top: 8px; border-top: 1px dashed var(--card-edge); }
+.fw-mcu b { color: var(--silk); }
+.fw-mcu a { color: var(--copper); }
+
+.fw-copy {
+  margin-left: auto;
+  background: transparent; border: 1px solid var(--card-edge); border-radius: 6px;
+  color: var(--silk-dim); font-family: var(--mono); font-size: 12px;
+  padding: 5px 10px; cursor: pointer;
+}
+.fw-copy:hover { color: var(--copper); border-color: var(--copper); }
+
+.fw-block { margin-bottom: 22px; }
+.fw-block h2 { font-family: var(--mono); font-size: 17px; margin-bottom: 12px; }
+.fw-steps { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.fw-steps li { font-size: 15px; line-height: 1.45; }
+.fw-steps code, .fw-preset pre {
+  font-family: var(--mono); background: var(--inset);
+  border: 1px solid var(--card-edge); border-radius: 4px; padding: 1px 6px; font-size: 13px;
+}
+
+.fw-presets { display: flex; flex-direction: column; gap: 12px; }
+.fw-preset {
+  background: var(--card); border: 1px solid var(--card-edge);
+  border-radius: 10px; padding: 14px 16px;
+}
+.fw-preset > header { display: flex; align-items: center; gap: 10px; }
+.fw-preset h3 { font-size: 14px; font-weight: 600; }
+.fw-preset pre {
+  margin-top: 10px; padding: 10px 12px; white-space: pre-wrap; line-height: 1.5;
+  color: var(--ok);
+}
+.fw-preset p { margin-top: 8px; font-size: 13px; color: var(--silk-dim); }

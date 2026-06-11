@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — типова конфігурація iFlight BLITZ F722. НЕ звірено з мануалом. Звірити перед пайкою: https://shop.iflight.com",
+  "id": "iflight-blitz-f722",
+  "type": "flight_controller",
+  "brand": "iFlight",
+  "model": "BLITZ F722",
+  "revision": "Mini/E55",
+  "mcu": "STM32F722",
+  "firmware_target": { "betaflight": "IFLIGHT_BLITZ_F722", "inav": null },
+  "voltage": {
+    "input_cells": "3S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (DJI plug)", "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 8,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
+  "known_issues": [],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://shop.iflight.com"
+}

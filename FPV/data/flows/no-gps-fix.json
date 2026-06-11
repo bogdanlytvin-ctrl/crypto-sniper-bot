@@ -1,0 +1,182 @@
+{
+  "$comment": "DRAFT-дерево. GPS не ловить супутники / немає 3D fix. Логіка Betaflight/iNav GPS setup. НЕ звірено живим ремонтом.",
+  "id": "no-gps-fix",
+  "symptom": "Немає GPS-фіксу",
+  "summary": "GPS не дає координат / 0 супутників. Від налаштування в Betaflight → живлення → дроти → огляд неба.",
+  "applies_to": { "has": ["gps"] },
+  "entry": "gps_detect",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+  "nodes": {
+    "gps_detect": {
+      "type": "check",
+      "id": "gps_detect",
+      "instruction": "Betaflight → GPS-вкладка: модуль увімкнено, скільки супутників?",
+      "method": "configurator",
+      "pad_ref": { "kind": "uart", "role": "gps" },
+      "note": "GPS-вкладка з'являється коли feature GPS увімкнено в Configuration. Спершу переконайся, що модуль активований у софті.",
+      "outcomes": [
+        { "label": "GPS не увімкнено в Configuration/Ports", "next": "c_gps_port" },
+        { "label": "Увімкнено, але 0 супутників / немає даних", "next": "gps_power" },
+        { "label": "Супутники ловляться, але fix довго/нестабільний", "next": "gps_skyview" }
+      ]
+    },
+    "gps_power": {
+      "type": "check",
+      "id": "gps_power",
+      "instruction": "Поміряй живлення GPS-модуля. Його LED блимає при пошуку?",
+      "method": "multimeter",
+      "expected": "≈5 В; LED модуля блимає при наявності супутників",
+      "pad_ref": { "kind": "bec", "voltage": "5V" },
+      "outcomes": [
+        { "label": "0 В / LED не світиться", "next": "gps_power_path" },
+        { "label": "Живлення є, дані не йдуть у Betaflight", "next": "gps_wiring" }
+      ]
+    },
+    "gps_power_path": {
+      "type": "check",
+      "id": "gps_power_path",
+      "instruction": "Огляньте пайку живлення GPS (5V і GND)",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Холодна пайка / обрив", "next": "c_cold_solder_gps" },
+        { "label": "Ціле, на паді теж 0 В", "next": "c_bec5_dead_gps" }
+      ]
+    },
+    "gps_wiring": {
+      "type": "check",
+      "id": "gps_wiring",
+      "instruction": "TX/RX GPS навхрест? Baud rate у Ports співпадає з модулем?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "TX/RX переплутані (не навхрест)", "next": "c_gps_tx_swap" },
+        { "label": "Невірний baud rate", "next": "c_gps_baud" },
+        { "label": "Усе вірно, модуль мовчить", "next": "c_gps_module" }
+      ]
+    },
+    "gps_skyview": {
+      "type": "check",
+      "id": "gps_skyview",
+      "instruction": "Тест на відкритому небі? Дав модулю час на холодний старт?",
+      "method": "visual",
+      "note": "У приміщенні / під деревами GPS не ловить. Перший fix після довгого простою (cold start) може зайняти 1-5 хв.",
+      "outcomes": [
+        { "label": "У приміщенні / під перешкодами", "next": "c_gps_skyview" },
+        { "label": "Небо відкрите, fix усе одно нестабільний", "next": "c_gps_interference" }
+      ]
+    },
+
+    "c_gps_port": {
+      "type": "cause",
+      "id": "c_gps_port",
+      "cause": "GPS не увімкнено в Betaflight (feature або Ports)",
+      "fix_steps": [
+        "Configuration → увімкни GPS feature.",
+        "Ports → GPS на UART модуля, протокол UBLOX, baud 115200 (або Auto).",
+        "Save & Reboot."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 5
+    },
+    "c_cold_solder_gps": {
+      "type": "cause",
+      "id": "c_cold_solder_gps",
+      "cause": "Холодна пайка / обрив живлення GPS",
+      "fix_steps": [
+        "Перепаяй пади 5V і GND модуля.",
+        "Прозвони провід до GPS.",
+        "Повторний вимір напруги."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 10
+    },
+    "c_bec5_dead_gps": {
+      "type": "cause",
+      "id": "c_bec5_dead_gps",
+      "cause": "Згорів 5V BEC живлення GPS",
+      "fix_steps": [
+        "Підтверди: на батареї є, на паді 5V — 0 В.",
+        "Тимчасово живи GPS від іншого справного 5V.",
+        "Системно — ремонт/заміна FC."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    },
+    "c_gps_tx_swap": {
+      "type": "cause",
+      "id": "c_gps_tx_swap",
+      "cause": "TX/RX GPS переплутані (не навхрест)",
+      "fix_steps": [
+        "GPS TX → RX-пад UART плати, GPS RX → TX-пад (навхрест).",
+        "Перепай за потреби.",
+        "Перевір дані у GPS-вкладці."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 10
+    },
+    "c_gps_baud": {
+      "type": "cause",
+      "id": "c_gps_baud",
+      "cause": "Невірний baud rate GPS у Ports",
+      "fix_steps": [
+        "Ports → виставі baud GPS відповідно до модуля (часто 9600 заводський, або 115200).",
+        "Спробуй Auto.",
+        "Save & Reboot."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 5
+    },
+    "c_gps_module": {
+      "type": "cause",
+      "id": "c_gps_module",
+      "cause": "Живлення і налаштування ок — несправний GPS-модуль",
+      "fix_steps": [
+        "Підмінь модуль завідомо робочим.",
+        "Перевір на іншому борту/USB-перехіднику (u-center).",
+        "Заміна модуля."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 20
+    },
+    "c_gps_skyview": {
+      "type": "cause",
+      "id": "c_gps_skyview",
+      "cause": "Немає огляду неба — GPS фізично не ловить у приміщенні",
+      "fix_steps": [
+        "Винеси дрон на відкрите небо.",
+        "Дай час на холодний старт (до 5 хв).",
+        "Антена GPS — вгору, без екранування корпусом."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 5
+    },
+    "c_gps_interference": {
+      "type": "cause",
+      "id": "c_gps_interference",
+      "cause": "Перешкоди / погане розташування антени GPS",
+      "fix_steps": [
+        "Підніми GPS над компонентами на щоглі, антеною вгору.",
+        "Віднеси від VTX і силових дротів (джерела ВЧ-шуму).",
+        "За потреби екрануй VTX мідною стрічкою."
+      ],
+      "fix_action": "rewire",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 15
+    }
+  }
+}

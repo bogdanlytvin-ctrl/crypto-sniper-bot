@@ -1,0 +1,20 @@
+{
+  "name": "FTOS — польовий довідник техніка FPV",
+  "short_name": "FTOS",
+  "description": "Діагностика по симптому й карта підключення FPV, прив'язані до пінауту плати. Працює офлайн.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101d15",
+  "theme_color": "#101d15",
+  "lang": "uk",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

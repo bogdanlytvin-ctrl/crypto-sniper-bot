@@ -1,0 +1,29 @@
+{
+  "$comment": "DRAFT — типова конфігурація JHEMCU GF16 (компактний F411 AIO). НЕ звірено з мануалом. F411 має мало UART — звірити перед пайкою.",
+  "id": "jhemcu-gf16-aio",
+  "type": "flight_controller",
+  "brand": "JHEMCU",
+  "model": "GF16",
+  "revision": "AIO F411",
+  "mcu": "STM32F411",
+  "firmware_target": { "betaflight": "JHEF411", "inav": null },
+  "voltage": {
+    "input_cells": "1S-4S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 1.5, "notes": "для RX, камери, малого VTX" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false, "notes": "SmartAudio для аналогового VTX" }
+  ],
+  "motor_outputs": 4,
+  "i2c": [],
+  "onboard_peripherals": ["blackbox_flash", "osd_analog", "current_sensor", "4in1_esc"],
+  "known_issues": [
+    { "issue": "F411 — лише 2-3 UART і менше пам'яті; немає вільного UART під GPS+VTX+RX одночасно", "workaround": "Плануй периферію під обмежені порти; GPS часто доводиться жертвувати", "source_url": "https://betaflight.com/docs/wiki" },
+    { "issue": "F411 без апаратних інверторів — SBUS напряму не працює", "workaround": "ELRS/CRSF", "source_url": "https://betaflight.com/docs/wiki" }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://www.jhemcu.com"
+}

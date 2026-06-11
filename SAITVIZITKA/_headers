@@ -1,0 +1,21 @@
+# Cloudflare Pages headers
+/*
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/src/*
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/Scripts/config.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/Images/*
+  Cache-Control: public, max-age=86400, must-revalidate
+
+/Components/*
+  Cache-Control: no-cache, no-store, must-revalidate

@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4>📦 Відкриті позиції</h4>
-  <span class="text-muted small">{{ positions|length }} відкрито</span>
+  <h4>📦 {{ UI.nav_positions }}</h4>
+  <span class="text-muted small">{{ positions|length }} {{ 'відкрито' if lang=='ua' else 'open' }}</span>
 </div>
 
 <div class="card">
   <table class="table table-hover mb-0">
     <thead>
       <tr>
-        <th>Ланцюг</th><th>Токен</th><th>Кількість</th><th>Ціна купівлі</th>
-        <th>Витрачено</th><th>Stop-loss</th><th>Користувач</th><th>Відкрито</th>
+        <th>{{ UI.sig_chain }}</th><th>{{ UI.pos_token }}</th><th>{{ UI.pos_amount }}</th>
+        <th>{{ UI.pos_buy_price }}</th><th>{{ 'Витрачено' if lang=='ua' else 'Spent' }}</th>
+        <th>{{ UI.pos_sl }}</th><th>{{ UI.user }}</th><th>{{ UI.pos_opened }}</th>
       </tr>
     </thead>
     <tbody>
@@ -19,7 +20,7 @@
       <td>{% if pos.chain=='solana' %}◎ SOL{% else %}🔶 BSC{% endif %}</td>
       <td>
         <b>{{ pos.token_symbol or '?' }}</b> {{ pos.token_name or '' }}<br>
-        <code class="small">{{ pos.token_address[:16] }}...</code>
+        <code class="small" data-copy="{{ pos.token_address }}" style="cursor:pointer" title="copy">{{ pos.token_address[:16] }}...</code>
       </td>
       <td>{{ '{:,.4f}'.format(pos.amount) }}</td>
       <td>${{ '{:,.8f}'.format(pos.buy_price_usd or 0) }}</td>
@@ -32,7 +33,7 @@
       <td class="text-muted small">{{ pos.opened_at[:16] }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="8" class="text-center text-muted py-4">Відкритих позицій немає</td></tr>
+    <tr><td colspan="8" class="text-center text-muted py-4">{{ 'Відкритих позицій немає' if lang=='ua' else 'No open positions' }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

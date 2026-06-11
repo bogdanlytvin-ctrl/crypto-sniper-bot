@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — звірити з офіційною документацією DJI перед публікацією",
+  "id": "dji-o3-air-unit",
+  "type": "vtx_digital",
+  "brand": "DJI",
+  "model": "O3 Air Unit",
+  "protocol": "MSP DisplayPort",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["9V", "7.4-26.4V"],
+    "current_draw_ma": 1000,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "VCC (7.4–26.4V)", "connects_to": "9V BEC (або VBAT до 6S)" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Peripherals: VTX (MSP + DisplayPort); OSD → HD",
+  "known_issues": [
+    {
+      "issue": "Висока тяга по струму на максимальній потужності — слабкий BEC просідає, юніт перезавантажується",
+      "workaround": "BEC мін. 2A на 9V або живлення від VBAT (до 6S)"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
+  "source_url": "https://www.dji.com/o3-air-unit"
+}

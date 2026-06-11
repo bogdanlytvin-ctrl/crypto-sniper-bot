@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="mb-0">💎 Підписки</h4>
-  <span class="text-muted small">Всього: {{ total }}</span>
+  <h4 class="mb-0">💎 {{ UI.nav_subscriptions }}</h4>
+  <span class="text-muted small">{{ 'Всього' if lang=='ua' else 'Total' }}: {{ total }}</span>
 </div>
 
 <!-- Tier stats -->
@@ -24,7 +24,7 @@
   <form class="row g-2" method="GET">
     <div class="col-auto">
       <select name="tier" class="form-select form-select-sm">
-        <option value="" {% if not tier_f %}selected{% endif %}>Всі тарифи</option>
+        <option value="" {% if not tier_f %}selected{% endif %}>{{ UI.all_tiers }}</option>
         <option value="free"  {% if tier_f=='free' %}selected{% endif %}>🆓 Free</option>
         <option value="basic" {% if tier_f=='basic' %}selected{% endif %}>💳 Basic</option>
         <option value="pro"   {% if tier_f=='pro' %}selected{% endif %}>🚀 Pro</option>
@@ -32,17 +32,17 @@
     </div>
     <div class="col-auto">
       <select name="status" class="form-select form-select-sm">
-        <option value="" {% if not status_f %}selected{% endif %}>Всі статуси</option>
+        <option value="" {% if not status_f %}selected{% endif %}>{{ UI.all_statuses }}</option>
         <option value="active"   {% if status_f=='active' %}selected{% endif %}>Active</option>
         <option value="inactive" {% if status_f=='inactive' %}selected{% endif %}>Inactive</option>
       </select>
     </div>
     <div class="col-auto">
-      <button type="submit" class="btn btn-sm btn-outline-secondary">Фільтр</button>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'Фільтр' if lang=='ua' else 'Filter' }}</button>
     </div>
     {% if tier_f or status_f %}
     <div class="col-auto">
-      <a href="{{ url_for('subscriptions') }}" class="btn btn-sm btn-outline-secondary">Скинути</a>
+      <a href="{{ url_for('subscriptions') }}" class="btn btn-sm btn-outline-secondary">{{ 'Скинути' if lang=='ua' else 'Reset' }}</a>
     </div>
     {% endif %}
   </form>
@@ -53,8 +53,9 @@
   <table class="table table-hover mb-0">
     <thead>
       <tr>
-        <th>#</th><th>Користувач</th><th>Тариф</th><th>Статус</th>
-        <th>Закінчується</th><th>Оновлено</th><th></th>
+        <th>#</th><th>{{ UI.user }}</th><th>{{ UI.tier }}</th><th>{{ UI.status }}</th>
+        <th>{{ 'Закінчується' if lang=='ua' else 'Expires' }}</th>
+        <th>{{ 'Оновлено' if lang=='ua' else 'Updated' }}</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -80,17 +81,17 @@
       <td class="text-muted small">
         {% if s.expires_at %}
           {% set exp = s.expires_at[:10] %}
-          <span {% if exp < now_ts|string[:10] %}style="color:#f85149"{% endif %}>{{ exp }}</span>
+          <span {% if exp < today %}style="color:#f85149"{% endif %}>{{ exp }}</span>
         {% else %}∞{% endif %}
       </td>
-      <td class="text-muted small">{{ s.updated_at[:10] }}</td>
+      <td class="text-muted small">{{ s.updated_at[:10] if s.updated_at else '—' }}</td>
       <td>
         <a href="{{ url_for('user_detail', uid=s.user_id) }}"
-           class="btn btn-sm btn-outline-secondary">Деталі</a>
+           class="btn btn-sm btn-outline-secondary">{{ 'Деталі' if lang=='ua' else 'Details' }}</a>
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="7" class="text-center text-muted py-4">Підписок немає</td></tr>
+    <tr><td colspan="7" class="text-center text-muted py-4">{{ 'Підписок немає' if lang=='ua' else 'No subscriptions' }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

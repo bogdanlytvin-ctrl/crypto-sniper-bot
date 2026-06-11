@@ -1,0 +1,133 @@
+{
+  "$comment": "DRAFT-дерево. Немає екранної індикації (OSD) поверх відео. Гілки: аналог (MAX7456) vs цифра (MSP DisplayPort). НЕ звірено живим ремонтом.",
+  "id": "no-osd",
+  "symptom": "Немає OSD (даних на екрані)",
+  "summary": "Відео є, але немає батареї/таймера/даних поверх нього. Аналог і цифра малюють OSD по-різному.",
+  "applies_to": { "has": ["vtx_digital", "vtx_analog"] },
+  "entry": "osd_type",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/OSD",
+  "nodes": {
+    "osd_type": {
+      "type": "check",
+      "id": "osd_type",
+      "instruction": "Який відеотракт?",
+      "method": "visual",
+      "note": "Якщо відео взагалі немає — спершу симптом 'Немає відео'. OSD малюється поверх існуючого відео.",
+      "outcomes": [
+        { "label": "Аналоговий (MAX7456 на FC)", "next": "osd_analog" },
+        { "label": "Цифровий (DJI/Walksnail, MSP OSD)", "next": "osd_digital" }
+      ]
+    },
+    "osd_analog": {
+      "type": "check",
+      "id": "osd_analog",
+      "instruction": "Betaflight → OSD: елементи увімкнені й у кадрі? Video format правильний?",
+      "method": "configurator",
+      "note": "Аналогове OSD малює чип MAX7456 поверх відео камери.",
+      "outcomes": [
+        { "label": "Елементи вимкнені / за межами кадру", "next": "c_osd_elements" },
+        { "label": "Невірний video format (NTSC/PAL)", "next": "c_osd_format" },
+        { "label": "Відео є, OSD взагалі немає", "next": "c_osd_chip" }
+      ]
+    },
+    "osd_digital": {
+      "type": "check",
+      "id": "osd_digital",
+      "instruction": "MSP DisplayPort увімкнено на UART до VTX? В окулярах обрано Betaflight/Custom OSD?",
+      "method": "configurator",
+      "pad_ref": { "kind": "uart", "role": "vtx_digital" },
+      "note": "Цифрове OSD йде по MSP DisplayPort через UART FC↔VTX, не через MAX7456.",
+      "outcomes": [
+        { "label": "MSP DisplayPort не увімкнено на UART", "next": "c_osd_msp" },
+        { "label": "Увімкнено, в окулярах не той режим OSD", "next": "c_osd_goggles" },
+        { "label": "Усе вірно, OSD немає", "next": "c_osd_fw" }
+      ]
+    },
+
+    "c_osd_elements": {
+      "type": "cause",
+      "id": "c_osd_elements",
+      "cause": "Елементи OSD вимкнені або поза кадром",
+      "fix_steps": [
+        "BF → OSD: увімкни потрібні елементи (напруга, таймер, RSSI).",
+        "Перетягни елементи в зону кадру (превʼю праворуч).",
+        "Save."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/OSD",
+      "est_minutes": 5
+    },
+    "c_osd_format": {
+      "type": "cause",
+      "id": "c_osd_format",
+      "cause": "Невірний video format OSD (NTSC/PAL)",
+      "fix_steps": [
+        "OSD → Video Format = AUTO або відповідно до камери.",
+        "Невірний формат зміщує/ховає елементи за кадр.",
+        "Save."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/OSD",
+      "est_minutes": 3
+    },
+    "c_osd_chip": {
+      "type": "cause",
+      "id": "c_osd_chip",
+      "cause": "Відео є, OSD немає — можливий дефект MAX7456 або його пайки",
+      "fix_steps": [
+        "Переший Betaflight, перевір що feature OSD активна.",
+        "Перевір, що камера дає сигнал саме через FC (VTX від FC, не напряму з камери).",
+        "Апаратний дефект OSD-чипа → заміна FC."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/OSD",
+      "est_minutes": 25
+    },
+    "c_osd_msp": {
+      "type": "cause",
+      "id": "c_osd_msp",
+      "cause": "MSP DisplayPort не увімкнено на UART до VTX",
+      "fix_steps": [
+        "Ports → на UART до юніта увімкни Peripherals = VTX (MSP+DisplayPort).",
+        "Save & Reboot.",
+        "Перевір, що OSD з'явилось у відео."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/OSD",
+      "est_minutes": 5
+    },
+    "c_osd_goggles": {
+      "type": "cause",
+      "id": "c_osd_goggles",
+      "cause": "В окулярах обрано не той режим OSD",
+      "fix_steps": [
+        "У меню окулярів обери Betaflight/Custom OSD (не Native).",
+        "Перевір версію прошивки окулярів.",
+        "Перезавантаж юніт і окуляри."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://www.dji.com/support",
+      "est_minutes": 5
+    },
+    "c_osd_fw": {
+      "type": "cause",
+      "id": "c_osd_fw",
+      "cause": "Усе вірно — несумісність прошивок FC і відеоюніта",
+      "fix_steps": [
+        "Онови Betaflight і прошивку юніта до сумісних версій.",
+        "Перевір підтримку MSP DisplayPort у даній версії юніта.",
+        "Повтори налаштування Ports."
+      ],
+      "fix_action": "reflash",
+      "confidence": "possible",
+      "source_url": "https://www.dji.com/support",
+      "est_minutes": 20
+    }
+  }
+}

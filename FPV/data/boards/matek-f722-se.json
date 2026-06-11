@@ -1,0 +1,33 @@
+{
+  "$comment": "DRAFT — типова конфігурація Mateksys F722-SE. НЕ звірено з мануалом. Звірити перед пайкою: https://www.mateksys.com",
+  "id": "matek-f722-se",
+  "type": "flight_controller",
+  "brand": "Mateksys",
+  "model": "F722",
+  "revision": "SE",
+  "mcu": "STM32F722",
+  "firmware_target": { "betaflight": "MATEKF722SE", "inav": "MATEKF722SE" },
+  "voltage": {
+    "input_cells": "2S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "VTX/периферія (за джампером)" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false, "notes": "SBUS-пад інвертований апаратно (F7 має інвертори)" },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
+    { "name": "UART5", "pads": ["T5", "R5"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 8,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
+  "known_issues": [
+    { "issue": "F7 має апаратні інвертори — SBUS працює на виділеному SBUS-паді", "workaround": "Використовуй SBUS-пад для інвертованих протоколів", "source_url": "https://betaflight.com/docs/wiki" }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://www.mateksys.com"
+}

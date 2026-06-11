@@ -1,0 +1,170 @@
+{
+  "$comment": "DRAFT-дерево. Дрон не тримає позицію: сповзає, кружляє 'унітазом' у GPS-режимах, або осцилює. Логіка залежить від режиму польоту. НЕ звірено живим ремонтом.",
+  "id": "drift-toilet",
+  "symptom": "Дрифт / кружляє 'унітазом'",
+  "summary": "Дрон сповзає або кружляє по колу. Причина залежить від режиму: GPS-унітаз = компас, Angle-дрифт = акселерометр, Acro-дрифт = пропи/тримінг.",
+  "applies_to": {},
+  "entry": "drift_mode",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Accelerometer-Calibration",
+  "nodes": {
+    "drift_mode": {
+      "type": "check",
+      "id": "drift_mode",
+      "instruction": "У якому режимі і як саме дрифтить?",
+      "method": "configurator",
+      "note": "Acro (без стабілізації) дрифт — норма, пілот тримає сам. Дрифт у Angle/Horizon = акселерометр. 'Унітаз' (кружляє колом) у GPS = компас.",
+      "outcomes": [
+        { "label": "Кружляє 'унітазом' у GPS Hold / RTH", "next": "compass_check" },
+        { "label": "Сповзає в Angle / Horizon", "next": "acc_check" },
+        { "label": "Дрифт у Acro", "next": "acro_check" },
+        { "label": "Хитає / осцилює на місці", "next": "c_vibration" }
+      ]
+    },
+    "compass_check": {
+      "type": "check",
+      "id": "compass_check",
+      "instruction": "Компас відкалібрований, орієнтація задана вірно, магнітних перешкод поряд немає?",
+      "method": "configurator",
+      "note": "'Унітаз' майже завжди компас: погана калібровка, невірна орієнтація (mag_align), або перешкоди від силових дротів/VTX.",
+      "outcomes": [
+        { "label": "Компас не калібрований / орієнтація невірна", "next": "c_compass_cal" },
+        { "label": "Калібрований, але поряд силові дроти / VTX", "next": "c_compass_interference" },
+        { "label": "Усе ок, унітаз лишається", "next": "c_compass_module" }
+      ]
+    },
+    "acc_check": {
+      "type": "check",
+      "id": "acc_check",
+      "instruction": "Акселерометр калібрований на рівній поверхні?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Не калібрований / калібрований не на рівному", "next": "c_acc_cal" },
+        { "label": "Калібрований, дрифт лишається", "next": "c_acc_trim" }
+      ]
+    },
+    "acro_check": {
+      "type": "check",
+      "id": "acro_check",
+      "instruction": "Пропелери цілі/збалансовані? Тримінг стіків на пульті в нулі?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Биті / незбалансовані пропи", "next": "c_props" },
+        { "label": "Тримінг стіків зміщений на пульті", "next": "c_radio_trim" }
+      ]
+    },
+
+    "c_compass_cal": {
+      "type": "cause",
+      "id": "c_compass_cal",
+      "cause": "Компас не відкалібрований або невірна орієнтація (mag_align)",
+      "fix_steps": [
+        "Setup → Calibrate Compass, обертай дрон по всіх осях.",
+        "Звір mag_align з фізичною орієнтацією модуля компаса.",
+        "Калібруй подалі від металу/магнітів."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 10
+    },
+    "c_compass_interference": {
+      "type": "cause",
+      "id": "c_compass_interference",
+      "cause": "Магнітні перешкоди на компас від силових дротів / VTX",
+      "fix_steps": [
+        "Віднеси GPS/компас від силових дротів і VTX.",
+        "Підніми модуль на щоглі.",
+        "Перекалібруй компас після переміщення."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 15
+    },
+    "c_compass_module": {
+      "type": "cause",
+      "id": "c_compass_module",
+      "cause": "Несправний або шумний компас",
+      "fix_steps": [
+        "Перевір компас на іншому борту / у u-center.",
+        "За постійного шуму — заміна модуля компаса/GPS.",
+        "Як варіант — політ без компаса (деякі режими це дозволяють)."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Setup",
+      "est_minutes": 20
+    },
+    "c_acc_cal": {
+      "type": "cause",
+      "id": "c_acc_cal",
+      "cause": "Акселерометр калібрований невірно",
+      "fix_steps": [
+        "Постав дрон на ідеально рівну поверхню.",
+        "Setup → Calibrate Accelerometer.",
+        "Перевір board alignment, якщо FC встановлений під кутом."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Accelerometer-Calibration",
+      "est_minutes": 5
+    },
+    "c_acc_trim": {
+      "type": "cause",
+      "id": "c_acc_trim",
+      "cause": "Залишковий дрифт — потрібен board alignment / RC trim",
+      "fix_steps": [
+        "Перевір board alignment (роль/тангаж зміщення FC).",
+        "Звір центрування каналів у Receiver (1500 у центрі).",
+        "За потреби — мала корекція trim."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Accelerometer-Calibration",
+      "est_minutes": 10
+    },
+    "c_props": {
+      "type": "cause",
+      "id": "c_props",
+      "cause": "Биті або незбалансовані пропелери",
+      "fix_steps": [
+        "Огляньте всі пропи на тріщини/щербини.",
+        "Заміни весь комплект (не по одному).",
+        "Перевір, що пропи правильної моделі/напрямку."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 5
+    },
+    "c_radio_trim": {
+      "type": "cause",
+      "id": "c_radio_trim",
+      "cause": "Зміщений тримінг / subtrim на пульті",
+      "fix_steps": [
+        "Обнули trim усіх осей на пульті.",
+        "Відцентруй стіки, перекалібруй пульт (gimbals).",
+        "Перевір центр каналів у Receiver = 1500."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Rx-Setup",
+      "est_minutes": 5
+    },
+    "c_vibration": {
+      "type": "cause",
+      "id": "c_vibration",
+      "cause": "Вібрації (мотор/підшипник/гнутий вал) збивають гіро",
+      "fix_steps": [
+        "Перевір баланс моторів і пропів, стан підшипників.",
+        "Огляньте soft-mount FC (гумки), щоб гасити вібрації.",
+        "Глянь Blackbox/гіро-трейс на шум, підстав фільтри."
+      ],
+      "fix_action": "clean",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    }
+  }
+}

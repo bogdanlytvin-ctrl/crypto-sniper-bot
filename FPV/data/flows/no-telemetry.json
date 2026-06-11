@@ -1,0 +1,93 @@
+{
+  "$comment": "DRAFT-дерево. На пульті немає телеметрії (RSSI/LQ/напруга тощо). Фокус ELRS/CRSF. НЕ звірено живим ремонтом.",
+  "id": "no-telemetry",
+  "symptom": "Немає телеметрії на пульті",
+  "summary": "Керування є, а даних назад (RSSI, напруга, сенсори) немає. Часто — напівдуплексна пайка або вимкнена телеметрія.",
+  "applies_to": { "has": ["receiver"] },
+  "entry": "tel_link",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+  "nodes": {
+    "tel_link": {
+      "type": "check",
+      "id": "tel_link",
+      "instruction": "Що саме з телеметрією?",
+      "method": "configurator",
+      "note": "ELRS/CRSF телеметрія йде по тому ж UART, що й керування (full duplex). Керування є, а телеметрії немає — часто підпаяний лише один дріт або телеметрія вимкнена.",
+      "outcomes": [
+        { "label": "Керування є, телеметрії немає зовсім", "next": "crsf_duplex" },
+        { "label": "На пульті немає жодного сенсора", "next": "c_tel_discover" },
+        { "label": "RSSI/LQ є, але напруги/інших даних немає", "next": "c_tel_sensors" }
+      ]
+    },
+    "crsf_duplex": {
+      "type": "check",
+      "id": "crsf_duplex",
+      "instruction": "Обидва дроти лінії приймача підпаяні навхрест? Telemetry увімкнена в Betaflight?",
+      "method": "visual",
+      "pad_ref": { "kind": "uart", "role": "receiver" },
+      "outcomes": [
+        { "label": "Підпаяний лише один дріт (half-duplex)", "next": "c_tel_halfduplex" },
+        { "label": "Обидва є, телеметрія вимкнена в BF", "next": "c_tel_feature" },
+        { "label": "Усе підпаяно і ввімкнено", "next": "c_tel_discover" }
+      ]
+    },
+
+    "c_tel_halfduplex": {
+      "type": "cause",
+      "id": "c_tel_halfduplex",
+      "cause": "Лінія приймача напівдуплексна — підпаяний лише TX приймача",
+      "fix_steps": [
+        "Підпай другий дріт навхрест: RX приймача ↔ TX-пад плати.",
+        "Цей зворотний канал і несе телеметрію у CRSF.",
+        "Перевір призначення Serial RX на цьому UART."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 10
+    },
+    "c_tel_feature": {
+      "type": "cause",
+      "id": "c_tel_feature",
+      "cause": "Телеметрія вимкнена в Betaflight",
+      "fix_steps": [
+        "Configuration → увімкни TELEMETRY.",
+        "Для CRSF телеметрія йде автоматично — перевір, що Serial RX = CRSF.",
+        "Save & Reboot."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Telemetry",
+      "est_minutes": 5
+    },
+    "c_tel_discover": {
+      "type": "cause",
+      "id": "c_tel_discover",
+      "cause": "Сенсори не виявлені на пульті",
+      "fix_steps": [
+        "На пульті: Telemetry → Delete all → Discover new sensors при ввімкненому дроні.",
+        "Переконайся, що лінк активний (RX має живлення).",
+        "Перевір, що модель на пульті та сама."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 5
+    },
+    "c_tel_sensors": {
+      "type": "cause",
+      "id": "c_tel_sensors",
+      "cause": "Частина сенсорів не приходить (напр. напруга батареї)",
+      "fix_steps": [
+        "Перевір, що FC передає потрібні сенсори (напруга з Power & Battery).",
+        "Онови ELRS до свіжої версії (розширені телеметрія-сенсори).",
+        "Передискавер сенсори на пульті."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 10
+    }
+  }
+}

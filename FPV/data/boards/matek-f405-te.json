@@ -1,0 +1,40 @@
+{
+  "$comment": "DRAFT — заповнено по типовій конфігурації, ОБОВ'ЯЗКОВО звірити з http://www.mateksys.com/?portfolio=f405-te перед публікацією",
+  "id": "matek-f405-te",
+  "type": "flight_controller",
+  "brand": "Mateksys",
+  "model": "F405-TE",
+  "revision": "TE",
+  "mcu": "STM32F405",
+  "firmware_target": { "betaflight": "MATEKF405TE", "inav": "MATEKF405TE" },
+  "voltage": {
+    "input_cells": "3S-8S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "RX, GPS, камера" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "цифровий VTX / аналоговий VTX" },
+      { "voltage": "3V3", "max_current_a": 0.2, "notes": "компас та інші 3.3V сенсори" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["TX1", "RX1"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": null, "inverted": false },
+    { "name": "UART2", "pads": ["TX2", "RX2"], "default_function": null, "recommended_for": ["receiver"], "connector": null, "inverted": false, "notes": "Рекомендовано для CRSF/ELRS" },
+    { "name": "UART3", "pads": ["TX3", "RX3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["TX4", "RX4"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
+    { "name": "UART5", "pads": ["TX5", "RX5"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["TX6", "RX6"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 8,
+  "i2c": [
+    { "name": "I2C1", "pads": ["SDA1", "SCL1"], "recommended_for": ["compass", "barometer_external"] }
+  ],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
+  "known_issues": [
+    {
+      "issue": "F405 без апаратних інверторів — SBUS напряму на RX-пад не працює",
+      "workaround": "Використовувати CRSF/ELRS",
+      "source_url": ""
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
+  "source_url": "http://www.mateksys.com/?portfolio=f405-te"
+}

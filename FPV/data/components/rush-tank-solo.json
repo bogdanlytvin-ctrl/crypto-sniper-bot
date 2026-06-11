@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — приклад аналогового VTX з SmartAudio, звірити з документацією RushFPV",
+  "id": "rush-tank-solo",
+  "type": "vtx_analog",
+  "brand": "RushFPV",
+  "model": "Tank Solo",
+  "protocol": "SmartAudio",
+  "requirements": {
+    "connection": "uart_tx_only",
+    "needs_full_duplex": false,
+    "voltage": ["9V", "7-36V"],
+    "current_draw_ma": 600,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "SA (SmartAudio)", "connects_to": "FC TX-пад обраного UART (тільки TX!)" },
+    { "component_pin": "VIDEO IN", "connects_to": "камера VIDEO OUT" },
+    { "component_pin": "VCC", "connects_to": "9V BEC або VBAT" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Peripherals: VTX (TBS SmartAudio); таблиця VTX — за регіоном",
+  "known_issues": [
+    {
+      "issue": "SmartAudio використовує лише TX-пад FC — RX того ж UART лишається вільним, але порт зайнятий цілком",
+      "workaround": "Планувати UART-и з урахуванням цього"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
+  "source_url": "https://rushfpv.net"
+}

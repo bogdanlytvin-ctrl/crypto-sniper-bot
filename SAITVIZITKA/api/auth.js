@@ -1,0 +1,38 @@
+import { getPool } from "./_db.js";
+import crypto from "crypto";
+
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// Validates the admin password (server-side only) and returns the protected
+// fields the admin needs to manage (telegram config). The password lives in the
+// EDIT_PASSWORD env var and is never sent to the public browser.
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).end();
+
+  const PASS = process.env.EDIT_PASSWORD || "Bogdan93";
+  try {
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    if (!body || !safeEqual(body.password, PASS)) return res.status(401).json({ ok: false });
+
+    let telegram = null;
+    const pool = getPool();
+    try {
+      const r = await pool.query(`SELECT data FROM site_content WHERE id = 'main' LIMIT 1`);
+      telegram = r.rows[0]?.data?.telegram || null;
+    } finally {
+      await pool.end();
+    }
+    return res.status(200).json({ ok: true, telegram });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}

@@ -1,0 +1,309 @@
+{
+  "$comment": "DRAFT-дерево. Складено за типовою логікою діагностики FPV відеолінку (Betaflight wiki + мануали VTX). НЕ звірено живим ремонтом — статус draft, UI показує попередження. Перед field_tested звірити кроки з реальним бортом.",
+  "id": "no-video",
+  "symptom": "Немає відео",
+  "summary": "Чорний/відсутній екран в окулярах. Спершу відсікаємо живлення VTX (моат: міряємо на падах плати), потім сигнал і антену.",
+  "applies_to": { "has": ["vtx_digital", "vtx_analog"] },
+  "entry": "vtx_type",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
+  "source_url": "https://betaflight.com/docs/wiki",
+  "nodes": {
+    "vtx_type": {
+      "type": "check",
+      "id": "vtx_type",
+      "instruction": "Який тип VTX на борту?",
+      "method": "visual",
+      "note": "Цифровий (DJI/Walksnail) і аналоговий діагностуються по-різному.",
+      "outcomes": [
+        { "label": "Цифровий (DJI O3 / Vista / Walksnail)", "next": "d_power" },
+        { "label": "Аналоговий", "next": "a_power" }
+      ]
+    },
+
+    "d_power": {
+      "type": "check",
+      "id": "d_power",
+      "instruction": "Підключи LiPo. Юніт стартує — блимає світлодіод, корпус тепліє?",
+      "method": "visual",
+      "note": "Тестуй з батареєю, не лише від USB: на F4-платах 9V BEC часто не активний без LiPo, і юніт «мертвий» хибно.",
+      "outcomes": [
+        { "label": "Мертвий, не гріється", "next": "d_power_meas" },
+        { "label": "Стартує, але відео нема", "next": "d_link" },
+        { "label": "Гріється ненормально / запах гару", "next": "c_short" }
+      ]
+    },
+    "d_power_meas": {
+      "type": "check",
+      "id": "d_power_meas",
+      "instruction": "Поміряй напругу живлення цифрового VTX мультиметром",
+      "method": "multimeter",
+      "expected": "≈9 В для DJI O3 / Vista (Walksnail — звір з мануалом)",
+      "pad_ref": { "kind": "bec", "voltage": "9V" },
+      "outcomes": [
+        { "label": "0 В", "next": "d_power_path" },
+        { "label": "Є ≈9 В", "next": "c_vtx_dead_d" },
+        { "label": "Просідає під навантаженням", "next": "c_bec_overload" }
+      ]
+    },
+    "d_power_path": {
+      "type": "check",
+      "id": "d_power_path",
+      "instruction": "Огляньте лінію 9V: пайка пада, шлейф до юніта, роз'єм",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Холодна/відірвана пайка або порваний шлейф", "next": "c_cold_solder" },
+        { "label": "Візуально ціле", "next": "d_pad_meas" }
+      ]
+    },
+    "d_pad_meas": {
+      "type": "check",
+      "id": "d_pad_meas",
+      "instruction": "Поміряй 9 В прямо на паді плати (не на боці юніта)",
+      "method": "multimeter",
+      "pad_ref": { "kind": "bec", "voltage": "9V" },
+      "outcomes": [
+        { "label": "На паді 9 В є, до юніта не доходить", "next": "c_broken_lead" },
+        { "label": "На паді теж 0 В", "next": "c_bec_dead" }
+      ]
+    },
+    "d_link": {
+      "type": "check",
+      "id": "d_link",
+      "instruction": "Перевір кабель даних (SH1.0) FC↔юніт і що окуляри на тому ж каналі/прив'язці",
+      "method": "configurator",
+      "note": "У DJI/Walksnail відео йде власним каналом, не через UART. UART потрібен лише для MSP-OSD та каналу керування.",
+      "outcomes": [
+        { "label": "Роз'єм нещільно / контакт окислений", "next": "c_data_connector" },
+        { "label": "Кабель щільний, прошивка юніта свіжа", "next": "c_goggles" }
+      ]
+    },
+
+    "a_power": {
+      "type": "check",
+      "id": "a_power",
+      "instruction": "Світяться індикатори/LED на аналоговому VTX після підключення LiPo?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Темний, не світиться", "next": "a_power_meas" },
+        { "label": "Світиться, відео нема або лише шум", "next": "a_signal" },
+        { "label": "Дуже гарячий", "next": "c_short" }
+      ]
+    },
+    "a_power_meas": {
+      "type": "check",
+      "id": "a_power_meas",
+      "instruction": "Поміряй напругу живлення VTX (звір вхід VTX із його мануалом — VBAT чи 5V)",
+      "method": "multimeter",
+      "expected": "Більшість аналогових VTX живляться від VBAT (≈7–26 В); камера зазвичай від 5 В",
+      "pad_ref": { "kind": "literal", "label": "VBAT (+ / батарейний пад)" },
+      "outcomes": [
+        { "label": "0 В", "next": "a_power_path" },
+        { "label": "Напруга є", "next": "a_signal" }
+      ]
+    },
+    "a_power_path": {
+      "type": "check",
+      "id": "a_power_path",
+      "instruction": "Простеж лінію живлення VTX: пайка, обрив, пад VBAT/5V",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Холодна пайка / обрив", "next": "c_cold_solder" },
+        { "label": "Ціле — на паді теж 0 В", "next": "c_bec_dead" }
+      ]
+    },
+    "a_signal": {
+      "type": "check",
+      "id": "a_signal",
+      "instruction": "У Betaflight → Ports: увімкнено SmartAudio/Tramp на UART VTX? Камера дає сигнал?",
+      "method": "configurator",
+      "pad_ref": { "kind": "uart", "role": "vtx_analog_control" },
+      "note": "Без сигналу з камери VTX теж дасть чорний екран — перевір живлення і провід камери.",
+      "outcomes": [
+        { "label": "Порт VTX не призначений", "next": "c_sa_port" },
+        { "label": "Порт ОК, але немає сигналу з камери", "next": "c_camera" },
+        { "label": "Усе призначено вірно", "next": "a_antenna" }
+      ]
+    },
+    "a_antenna": {
+      "type": "check",
+      "id": "a_antenna",
+      "instruction": "Перевір антену VTX і коаксіал біля роз'єму",
+      "method": "visual",
+      "note": "Передача без антени майже завжди палить вихідний каскад VTX. Якщо літали без антени — причина ймовірно тут.",
+      "outcomes": [
+        { "label": "Антена відсутня / обірваний коаксіал", "next": "c_antenna" },
+        { "label": "Антена ціла", "next": "c_vtx_dead_a" }
+      ]
+    },
+
+    "c_short": {
+      "type": "cause",
+      "id": "c_short",
+      "cause": "Коротке замикання / згорілий VTX",
+      "fix_steps": [
+        "Негайно відключи батарею — далі гріти небезпечно.",
+        "Огляньте VTX і пади на КЗ, обвуглення, здуті елементи.",
+        "Прозвони живлення VTX на КЗ перед повторним вмиканням.",
+        "За підтвердженого пробою — заміна VTX."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    },
+    "c_vtx_dead_d": {
+      "type": "cause",
+      "id": "c_vtx_dead_d",
+      "cause": "Живлення є, юніт не оживає — несправний юніт або кабель даних",
+      "fix_steps": [
+        "Перевір/заміни кабель даних SH1.0.",
+        "Підключи юніт до завідомо робочого борта — щоб відсікти FC.",
+        "Якщо мертвий і там — несправний юніт (RMA/заміна)."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://www.dji.com/support",
+      "est_minutes": 20
+    },
+    "c_bec_overload": {
+      "type": "cause",
+      "id": "c_bec_overload",
+      "cause": "9V BEC просідає під навантаженням (перевантажений або слабкий)",
+      "fix_steps": [
+        "Звір сумарне навантаження на 9V з лімітом BEC у профілі плати.",
+        "Прибери зайвих споживачів з 9V.",
+        "За потреби — окремий зовнішній 9V BEC під VTX."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    },
+    "c_cold_solder": {
+      "type": "cause",
+      "id": "c_cold_solder",
+      "cause": "Холодна пайка / обрив на лінії живлення VTX",
+      "fix_steps": [
+        "Перепаяй пад живлення з флюсом, прогрій до блискучої краплі.",
+        "Перевір, що пад не відірваний від доріжки (lifted pad).",
+        "Після пайки — повторний вимір напруги."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 10
+    },
+    "c_broken_lead": {
+      "type": "cause",
+      "id": "c_broken_lead",
+      "cause": "Обрив дроту живлення між падом і юнітом",
+      "fix_steps": [
+        "Прозвони провід від пада до роз'єму юніта.",
+        "Заміни пошкоджену жилу/шлейф.",
+        "Перевір обтиск роз'єму SH1.0."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 10
+    },
+    "c_bec_dead": {
+      "type": "cause",
+      "id": "c_bec_dead",
+      "cause": "Згорів BEC живлення VTX на платі",
+      "fix_steps": [
+        "Підтверди: на батареї є, на паді BEC — 0 В.",
+        "Тимчасове рішення: живити VTX від зовнішнього BEC потрібної напруги.",
+        "Системне — заміна/ремонт FC (BEC зазвичай не ремонтується в полі)."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    },
+    "c_data_connector": {
+      "type": "cause",
+      "id": "c_data_connector",
+      "cause": "Поганий контакт у роз'ємі даних VTX",
+      "fix_steps": [
+        "Перевстав / переобтисни роз'єм SH1.0.",
+        "За окислення — почисти контакти, заміни шлейф.",
+        "Перевір порядок жил по мануалу юніта."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://www.dji.com/support",
+      "est_minutes": 10
+    },
+    "c_goggles": {
+      "type": "cause",
+      "id": "c_goggles",
+      "cause": "Проблема на боці окулярів — канал, прив'язка або прошивка",
+      "fix_steps": [
+        "Звір канал/частоту окулярів і юніта.",
+        "Перебіндь юніт з окулярами за мануалом.",
+        "Онови прошивку окулярів і юніта до сумісних версій."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://www.dji.com/support",
+      "est_minutes": 15
+    },
+    "c_sa_port": {
+      "type": "cause",
+      "id": "c_sa_port",
+      "cause": "SmartAudio/Tramp не призначений на UART VTX (немає лише керування; чорний екран — якщо ще й камера/живлення)",
+      "fix_steps": [
+        "Betaflight → Ports: на UART VTX увімкни Peripherals = VTX (SmartAudio/Tramp).",
+        "Save & Reboot.",
+        "Перевір вкладку Video Transmitter."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/SmartAudio",
+      "est_minutes": 5
+    },
+    "c_camera": {
+      "type": "cause",
+      "id": "c_camera",
+      "cause": "Немає відеосигналу з камери на вхід VTX",
+      "fix_steps": [
+        "Перевір живлення камери (зазвичай 5 В) і відеопровід камера→VTX.",
+        "Перепаяй холодні з'єднання відеолінії.",
+        "Тест: підмінити камеру завідомо робочою."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 15
+    },
+    "c_antenna": {
+      "type": "cause",
+      "id": "c_antenna",
+      "cause": "Відсутня/пошкоджена антена — ймовірно спалений вихідний каскад VTX",
+      "fix_steps": [
+        "Правило: ніколи не подавати живлення на VTX без антени.",
+        "Заміни антену/коаксіал.",
+        "Якщо літали без антени — вихідний каскад зазвичай мертвий, заміна VTX."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    },
+    "c_vtx_dead_a": {
+      "type": "cause",
+      "id": "c_vtx_dead_a",
+      "cause": "Живлення, порт і антена ОК — несправний аналоговий VTX",
+      "fix_steps": [
+        "Підмінь VTX завідомо робочим для підтвердження.",
+        "Перевір температурний режим (перегрів від поганого тепловідводу).",
+        "За підтвердження — заміна VTX."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    }
+  }
+}

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Bohdan — Telegram-боти, лендинги, сайти-візитки</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Богдан — самоучка-розробник. Роблю Telegram-ботів, лендинги, сайти-візитки, веб-додатки та автоматизацію. Швидко, чесно, з результатом.">
+<meta name="keywords" content="telegram бот, лендинг, сайт візитка, веб розробник, автоматизація, n8n, python, javascript, Bohdan">
+<meta name="author" content="Bohdan">
+<meta name="theme-color" content="#0B0B0C">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Bohdan — Telegram-боти, лендинги, сайти">
+<meta property="og:description" content="Самоучка-розробник. 40+ проектів. Стек: python · js · n8n. Старт від 2000 грн.">
+<meta property="og:image" content="Images/og-cover.svg">
+<meta property="og:locale" content="uk_UA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bohdan — Telegram-боти, лендинги, сайти">
+<meta name="twitter:description" content="Самоучка-розробник. 40+ проектів.">
+<meta name="twitter:image" content="Images/og-cover.svg">
+<link rel="icon" type="image/svg+xml" href="Images/favicon.svg">
+<link rel="apple-touch-icon" href="Images/favicon.svg">
+<link rel="canonical" href="/">
+<link rel="alternate" hreflang="uk" href="/">
+<link rel="alternate" hreflang="en" href="/?lang=en">
+<link rel="alternate" hreflang="ru" href="/?lang=ru">
+<link rel="alternate" hreflang="x-default" href="/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="format-detection" content="telephone=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Person",
+      "@id": "#bohdan",
+      "name": "Bohdan",
+      "jobTitle": "Web Developer",
+      "description": "Самоучка-розробник. Telegram-боти, лендинги, сайти-візитки, веб-додатки, автоматизація.",
+      "url": "/",
+      "knowsAbout": ["Telegram Bots", "Web Development", "Landing Pages", "Automation", "n8n", "Python", "JavaScript"]
+    },
+    {
+      "@type": "ProfessionalService",
+      "name": "Bohdan — Web Development",
+      "image": "/og-cover.svg",
+      "priceRange": "₴₴",
+      "description": "Telegram-боти, лендинги, сайти-візитки, веб-додатки, автоматизація. Старт від 2000 грн.",
+      "areaServed": "UA",
+      "provider": { "@id": "#bohdan" },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Послуги",
+        "itemListElement": [
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Telegram-бот" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Лендинг" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Сайт-візитка" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Веб-додаток" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Автоматизація n8n" } }
+        ]
+      }
+    },
+    {
+      "@type": "WebSite",
+      "url": "/",
+      "name": "Bohdan Portfolio",
+      "inLanguage": ["uk", "en", "ru"],
+      "publisher": { "@id": "#bohdan" }
+    }
+  ]
+}
+</script>
+<style>
+  html, body { margin: 0; padding: 0; background: #0B0B0C; color: #E8E6E1; font-family: "Inter", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="Scripts/config.js"></script>
+<script src="src/db.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lenis@1.1.20/dist/lenis.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="src/store.jsx"></script>
+<script type="text/babel" src="src/variants/price-calculator.jsx"></script>
+<script type="text/babel" src="src/variants/dark.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accent": "#E89B3C"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [editMode, setEditMode] = React.useState(false);
+  const [data, update] = useStore();
+  const [tweaks, setTweaks] = React.useState(() => ({ ...TWEAK_DEFAULTS, accent: (typeof loadStore === "function" ? loadStore().accent : null) || TWEAK_DEFAULTS.accent }));
+
+  // apply tweak accent to store only when user actively changes it in edit mode
+  const isFirstMount = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstMount.current) { isFirstMount.current = false; return; }
+    if (!editMode) return;
+    if (tweaks.accent && tweaks.accent !== data.accent) {
+      update(d => { d.accent = tweaks.accent; return d; });
+    }
+  }, [tweaks.accent]);
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === "__activate_edit_mode") setEditMode(true);
+      if (e.data?.type === "__deactivate_edit_mode") setEditMode(false);
+    };
+    window.addEventListener("message", handler);
+    window.parent.postMessage({ type: "__edit_mode_available" }, "*");
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  const setTweak = (key, val) => {
+    const next = { ...tweaks, [key]: val };
+    setTweaks(next);
+    window.parent.postMessage({ type: "__edit_mode_set_keys", edits: { [key]: val } }, "*");
+  };
+
+  const presets = [
+    { n: "Amber",  c: "#E89B3C" },
+    { n: "Blue",   c: "#4B7CF0" },
+    { n: "Green",  c: "#5CBF7F" },
+    { n: "Violet", c: "#9B6BE8" },
+    { n: "Pink",   c: "#E86BA0" },
+    { n: "Red",    c: "#E25C5C" },
+    { n: "Cyan",   c: "#4BC4D8" },
+    { n: "Lime",   c: "#A8D840" },
+  ];
+
+  return (
+    <>
+      <DarkSite />
+      {editMode && (
+        <div style={{ position: "fixed", right: 24, bottom: 24, width: 280, background: "#0F0F10", border: "1px solid #1F1E1B", borderRadius: 12, padding: 20, zIndex: 9999, fontFamily: '"Inter", sans-serif', color: "#E8E6E1", boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ fontFamily: "Instrument Serif, serif", fontSize: 22, marginBottom: 4 }}>Tweaks</div>
+          <div style={{ color: "#8B8982", fontSize: 12, marginBottom: 16 }}>Миттєва зміна акценту. Для повного редагування — <a href="admin.html" style={{ color: tweaks.accent }}>адмінка</a>.</div>
+          <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, color: "#5E5B54", letterSpacing: "0.1em", marginBottom: 8 }}>ACCENT</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 12 }}>
+            {presets.map(p => (
+              <button key={p.c} onClick={() => setTweak("accent", p.c)} title={p.n} style={{ height: 36, background: p.c, border: tweaks.accent === p.c ? "2px solid #E8E6E1" : "1px solid #1F1E1B", borderRadius: 6, cursor: "pointer" }} />
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="color" value={tweaks.accent} onChange={e => setTweak("accent", e.target.value)} style={{ width: 40, height: 32, border: "1px solid #1F1E1B", borderRadius: 6, background: "transparent", cursor: "pointer" }} />
+            <input value={tweaks.accent} onChange={e => setTweak("accent", e.target.value)} style={{ flex: 1, background: "#0B0B0C", border: "1px solid #1F1E1B", color: "#E8E6E1", padding: 8, fontSize: 12, borderRadius: 6, fontFamily: "JetBrains Mono, monospace" }} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

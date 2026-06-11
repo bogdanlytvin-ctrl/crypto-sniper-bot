@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}CLAUDE.md{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between page-header" style="margin-bottom:16px">
+  <div>
+    <h1>📋 CLAUDE.md</h1>
+    <p>Головний файл агентів — правила, ролі, протоколи, стек</p>
+  </div>
+  <div class="flex gap-8">
+    <button class="btn btn-ghost btn-sm" onclick="toggleEdit()">
+      <i class="fa fa-pen" id="editIcon"></i> <span id="editLabel">Редагувати</span>
+    </button>
+    <a href="/" class="btn btn-ghost btn-sm">← Дашборд</a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap">
+  {% set lines = content.split('\n')|length %}
+  {% set words = content.split()|length %}
+  <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--text2)">
+    <strong style="color:var(--text)">{{ lines }}</strong> рядків
+  </div>
+  <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--text2)">
+    <strong style="color:var(--text)">{{ words }}</strong> слів
+  </div>
+  <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--text2)">
+    <strong style="color:var(--text)">~{{ (content|length / 4)|int }}</strong> токенів
+  </div>
+  <div style="background:rgba(0,229,176,.1); border:1px solid rgba(0,229,176,.2); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--green)">
+    <i class="fa fa-circle-check"></i> 7 агентів активні
+  </div>
+</div>
+
+<!-- View mode -->
+<div class="card" id="viewMode">
+  <pre style="max-height:75vh; overflow-y:auto; background:transparent; border:none; padding:0; white-space:pre-wrap; font-size:13px; line-height:1.7; color:var(--text2)">{{ content }}</pre>
+</div>
+
+<!-- Edit mode (hidden by default) -->
+<form method="POST" action="/claude-md/save" id="editMode" style="display:none">
+  <div class="card" style="padding:12px">
+    <textarea name="content" class="form-control" id="editor"
+              style="font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.7;
+                     min-height:70vh; resize:vertical; background:var(--bg); color:var(--text2)">{{ content }}</textarea>
+  </div>
+  <div class="flex gap-8 mt-16">
+    <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Зберегти</button>
+    <button type="button" class="btn btn-ghost" onclick="toggleEdit()">Скасувати</button>
+    <span style="color:var(--text3); font-size:12px; align-self:center; margin-left:8px">
+      ⚠️ Зберігати тільки перевірений контент — агенти читають цей файл
+    </span>
+  </div>
+</form>
+
+<script>
+let editing = false;
+function toggleEdit() {
+  editing = !editing;
+  document.getElementById('viewMode').style.display = editing ? 'none' : 'block';
+  document.getElementById('editMode').style.display = editing ? 'block' : 'none';
+  document.getElementById('editIcon').className = editing ? 'fa fa-eye' : 'fa fa-pen';
+  document.getElementById('editLabel').textContent = editing ? 'Перегляд' : 'Редагувати';
+  if (editing) document.getElementById('editor').focus();
+}
+</script>
+{% endblock %}

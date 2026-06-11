@@ -63,24 +63,40 @@
     <nav class="col-md-2 sidebar d-none d-md-block">
       <div class="brand">🎯 Crypto Sniper</div>
 
-      <div class="nav-section">Основне</div>
-      <a href="{{ url_for('dashboard') }}"      class="{{ 'active' if request.endpoint=='dashboard' }}">📊 Dashboard</a>
-      <a href="{{ url_for('users') }}"           class="{{ 'active' if request.endpoint in ('users','user_detail') }}">👥 Користувачі</a>
-      <a href="{{ url_for('subscriptions') }}"   class="{{ 'active' if request.endpoint=='subscriptions' }}">💎 Підписки</a>
-      <a href="{{ url_for('payments') }}"        class="{{ 'active' if request.endpoint=='payments' }}">💳 Платежі</a>
+      <!-- Language toggle -->
+      <div style="padding:6px 20px 10px;display:flex;gap:6px">
+        <a href="{{ url_for('set_lang', lang='ua') }}"
+           style="padding:3px 8px;border-radius:4px;font-size:.8rem;text-decoration:none;
+                  background:{{ '#58a6ff22' if lang=='ua' else 'transparent' }};
+                  color:{{ '#58a6ff' if lang=='ua' else '#8b949e' }};border:1px solid {{ '#58a6ff44' if lang=='ua' else '#30363d' }}">
+          🇺🇦 UA
+        </a>
+        <a href="{{ url_for('set_lang', lang='en') }}"
+           style="padding:3px 8px;border-radius:4px;font-size:.8rem;text-decoration:none;
+                  background:{{ '#58a6ff22' if lang=='en' else 'transparent' }};
+                  color:{{ '#58a6ff' if lang=='en' else '#8b949e' }};border:1px solid {{ '#58a6ff44' if lang=='en' else '#30363d' }}">
+          🇬🇧 EN
+        </a>
+      </div>
 
-      <div class="nav-section">Торгівля</div>
-      <a href="{{ url_for('signals') }}"         class="{{ 'active' if request.endpoint=='signals' }}">📡 Сигнали</a>
-      <a href="{{ url_for('trades') }}"          class="{{ 'active' if request.endpoint=='trades' }}">💱 Угоди</a>
-      <a href="{{ url_for('positions') }}"       class="{{ 'active' if request.endpoint=='positions' }}">📦 Позиції</a>
+      <div class="nav-section">{{ UI.nav_main }}</div>
+      <a href="{{ url_for('dashboard') }}"      class="{{ 'active' if request.endpoint=='dashboard' }}">📊 {{ UI.nav_dashboard }}</a>
+      <a href="{{ url_for('users') }}"           class="{{ 'active' if request.endpoint in ('users','user_detail') }}">👥 {{ UI.nav_users }}</a>
+      <a href="{{ url_for('subscriptions') }}"   class="{{ 'active' if request.endpoint=='subscriptions' }}">💎 {{ UI.nav_subscriptions }}</a>
+      <a href="{{ url_for('payments') }}"        class="{{ 'active' if request.endpoint=='payments' }}">💳 {{ UI.nav_payments }}</a>
 
-      <div class="nav-section">Управління</div>
-      <a href="{{ url_for('broadcast') }}"       class="{{ 'active' if request.endpoint=='broadcast' }}">📢 Розсилка</a>
-      <a href="{{ url_for('settings') }}"        class="{{ 'active' if request.endpoint=='settings' }}">⚙️ Налаштування</a>
-      <a href="{{ url_for('audit') }}"           class="{{ 'active' if request.endpoint=='audit' }}">🔍 Аудит</a>
+      <div class="nav-section">{{ UI.nav_trading }}</div>
+      <a href="{{ url_for('signals') }}"         class="{{ 'active' if request.endpoint=='signals' }}">📡 {{ UI.nav_signals }}</a>
+      <a href="{{ url_for('trades') }}"          class="{{ 'active' if request.endpoint=='trades' }}">💱 {{ UI.nav_trades }}</a>
+      <a href="{{ url_for('positions') }}"       class="{{ 'active' if request.endpoint=='positions' }}">📦 {{ UI.nav_positions }}</a>
+
+      <div class="nav-section">{{ UI.nav_management }}</div>
+      <a href="{{ url_for('broadcast') }}"       class="{{ 'active' if request.endpoint=='broadcast' }}">📢 {{ UI.nav_broadcast }}</a>
+      <a href="{{ url_for('settings') }}"        class="{{ 'active' if request.endpoint=='settings' }}">⚙️ {{ UI.nav_settings }}</a>
+      <a href="{{ url_for('audit') }}"           class="{{ 'active' if request.endpoint=='audit' }}">🔍 {{ UI.nav_audit }}</a>
 
       <hr style="border-color:#30363d;margin:8px 20px">
-      <a href="{{ url_for('logout') }}" style="color:#f85149">🚪 Вийти</a>
+      <a href="{{ url_for('logout') }}" style="color:#f85149">🚪 {{ UI.nav_logout }}</a>
     </nav>
 
     <!-- Main content -->

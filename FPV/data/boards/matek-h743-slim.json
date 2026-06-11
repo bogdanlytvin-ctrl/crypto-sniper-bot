@@ -1,0 +1,33 @@
+{
+  "$comment": "DRAFT — типова конфігурація Mateksys H743-SLIM. НЕ звірено з мануалом. Звірити перед пайкою: https://www.mateksys.com",
+  "id": "matek-h743-slim",
+  "type": "flight_controller",
+  "brand": "Mateksys",
+  "model": "H743",
+  "revision": "SLIM",
+  "mcu": "STM32H743",
+  "firmware_target": { "betaflight": "MATEKH743", "inav": "MATEKH743" },
+  "voltage": {
+    "input_cells": "2S-8S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "VTX/периферія (Vx за джампером)" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": "plug", "inverted": false },
+    { "name": "UART7", "pads": ["T7", "R7"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 8,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }, { "name": "I2C2", "pads": ["SDA2", "SCL2"], "recommended_for": ["barometer", "any"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "dual_gyro"],
+  "known_issues": [
+    { "issue": "H743 — потужний чип, багато UART; легко переплутати призначення портів", "workaround": "Веди облік розводки, звіряй з мануалом Matek", "source_url": "https://www.mateksys.com" }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://www.mateksys.com"
+}

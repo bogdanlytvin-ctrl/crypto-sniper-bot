@@ -1,0 +1,127 @@
+{
+  "$comment": "DRAFT-дерево. Напруга сильно просідає під газом або занижена. Акумулятор / з'єднання / конденсатор / калібровка. НЕ звірено живим ремонтом.",
+  "id": "voltage-sag",
+  "symptom": "Просідає живлення / падає напруга",
+  "summary": "Напруга падає під газом або показується занижена. Від акумулятора до з'єднань і калібровки датчика.",
+  "applies_to": {},
+  "entry": "sag_when",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+  "nodes": {
+    "sag_when": {
+      "type": "check",
+      "id": "sag_when",
+      "instruction": "Коли і наскільки просідає напруга?",
+      "method": "multimeter",
+      "note": "Деяке просідання під газом — норма (залежить від C-rating і заряду). Сильне = акумулятор або з'єднання.",
+      "outcomes": [
+        { "label": "Сильно під газом, відновлюється у спокої", "next": "sag_battery" },
+        { "label": "Низька напруга навіть без навантаження", "next": "sag_idle" },
+        { "label": "Betaflight показує дивну напругу (невідповідну)", "next": "c_vbat_cal" }
+      ]
+    },
+    "sag_battery": {
+      "type": "check",
+      "id": "sag_battery",
+      "instruction": "Стан акумулятора: заряд, вік, C-rating, температура, здуття?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Старий / низький C-rating / розряджений / холодний / здутий", "next": "c_battery" },
+        { "label": "Акумулятор у нормі — дивись з'єднання", "next": "sag_connection" }
+      ]
+    },
+    "sag_connection": {
+      "type": "check",
+      "id": "sag_connection",
+      "instruction": "Огляньте XT60, пайку силових дротів і конденсатор живлення",
+      "method": "multimeter",
+      "outcomes": [
+        { "label": "Холодна пайка XT60/силових / поганий роз'єм", "next": "c_power_solder" },
+        { "label": "Відсутній / відірваний конденсатор", "next": "c_cap" },
+        { "label": "Усе ціле, просідання лишається", "next": "c_short_partial" }
+      ]
+    },
+    "sag_idle": {
+      "type": "check",
+      "id": "sag_idle",
+      "instruction": "Поміряй напругу акумулятора напряму — вона теж занижена відносно банок?",
+      "method": "multimeter",
+      "note": "Заряджена банка LiPo ≈4.2 В, 'порожня' ≈3.5 В. 6S повна ≈25.2 В.",
+      "outcomes": [
+        { "label": "Так, занижена і на самому акумуляторі", "next": "c_battery" },
+        { "label": "На акумуляторі норм, на платі занижена", "next": "c_power_solder" }
+      ]
+    },
+
+    "c_vbat_cal": {
+      "type": "cause",
+      "id": "c_vbat_cal",
+      "cause": "Невірна калібровка датчика напруги (проблема показу, не реального живлення)",
+      "fix_steps": [
+        "Power & Battery → відкалібруй Voltage Scale по реальному мультиметру.",
+        "Звір показ BF із виміряною напругою.",
+        "Save."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+      "est_minutes": 5
+    },
+    "c_battery": {
+      "type": "cause",
+      "id": "c_battery",
+      "cause": "Акумулятор: зношений / низький C-rating / розряджений / холодний / здутий",
+      "fix_steps": [
+        "Заряди / прогрій акумулятор; не використовуй здуті.",
+        "Перевір під навантаженням — сильне просідання = заміна.",
+        "Бери LiPo з достатнім C-rating під споживання дрона."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+      "est_minutes": 10
+    },
+    "c_power_solder": {
+      "type": "cause",
+      "id": "c_power_solder",
+      "cause": "Холодна пайка XT60 / силових дротів або поганий роз'єм",
+      "fix_steps": [
+        "Перепай майданчики XT60 і силові дроти (товстий припій, добрий прогрів).",
+        "Перевір обтиск/контакт роз'єму акумулятора.",
+        "Прозвони падіння напруги на з'єднанні під навантаженням."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+      "est_minutes": 15
+    },
+    "c_cap": {
+      "type": "cause",
+      "id": "c_cap",
+      "cause": "Відсутній / відірваний конденсатор живлення",
+      "fix_steps": [
+        "Встанови low-ESR конденсатор на вхід живлення (зменшує просідання й шум).",
+        "Полярність строго за маркуванням.",
+        "Перевір пайку конденсатора на холодну."
+      ],
+      "fix_action": "resolder",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+      "est_minutes": 10
+    },
+    "c_short_partial": {
+      "type": "cause",
+      "id": "c_short_partial",
+      "cause": "Частковий КЗ створює просадку під навантаженням",
+      "fix_steps": [
+        "Шукай гарячі точки / запах під навантаженням.",
+        "Перевір частковий міст припою, пробитий MOSFET/конденсатор.",
+        "За підтвердженого КЗ — не вмикати, локалізувати й усунути."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    }
+  }
+}

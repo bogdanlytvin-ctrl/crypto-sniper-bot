@@ -1,0 +1,31 @@
+{
+  "$comment": "DRAFT — типова конфігурація SpeedyBee F405 Mini. НЕ звірено з мануалом. Звірити перед пайкою: https://wiki.speedybee.com",
+  "id": "speedybee-f405-mini",
+  "type": "flight_controller",
+  "brand": "SpeedyBee",
+  "model": "F405 Mini",
+  "revision": "20x20",
+  "mcu": "STM32F405",
+  "firmware_target": { "betaflight": "SPEEDYBEEF405MINI", "inav": null },
+  "voltage": {
+    "input_cells": "3S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (VTX plug)", "inverted": false },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
+  ],
+  "motor_outputs": 4,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
+  "known_issues": [
+    { "issue": "Mini-формат 20x20 — менше виведених падів, перевір доступність UART", "workaround": "Плануй розводку під наявні пади", "source_url": "https://wiki.speedybee.com" }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://wiki.speedybee.com"
+}

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="mb-0">💳 Платежі</h4>
-  <span class="text-muted small">Всього: {{ total }}</span>
+  <h4 class="mb-0">💳 {{ UI.nav_payments }}</h4>
+  <span class="text-muted small">{{ 'Всього' if lang=='ua' else 'Total' }}: {{ total }}</span>
 </div>
 
 <!-- Revenue stats -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card stat-card stat-green p-3">
-      <div class="text-muted small">Дохід всього</div>
+      <div class="text-muted small">{{ 'Дохід всього' if lang=='ua' else 'Total revenue' }}</div>
       <div class="fs-3 fw-bold">${{ '%.2f'|format(revenue) }}</div>
     </div>
   </div>
@@ -18,7 +18,7 @@
     <div class="card stat-card {% if row.tier=='pro' %}stat-purple{% else %}stat-yellow{% endif %} p-3">
       <div class="text-muted small">
         {% if row.tier=='pro' %}🚀 Pro{% else %}💳 Basic{% endif %}
-        ({{ row.cnt }} оплат)
+        ({{ row.cnt }} {{ 'оплат' if lang=='ua' else 'paid' }})
       </div>
       <div class="fs-3 fw-bold">${{ '%.0f'|format(row.total) }}</div>
     </div>
@@ -31,18 +31,18 @@
   <form class="row g-2" method="GET">
     <div class="col-auto">
       <select name="status" class="form-select form-select-sm">
-        <option value="" {% if not status_f %}selected{% endif %}>Всі статуси</option>
-        <option value="paid"    {% if status_f=='paid' %}selected{% endif %}>✓ Оплачені</option>
-        <option value="pending" {% if status_f=='pending' %}selected{% endif %}>⏳ Очікують</option>
-        <option value="expired" {% if status_f=='expired' %}selected{% endif %}>✗ Протерміновані</option>
+        <option value="" {% if not status_f %}selected{% endif %}>{{ UI.all_statuses }}</option>
+        <option value="paid"    {% if status_f=='paid' %}selected{% endif %}>✓ {{ 'Оплачені' if lang=='ua' else 'Paid' }}</option>
+        <option value="pending" {% if status_f=='pending' %}selected{% endif %}>⏳ {{ 'Очікують' if lang=='ua' else 'Pending' }}</option>
+        <option value="expired" {% if status_f=='expired' %}selected{% endif %}>✗ {{ 'Протерміновані' if lang=='ua' else 'Expired' }}</option>
       </select>
     </div>
     <div class="col-auto">
-      <button type="submit" class="btn btn-sm btn-outline-secondary">Фільтр</button>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'Фільтр' if lang=='ua' else 'Filter' }}</button>
     </div>
     {% if status_f %}
     <div class="col-auto">
-      <a href="{{ url_for('payments') }}" class="btn btn-sm btn-outline-secondary">Скинути</a>
+      <a href="{{ url_for('payments') }}" class="btn btn-sm btn-outline-secondary">{{ 'Скинути' if lang=='ua' else 'Reset' }}</a>
     </div>
     {% endif %}
   </form>
@@ -53,8 +53,11 @@
   <table class="table table-hover mb-0">
     <thead>
       <tr>
-        <th>#</th><th>Користувач</th><th>Тариф</th><th>Сума</th>
-        <th>Статус</th><th>Invoice ID</th><th>Створено</th><th>Оплачено</th>
+        <th>#</th><th>{{ UI.user }}</th><th>{{ UI.tier }}</th>
+        <th>{{ UI.trades_amount }}</th><th>{{ UI.status }}</th>
+        <th>Invoice ID</th>
+        <th>{{ 'Створено' if lang=='ua' else 'Created' }}</th>
+        <th>{{ 'Оплачено' if lang=='ua' else 'Paid at' }}</th>
       </tr>
     </thead>
     <tbody>
@@ -92,7 +95,7 @@
       <td class="text-muted small">{{ p.paid_at[:10] if p.paid_at else '—' }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="8" class="text-center text-muted py-4">Платежів немає</td></tr>
+    <tr><td colspan="8" class="text-center text-muted py-4">{{ 'Платежів немає' if lang=='ua' else 'No payments' }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

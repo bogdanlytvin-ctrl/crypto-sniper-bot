@@ -1,0 +1,237 @@
+{
+  "$comment": "DRAFT-дерево. Діагностика відсутності лінку приймач↔пульт (ELRS/CRSF). Складено за логікою ExpressLRS + Betaflight. НЕ звірено живим ремонтом.",
+  "id": "no-rx-link",
+  "symptom": "Немає лінку з пультом / не біндиться",
+  "summary": "Пульт не керує дроном. Йдемо від світлодіода приймача: живлення → прив'язка → лінк → налаштування Betaflight.",
+  "applies_to": { "has": ["receiver"] },
+  "entry": "rx_led",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+  "nodes": {
+    "rx_led": {
+      "type": "check",
+      "id": "rx_led",
+      "instruction": "Який стан світлодіода приймача після ввімкнення?",
+      "method": "visual",
+      "note": "ELRS: рівне світло = є лінк; повільне блимання = немає прив'язки/model match; швидке = режим біндингу або завантаження; темний = немає живлення.",
+      "outcomes": [
+        { "label": "Темний, не світиться", "next": "rx_power_meas" },
+        { "label": "Швидке блимання (не біндиться)", "next": "bind_mode" },
+        { "label": "Повільне блимання (немає лінку)", "next": "link_check" },
+        { "label": "Рівне світло, але в Betaflight немає каналів", "next": "bf_serialrx" }
+      ]
+    },
+    "rx_power_meas": {
+      "type": "check",
+      "id": "rx_power_meas",
+      "instruction": "Поміряй напругу живлення приймача мультиметром",
+      "method": "multimeter",
+      "expected": "≈5 В (більшість ELRS/CRSF приймачів)",
+      "pad_ref": { "kind": "bec", "voltage": "5V" },
+      "outcomes": [
+        { "label": "0 В", "next": "rx_power_path" },
+        { "label": "Є ≈5 В", "next": "c_rx_dead" }
+      ]
+    },
+    "rx_power_path": {
+      "type": "check",
+      "id": "rx_power_path",
+      "instruction": "Огляньте пайку живлення RX (5V і GND) та провід",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Холодна пайка / обрив", "next": "c_cold_solder_rx" },
+        { "label": "Ціле, на паді теж 0 В", "next": "c_bec5_dead" }
+      ]
+    },
+    "bind_mode": {
+      "type": "check",
+      "id": "bind_mode",
+      "instruction": "Binding phrase на TX і RX однакова? Модуль передавача увімкнений?",
+      "method": "configurator",
+      "note": "ELRS прив'язується по binding phrase, прошитій у TX і RX — мають збігатися. Інакше — традиційний бінд кнопкою/3-кратним перезавантаженням.",
+      "outcomes": [
+        { "label": "Binding phrase різні / не налаштована", "next": "c_bind_phrase" },
+        { "label": "Phrase однакова, все одно не біндиться", "next": "c_fw_mismatch" },
+        { "label": "Модуль TX вимкнено / без живлення", "next": "c_tx_off" }
+      ]
+    },
+    "link_check": {
+      "type": "check",
+      "id": "link_check",
+      "instruction": "На пульті: модель/вихід увімкнено, не в failsafe, потужність TX не 0?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Модель вимкнена / TX power 0 / обрана інша модель", "next": "c_tx_model" },
+        { "label": "TX ок, RX все одно без лінку", "next": "c_antenna_rx" }
+      ]
+    },
+    "bf_serialrx": {
+      "type": "check",
+      "id": "bf_serialrx",
+      "instruction": "Betaflight → Ports: на UART приймача увімкнено Serial RX? Provider = CRSF?",
+      "method": "configurator",
+      "pad_ref": { "kind": "uart", "role": "receiver" },
+      "note": "Рівне світло = лінк TX↔RX є. Отже проблема між приймачем і польотником: UART або протокол.",
+      "outcomes": [
+        { "label": "Serial RX не увімкнено на тому UART", "next": "c_serialrx_port" },
+        { "label": "Provider не CRSF", "next": "c_protocol" },
+        { "label": "Усе вірно, каналів немає", "next": "c_rx_tx_swap" }
+      ]
+    },
+
+    "c_rx_dead": {
+      "type": "cause",
+      "id": "c_rx_dead",
+      "cause": "Живлення є, приймач не оживає — ймовірно несправний RX",
+      "fix_steps": [
+        "Підключи RX до завідомо робочого живлення/борта.",
+        "Якщо темний і там — несправний приймач.",
+        "Заміна приймача."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 20
+    },
+    "c_cold_solder_rx": {
+      "type": "cause",
+      "id": "c_cold_solder_rx",
+      "cause": "Холодна пайка / обрив живлення приймача",
+      "fix_steps": [
+        "Перепаяй пади 5V і GND приймача.",
+        "Прозвони провід від пада плати до RX.",
+        "Повторний вимір напруги."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 10
+    },
+    "c_bec5_dead": {
+      "type": "cause",
+      "id": "c_bec5_dead",
+      "cause": "Згорів 5V BEC живлення приймача",
+      "fix_steps": [
+        "Підтверди: на батареї є, на паді 5V — 0 В.",
+        "Тимчасово — живи RX від іншого справного 5V.",
+        "Системно — ремонт/заміна FC."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    },
+    "c_bind_phrase": {
+      "type": "cause",
+      "id": "c_bind_phrase",
+      "cause": "Binding phrase ELRS не збігається на TX і RX",
+      "fix_steps": [
+        "Пропиши однакову binding phrase у прошивці TX і RX.",
+        "Або зроби традиційний бінд (кнопка / 3 перезавантаження RX у режим bind).",
+        "Перевір model match на пульті."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://www.expresslrs.org/quick-start/binding/",
+      "est_minutes": 10
+    },
+    "c_fw_mismatch": {
+      "type": "cause",
+      "id": "c_fw_mismatch",
+      "cause": "Несумісні версії прошивки ELRS на TX і RX",
+      "fix_steps": [
+        "Звір мажорні версії ELRS на TX і RX (мають збігатися).",
+        "Онови обидва до однієї версії через ExpressLRS Configurator.",
+        "Повтори бінд."
+      ],
+      "fix_action": "reflash",
+      "confidence": "possible",
+      "source_url": "https://www.expresslrs.org/software/updating/",
+      "est_minutes": 30
+    },
+    "c_tx_off": {
+      "type": "cause",
+      "id": "c_tx_off",
+      "cause": "Модуль передавача вимкнено або без живлення",
+      "fix_steps": [
+        "Увімкни зовнішній ELRS-модуль або внутрішній RF на пульті.",
+        "Перевір контакт модуля в банановому відсіку.",
+        "Перевір рівень заряду пульта."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 5
+    },
+    "c_tx_model": {
+      "type": "cause",
+      "id": "c_tx_model",
+      "cause": "На пульті вимкнено модель/вихід, нульова потужність або обрана інша модель",
+      "fix_steps": [
+        "Вибери правильну модель у пульті.",
+        "Увімкни Internal/External RF та External module output.",
+        "Підніми TX power з 0."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 5
+    },
+    "c_antenna_rx": {
+      "type": "cause",
+      "id": "c_antenna_rx",
+      "cause": "Пошкоджена/відсутня антена приймача — короткий або відсутній лінк",
+      "fix_steps": [
+        "Огляньте антену RX і місце пайки коаксіалу.",
+        "Заміни антену приймача.",
+        "Перевір орієнтацію антен (не паралельно землі під час літа)."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://www.expresslrs.org/quick-start/getting-started/",
+      "est_minutes": 15
+    },
+    "c_serialrx_port": {
+      "type": "cause",
+      "id": "c_serialrx_port",
+      "cause": "Serial RX не призначено на UART приймача",
+      "fix_steps": [
+        "Betaflight → Ports: увімкни Serial RX на UART, до якого підпаяний приймач.",
+        "Save & Reboot.",
+        "Перевір канали у вкладці Receiver."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Rx-Setup",
+      "est_minutes": 5
+    },
+    "c_protocol": {
+      "type": "cause",
+      "id": "c_protocol",
+      "cause": "Невірний протокол приймача в Betaflight",
+      "fix_steps": [
+        "Receiver → Serial Receiver Provider = CRSF (для ELRS/Crossfire).",
+        "Save.",
+        "Перевір рух стіків у Receiver."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Rx-Setup",
+      "est_minutes": 5
+    },
+    "c_rx_tx_swap": {
+      "type": "cause",
+      "id": "c_rx_tx_swap",
+      "cause": "TX і RX переплутані (не навхрест)",
+      "fix_steps": [
+        "Лінія RX має йти навхрест: TX приймача → RX-пад плати і навпаки.",
+        "Перепай, якщо переплутано.",
+        "Перевір канали у Receiver."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Rx-Setup",
+      "est_minutes": 10
+    }
+  }
+}

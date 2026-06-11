@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Агенти{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>🤖 Агентський склад</h1>
+  <p>7 спеціалізованих агентів · паралельне виконання · пам'ять між сесіями</p>
+</div>
+
+<!-- Lifecycle -->
+<div class="card mb-20">
+  <div class="card-title">Lifecycle задачі</div>
+  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px">
+    {% set steps = [
+      ('🎯','Orchestrator','Пам\'ять + Питання','var(--purple)'),
+      ('→',None,None,None),
+      ('📋','Plan','Підтвердження','var(--purple)'),
+      ('→',None,None,None),
+      ('⚡','Code Agent','Код 2026','var(--green)'),
+      ('+',None,None,None),
+      ('🔍','Bug Hunter','Паралельно','var(--red)'),
+      ('→',None,None,None),
+      ('🛡️','Security','OWASP check','var(--orange)'),
+      ('→',None,None,None),
+      ('✅','Reviewer','+10% rule','var(--teal)'),
+      ('→',None,None,None),
+      ('📚','Memory','Звіт + Уроки','var(--lavender)'),
+    ] %}
+    {% for emoji, name, sub, color in steps %}
+      {% if name %}
+      <div style="background:var(--bg3); border:1px solid {{ color }}44; border-radius:9px; padding:7px 12px; color:{{ color }}; flex-shrink:0">
+        {{ emoji }} <strong>{{ name }}</strong>
+        {% if sub %}<br><span style="color:var(--text3); font-size:10px">{{ sub }}</span>{% endif %}
+      </div>
+      {% else %}
+      <span style="color:var(--text3); font-weight:700">{{ emoji }}</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Agent cards -->
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px">
+  {% for agent in agents %}
+  <div id="{{ agent.id }}" style="
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-top:3px solid {{ agent.color }};
+    border-radius:14px;
+    padding:22px;
+    transition:.2s;
+    position:relative;
+  " onmouseover="this.style.borderColor='{{ agent.color }}'"
+     onmouseout="this.style.borderTopColor='{{ agent.color }}'; this.style.borderRightColor='var(--border)'; this.style.borderBottomColor='var(--border)'; this.style.borderLeftColor='var(--border)'">
+
+    <!-- Header -->
+    <div class="flex items-center gap-12 mb-16">
+      <div style="font-size:32px; line-height:1">{{ agent.emoji }}</div>
+      <div>
+        <div style="font-size:16px; font-weight:700">{{ agent.name }}</div>
+        <div style="font-size:12px; color:var(--text2); margin-top:2px">{{ agent.role }}</div>
+      </div>
+      <span class="badge badge-active" style="margin-left:auto">Active</span>
+    </div>
+
+    <!-- Description -->
+    <p style="font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:14px">{{ agent.description }}</p>
+
+    <!-- Skills -->
+    <div style="margin-bottom:14px">
+      {% for skill in agent.skills %}
+      <span style="display:inline-block; background:var(--bg4); border:1px solid var(--border); border-radius:20px;
+                   padding:3px 9px; font-size:11px; color:var(--text2); margin:2px">{{ skill }}</span>
+      {% endfor %}
+    </div>
+
+    <!-- Trigger + Files -->
+    <div style="border-top:1px solid var(--border); padding-top:12px; margin-top:4px; font-size:12px; color:var(--text3)">
+      <div><strong style="color:var(--text2)">Тригер:</strong> {{ agent.trigger }}</div>
+      <div style="margin-top:4px"><strong style="color:var(--text2)">Файли:</strong>
+        {% for f in agent.files %}<code style="font-size:10px; margin-left:4px">{{ f }}</code>{% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Rules section -->
+<div class="grid-2 mt-20">
+  <div class="card">
+    <div class="card-title">🚫 Anti-Hallucination (абсолютні)</div>
+    <table class="data-table">
+      <thead><tr><th>Заборонено</th><th>Правило</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--red)">Вигадувати функцію</td><td><code>Grep "def fn"</code> спочатку</td></tr>
+        <tr><td style="color:var(--red)">Edit без Read</td><td><code>Read</code> → потім <code>Edit</code></td></tr>
+        <tr><td style="color:var(--red)">Стверджувати без перевірки</td><td>"Перевірю" → <code>Grep/Read</code></td></tr>
+        <tr><td style="color:var(--red)">Читати весь файл</td><td><code>Grep -n</code> → offset+limit</td></tr>
+        <tr><td style="color:var(--red)">Ігнорувати уроки</td><td>LESSONS.md читати на старті</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚡ Token Efficiency</div>
+    <div style="font-size:13px; line-height:2; color:var(--text2)">
+      <div class="flex justify-between"><code>Glob "**/*.py"</code><span style="color:var(--text3)">~50 tok</span></div>
+      <div class="flex justify-between"><code>Grep pattern --type py</code><span style="color:var(--text3)">~100 tok</span></div>
+      <div class="flex justify-between"><code>Grep -n</code> конкретний файл<span style="color:var(--text3)">~100 tok</span></div>
+      <div class="flex justify-between"><code>Read offset+limit=40</code><span style="color:var(--text3)">~300 tok</span></div>
+      <div class="flex justify-between"><code>Edit</code> точний рядок<span style="color:var(--text3)">~200 tok</span></div>
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px" class="flex justify-between">
+        <strong style="color:var(--green)">Total ~750 tok</strong>
+        <span style="text-decoration:line-through; color:var(--red)">5000+ tok</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

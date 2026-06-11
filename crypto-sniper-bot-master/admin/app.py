@@ -51,10 +51,169 @@ def format_ts(ts) -> str:
 
 @app.context_processor
 def inject_globals():
+    today = _dt.date.today().isoformat()
+    lang  = session.get("admin_lang", "ua")
     return {
         "now_ts": time.time(),
+        "today": today,
         "totp_enabled": bool(ADMIN_TOTP_SECRET),
+        "lang": lang,
+        "UI": _UI.get(lang, _UI["ua"]),
     }
+
+
+# ── Admin UI translations ─────────────────────────────────────────────────────
+
+_UI = {
+    "ua": {
+        # Sidebar
+        "nav_main":          "Основне",
+        "nav_trading":       "Торгівля",
+        "nav_management":    "Управління",
+        "nav_dashboard":     "Dashboard",
+        "nav_users":         "Користувачі",
+        "nav_subscriptions": "Підписки",
+        "nav_payments":      "Платежі",
+        "nav_signals":       "Сигнали",
+        "nav_trades":        "Угоди",
+        "nav_positions":     "Позиції",
+        "nav_broadcast":     "Розсилка",
+        "nav_settings":      "Налаштування",
+        "nav_audit":         "Аудит",
+        "nav_logout":        "Вийти",
+        # Common
+        "actions":           "Дії",
+        "user":              "Користувач",
+        "status":            "Статус",
+        "tier":              "Тариф",
+        "date":              "Дата",
+        "save":              "Зберегти",
+        "cancel":            "Скасувати",
+        "search":            "Пошук",
+        "ban":               "Заблокувати",
+        "unban":             "Розблокувати",
+        "all_tiers":         "Всі тарифи",
+        "all_chains":        "Всі ланцюги",
+        "all_statuses":      "Всі статуси",
+        # Dashboard
+        "db_title":          "Dashboard",
+        "db_users":          "Користувачів",
+        "db_signals_today":  "Сигналів сьогодні",
+        "db_active_subs":    "Активних підписок",
+        "db_open_pos":       "Відкритих позицій",
+        "db_revenue":        "Дохід (USD)",
+        "db_trades":         "Угод усього",
+        # Users
+        "users_title":       "Користувачі",
+        "users_id":          "ID",
+        "users_name":        "Ім'я",
+        "users_username":    "Username",
+        "users_lang":        "Мова",
+        "users_registered":  "Реєстрація",
+        "users_signals":     "Сигналів",
+        # Settings
+        "settings_title":    "Налаштування бота",
+        "settings_key":      "Ключ",
+        "settings_value":    "Значення",
+        "settings_saved":    "Збережено",
+        # Signals
+        "signals_title":     "Сигнали",
+        "sig_chain":         "Ланцюг",
+        "sig_token":         "Токен",
+        "sig_score":         "Скор",
+        "sig_type":          "Тип",
+        "sig_liq":           "Ліквідність",
+        "sig_vol":           "Обсяг 1г",
+        "sig_chg":           "Зміна",
+        # Positions
+        "pos_title":         "Позиції",
+        "pos_token":         "Токен",
+        "pos_amount":        "Кількість",
+        "pos_buy_price":     "Ціна купівлі",
+        "pos_sl":            "Stop-loss",
+        "pos_opened":        "Відкрито",
+        # Trades
+        "trades_title":      "Угоди",
+        "trades_type":       "Тип",
+        "trades_amount":     "Сума",
+        "trades_status":     "Статус",
+        "trades_tx":         "TX Hash",
+    },
+    "en": {
+        # Sidebar
+        "nav_main":          "Main",
+        "nav_trading":       "Trading",
+        "nav_management":    "Management",
+        "nav_dashboard":     "Dashboard",
+        "nav_users":         "Users",
+        "nav_subscriptions": "Subscriptions",
+        "nav_payments":      "Payments",
+        "nav_signals":       "Signals",
+        "nav_trades":        "Trades",
+        "nav_positions":     "Positions",
+        "nav_broadcast":     "Broadcast",
+        "nav_settings":      "Settings",
+        "nav_audit":         "Audit",
+        "nav_logout":        "Logout",
+        # Common
+        "actions":           "Actions",
+        "user":              "User",
+        "status":            "Status",
+        "tier":              "Tier",
+        "date":              "Date",
+        "save":              "Save",
+        "cancel":            "Cancel",
+        "search":            "Search",
+        "ban":               "Ban",
+        "unban":             "Unban",
+        "all_tiers":         "All tiers",
+        "all_chains":        "All chains",
+        "all_statuses":      "All statuses",
+        # Dashboard
+        "db_title":          "Dashboard",
+        "db_users":          "Users",
+        "db_signals_today":  "Signals today",
+        "db_active_subs":    "Active subscriptions",
+        "db_open_pos":       "Open positions",
+        "db_revenue":        "Revenue (USD)",
+        "db_trades":         "Total trades",
+        # Users
+        "users_title":       "Users",
+        "users_id":          "ID",
+        "users_name":        "Name",
+        "users_username":    "Username",
+        "users_lang":        "Language",
+        "users_registered":  "Registered",
+        "users_signals":     "Signals",
+        # Settings
+        "settings_title":    "Bot Settings",
+        "settings_key":      "Key",
+        "settings_value":    "Value",
+        "settings_saved":    "Saved",
+        # Signals
+        "signals_title":     "Signals",
+        "sig_chain":         "Chain",
+        "sig_token":         "Token",
+        "sig_score":         "Score",
+        "sig_type":          "Type",
+        "sig_liq":           "Liquidity",
+        "sig_vol":           "Vol 1h",
+        "sig_chg":           "Change",
+        # Positions
+        "pos_title":         "Positions",
+        "pos_token":         "Token",
+        "pos_amount":        "Amount",
+        "pos_buy_price":     "Buy price",
+        "pos_sl":            "Stop-loss",
+        "pos_opened":        "Opened",
+        # Trades
+        "trades_title":      "Trades",
+        "trades_type":       "Type",
+        "trades_amount":     "Amount",
+        "trades_status":     "Status",
+        "trades_tx":         "TX Hash",
+    },
+}
 
 
 # ── Security helpers ───────────────────────────────────────────────────────────
@@ -107,6 +266,16 @@ def _check_csrf() -> bool:
     form_token = request.form.get("csrf_token", "")
     sess_token = session.pop("csrf", "")
     return bool(sess_token and secrets.compare_digest(form_token, sess_token))
+
+
+# ── Language switch ───────────────────────────────────────────────────────────
+
+@app.route("/set_lang/<lang>")
+@login_required
+def set_lang(lang: str):
+    if lang in ("ua", "en"):
+        session["admin_lang"] = lang
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 # ── Auth ────────────────────────────────────────────────────────────────────────
@@ -414,17 +583,31 @@ def trades():
     page     = max(1, request.args.get("page", 1, type=int))
     per_page = 30
     offset   = (page - 1) * per_page
+    status_f = request.args.get("status", "")
+    pnl_f    = request.args.get("pnl", "")
+
+    where_parts, params = [], []
+    if status_f in ("open", "closed"):
+        where_parts.append("t.status=?")
+        params.append(status_f)
+    if pnl_f == "profit":
+        where_parts.append("COALESCE(t.pnl_usd, 0) > 0")
+    elif pnl_f == "loss":
+        where_parts.append("COALESCE(t.pnl_usd, 0) <= 0")
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
     with db.get_conn() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
-        rows  = conn.execute("""
+        total = conn.execute(f"SELECT COUNT(*) FROM trades t {where_sql}", params).fetchone()[0]
+        rows  = conn.execute(f"""
             SELECT t.*, u.first_name, u.username
             FROM trades t JOIN users u ON u.id=t.user_id
-            ORDER BY t.created_at DESC LIMIT ? OFFSET ?
-        """, (per_page, offset)).fetchall()
+            {where_sql}
+            ORDER BY COALESCE(t.closed_at, t.created_at) DESC LIMIT ? OFFSET ?
+        """, params + [per_page, offset]).fetchall()
 
     return render_template("trades.html", trades=rows, page=page,
-                           total=total, per_page=per_page)
+                           total=total, per_page=per_page,
+                           status_f=status_f, pnl_f=pnl_f)
 
 
 # ── Positions ──────────────────────────────────────────────────────────────────
@@ -523,15 +706,38 @@ def payments():
 # ── Bot Settings ───────────────────────────────────────────────────────────────
 
 _SETTINGS_META = {
-    "min_signal_score":    ("Мін. score для надсилання сигналів",    "int",   "0–100"),
-    "free_daily_signals":  ("Free: сигналів/день",                   "int",   "0 = без ліміту"),
-    "basic_daily_signals": ("Basic: сигналів/день",                  "int",   "0 = без ліміту"),
-    "pro_daily_signals":   ("Pro: сигналів/день",                    "int",   "0 = без ліміту"),
-    "basic_price_usd":     ("Ціна Basic ($)",                        "float", "USD"),
-    "pro_price_usd":       ("Ціна Pro ($)",                          "float", "USD"),
-    "basic_duration_days": ("Basic: тривалість (днів)",              "int",   ""),
-    "pro_duration_days":   ("Pro: тривалість (днів)",                "int",   ""),
-    "maintenance_mode":    ("Режим обслуговування (0/1)",            "int",   "1 = вимкнути сигнали"),
+    "free_min_score":      ("🆓 Free: мін. score",    "int",   "0–100"),
+    "basic_min_score":     ("💳 Basic: мін. score",   "int",   "0–100"),
+    "pro_min_score":       ("🚀 Pro: мін. score",     "int",   "0–100"),
+    "min_signal_score":    ("🌐 Global min score",    "int",   "0–100"),
+    "free_daily_signals":  ("🆓 Free: сигналів/день", "int",   "0=∞"),
+    "basic_daily_signals": ("💳 Basic: сигналів/день","int",   "0=∞"),
+    "pro_daily_signals":   ("🚀 Pro: сигналів/день",  "int",   "0=∞"),
+    "chain_solana_enabled":        ("◎ Solana chain enabled",     "int",   "0/1"),
+    "chain_bsc_enabled":           ("🔶 BSC chain enabled",        "int",   "0/1"),
+    "source_pancake_enabled":      ("Pancake source enabled",      "int",   "0/1"),
+    "source_gecko_solana_enabled": ("Gecko Solana source enabled", "int",   "0/1"),
+    "source_gecko_bsc_enabled":    ("Gecko BSC source enabled",    "int",   "0/1"),
+    "source_dex_enabled":          ("DexScreener source enabled",  "int",   "0/1"),
+    "source_pump_enabled":         ("pump.fun source enabled",     "int",   "0/1"),
+    "dex_allowlist":               ("DEX allowlist",               "text",  "comma-separated"),
+    "dex_blocklist":               ("DEX blocklist",               "text",  "comma-separated"),
+    "quality_min_score":           ("Quality gate: min score",        "int",   "0–100"),
+    "quality_min_liq_usd":         ("Quality gate: min liquidity USD","float", ">=0"),
+    "quality_min_vol_1h_usd":      ("Quality gate: min volume 1h USD","float", ">=0"),
+    "quality_min_vol_liq":         ("Quality gate: min vol/liq ratio","float", ">=0"),
+    "quality_min_txns_1h":         ("Quality gate: min txns 1h",      "int",   ">=0"),
+    "quality_min_buy_ratio":       ("Quality gate: min buy ratio",    "float", "0..1"),
+    "quality_max_red_1h":          ("Quality gate: max red 1h %",     "float", "negative"),
+    "pump_min_mcap_usd":           ("pump.fun: min market cap USD",   "float", ">=0"),
+    "pump_min_vsol_reserve":       ("pump.fun: min virtual SOL reserve","float", ">=0"),
+    "pump_min_replies":            ("pump.fun: min replies",          "int",   ">=0"),
+    "pump_require_koth_or_complete": ("pump.fun: require KOTH/complete", "int", "0/1"),
+    "basic_price_usd":     ("Basic ціна ($)",          "float", ""),
+    "pro_price_usd":       ("Pro ціна ($)",            "float", ""),
+    "basic_duration_days": ("Basic тривалість (днів)", "int",   ""),
+    "pro_duration_days":   ("Pro тривалість (днів)",   "int",   ""),
+    "maintenance_mode":    ("Maintenance mode (0/1)",  "int",   "1=стоп"),
 }
 
 
@@ -545,10 +751,12 @@ def settings():
 
         changes = []
         for key in _SETTINGS_META:
-            val = request.form.get(key, "").strip()
-            if val:
-                db.set_bot_setting(key, val)
-                changes.append(f"{key}={val}")
+            raw = request.form.get(key)
+            if raw is None:
+                continue
+            val = raw.strip()
+            db.set_bot_setting(key, val)
+            changes.append(f"{key}={val}")
 
         if changes:
             _audit("update_settings", "; ".join(changes))
@@ -657,5 +865,5 @@ def api_stats():
 
 if __name__ == "__main__":
     db.init_db()
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True, use_reloader=False)

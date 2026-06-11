@@ -128,76 +128,6 @@ async def get_bnb_balance(address: str) -> float:
         return 0.0
 
 
-async def get_sol_token_balance_raw(wallet_address: str, mint: str) -> tuple[int, int]:
-    """
-    Returns (raw_amount, decimals) for the given SPL token mint in the wallet.
-    raw_amount is in the smallest unit (i.e. amount * 10^decimals).
-    Returns (0, 0) if not found or on error.
-    """
-    payload = {
-        "jsonrpc": "2.0", "id": 1,
-        "method": "getTokenAccountsByOwner",
-        "params": [
-            wallet_address,
-            {"mint": mint},
-            {"encoding": "jsonParsed", "commitment": "confirmed"},
-        ],
-    }
-    try:
-        async with aiohttp.ClientSession() as s:
-            async with s.post(SOLANA_RPC, json=payload,
-                              timeout=aiohttp.ClientTimeout(total=10)) as r:
-                data = await r.json()
-                accounts = data.get("result", {}).get("value", [])
-                if not accounts:
-                    return (0, 0)
-                info = (accounts[0].get("account", {})
-                                   .get("data", {})
-                                   .get("parsed", {})
-                                   .get("info", {}))
-                ta       = info.get("tokenAmount", {})
-                decimals = int(ta.get("decimals", 0))
-                raw_amt  = int(ta.get("amount", 0))
-                return (raw_amt, decimals)
-    except Exception as e:
-        logger.error("SOL token balance raw error: %s", e)
-        return (0, 0)
-
-
-async def get_bsc_token_balance_raw(wallet_address: str, token_address: str) -> tuple[int, int]:
-    """
-    Returns (raw_amount, decimals) for the given BEP-20 token.
-    Uses eth_call on balanceOf + decimals.
-    """
-    _ERC20_BALANCE_ABI = [
-        {"inputs":[{"name":"account","type":"address"}],
-         "name":"balanceOf","outputs":[{"name":"","type":"uint256"}],
-         "stateMutability":"view","type":"function"},
-        {"inputs":[],"name":"decimals",
-         "outputs":[{"name":"","type":"uint8"}],
-         "stateMutability":"view","type":"function"},
-    ]
-    try:
-        import asyncio as _asyncio
-
-        def _read():
-            from web3 import Web3  # type: ignore
-            w3 = Web3(Web3.HTTPProvider(BSC_RPC))
-            contract = w3.eth.contract(
-                address=w3.to_checksum_address(token_address),
-                abi=_ERC20_BALANCE_ABI,
-            )
-            decimals = contract.functions.decimals().call()
-            balance  = contract.functions.balanceOf(
-                w3.to_checksum_address(wallet_address)).call()
-            return (balance, decimals)
-
-        return await _asyncio.to_thread(_read)
-    except Exception as e:
-        logger.error("BSC token balance raw error: %s", e)
-        return (0, 0)
-
-
 def is_valid_solana_address(address: str) -> bool:
     import re
     return bool(re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', address))
@@ -206,26 +136,3 @@ def is_valid_solana_address(address: str) -> bool:
 def is_valid_evm_address(address: str) -> bool:
     import re
     return bool(re.match(r'^0x[0-9a-fA-F]{40}$', address))
-
-
-def is_valid_solana_private_key(pk: str) -> bool:
-    """
-    Accepts either:
-      - Base58-encoded 64-byte keypair  (87-88 chars)
-      - Base58-encoded 32-byte seed     (43-44 chars)
-    """
-    import base58  # type: ignore
-    try:
-        decoded = base58.b58decode(pk.strip())
-        return len(decoded) in (32, 64)
-    except Exception:
-        return False
-
-
-def is_valid_bsc_private_key(pk: str) -> bool:
-    """Hex private key, 64 hex chars, optional 0x prefix."""
-    import re
-    clean = pk.strip()
-    if clean.startswith("0x") or clean.startswith("0X"):
-        clean = clean[2:]
-    return bool(re.match(r'^[0-9a-fA-F]{64}$', clean))

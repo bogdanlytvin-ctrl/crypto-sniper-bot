@@ -806,6 +806,55 @@ def audit():
     return render_template("audit.html", logs=logs)
 
 
+# ── Blacklist ──────────────────────────────────────────────────────────────────
+
+@app.route("/blacklist", methods=["GET", "POST"])
+@login_required
+def blacklist():
+    if request.method == "POST":
+        if not _check_csrf():
+            flash("CSRF error.")
+            return redirect(url_for("blacklist"))
+
+        action = request.form.get("action", "")
+        if action == "add":
+            chain   = request.form.get("chain", "all").strip()
+            addr    = request.form.get("token_address", "").strip()
+            reason  = request.form.get("reason", "").strip()
+            if addr:
+                db.add_to_blacklist(chain, addr, reason)
+                _audit("blacklist_add", f"chain={chain} addr={addr} reason={reason}")
+                flash(f"Токен {addr[:12]}... додано до чорного списку.")
+            else:
+                flash("Адреса токена обов'язкова.")
+        elif action == "remove":
+            addr = request.form.get("token_address", "").strip()
+            if addr:
+                db.remove_from_blacklist(addr)
+                _audit("blacklist_remove", f"addr={addr}")
+                flash(f"Токен {addr[:12]}... видалено з чорного списку.")
+
+        return redirect(url_for("blacklist"))
+
+    entries = db.get_blacklist()
+    return render_template("blacklist.html", entries=entries, csrf_token=_csrf_token())
+
+
+# ── Logs (trade history + performance) ─────────────────────────────────────────
+
+@app.route("/logs")
+@login_required
+def logs():
+    with db.get_conn() as conn:
+        trades_log = conn.execute("""
+            SELECT t.*, u.first_name, u.username
+            FROM trades t JOIN users u ON u.id=t.user_id
+            ORDER BY t.created_at DESC LIMIT 100
+        """).fetchall()
+    perf = db.get_bot_performance()
+    return render_template("logs.html", trades_log=trades_log, perf=perf)
+
+
 # ── API: quick stats for dashboard refresh ─────────────────────────────────────
 
 @app.route("/api/stats")

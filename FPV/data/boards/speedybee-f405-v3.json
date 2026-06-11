@@ -1,0 +1,33 @@
+{
+  "$comment": "DRAFT — типова конфігурація SpeedyBee F405 V3. НЕ звірено з мануалом. Звірити кожен UART/BEC перед пайкою: https://wiki.speedybee.com",
+  "id": "speedybee-f405-v3",
+  "type": "flight_controller",
+  "brand": "SpeedyBee",
+  "model": "F405",
+  "revision": "V3",
+  "mcu": "STM32F405",
+  "firmware_target": { "betaflight": "SPEEDYBEEF405V3", "inav": "SPEEDYBEEF405V3" },
+  "voltage": {
+    "input_cells": "3S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX (DJI/Vista)" }
+    ]
+  },
+  "uarts": [
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (DJI plug)", "inverted": false, "notes": "Виведений на роз'єм для цифрового VTX разом з 9V" },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади + pinheader", "inverted": false, "notes": "Стандартне місце ELRS/CRSF приймача" },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false, "notes": "Рекомендоване місце для GPS" },
+    { "name": "UART5", "pads": ["T5", "R5"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "8-pin ESC plug", "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false, "notes": "SmartAudio/Tramp для аналогового VTX" }
+  ],
+  "motor_outputs": 8,
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "bluetooth"],
+  "known_issues": [
+    { "issue": "F405 не має апаратних інверторів — SBUS напряму на звичайний RX-пад не працює", "workaround": "ELRS/CRSF або окремий SBUS-пад", "source_url": "https://betaflight.com/docs/wiki" }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://wiki.speedybee.com"
+}

@@ -94,6 +94,8 @@
       <a href="{{ url_for('broadcast') }}"       class="{{ 'active' if request.endpoint=='broadcast' }}">📢 {{ UI.nav_broadcast }}</a>
       <a href="{{ url_for('settings') }}"        class="{{ 'active' if request.endpoint=='settings' }}">⚙️ {{ UI.nav_settings }}</a>
       <a href="{{ url_for('audit') }}"           class="{{ 'active' if request.endpoint=='audit' }}">🔍 {{ UI.nav_audit }}</a>
+      <a href="{{ url_for('blacklist') }}"       class="{{ 'active' if request.endpoint=='blacklist' }}">🚫 Blacklist</a>
+      <a href="{{ url_for('logs') }}"            class="{{ 'active' if request.endpoint=='logs' }}">📋 Logs</a>
 
       <hr style="border-color:#30363d;margin:8px 20px">
       <a href="{{ url_for('logout') }}" style="color:#f85149">🚪 {{ UI.nav_logout }}</a>

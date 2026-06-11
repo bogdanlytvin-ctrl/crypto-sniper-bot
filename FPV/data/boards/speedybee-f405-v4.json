@@ -1,0 +1,103 @@
+{
+  "$comment": "ПРИКЛАД заповненого профілю. Дані наведені за типовою конфігурацією SpeedyBee F405 V4 — ПЕРЕД ПУБЛІКАЦІЄЮ кожне поле звірити з офіційним мануалом: https://wiki.speedybee.com (status: draft, поки не звірено!)",
+  "id": "speedybee-f405-v4",
+  "type": "flight_controller",
+  "brand": "SpeedyBee",
+  "model": "F405",
+  "revision": "V4",
+  "mcu": "STM32F405",
+  "firmware_target": {
+    "betaflight": "SPEEDYBEEF405V4",
+    "inav": "SPEEDYBEEF405V4"
+  },
+  "voltage": {
+    "input_cells": "3S-6S",
+    "bec_outputs": [
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX (DJI O3 / Vista)" },
+      { "voltage": "4V5", "max_current_a": 1.0, "notes": "живиться від USB — для налаштування RX без батареї" }
+    ]
+  },
+  "uarts": [
+    {
+      "name": "UART1",
+      "pads": ["T1", "R1"],
+      "default_function": null,
+      "recommended_for": ["vtx_digital"],
+      "connector": "SH1.0 6-pin (DJI plug)",
+      "inverted": false,
+      "notes": "Виведений на роз'єм для DJI O3/Vista разом з 9V"
+    },
+    {
+      "name": "UART2",
+      "pads": ["T2", "R2"],
+      "default_function": "Receiver",
+      "recommended_for": ["receiver"],
+      "connector": "пади + 4-pin pinheader",
+      "inverted": false,
+      "notes": "Стандартне місце для ELRS/CRSF приймача"
+    },
+    {
+      "name": "UART3",
+      "pads": ["T3", "R3"],
+      "default_function": null,
+      "recommended_for": ["any", "camera_control"],
+      "connector": null,
+      "inverted": false
+    },
+    {
+      "name": "UART4",
+      "pads": ["T4", "R4"],
+      "default_function": null,
+      "recommended_for": ["gps"],
+      "connector": null,
+      "inverted": false,
+      "notes": "Рекомендоване місце для GPS (M10 та подібних)"
+    },
+    {
+      "name": "UART5",
+      "pads": ["T5", "R5"],
+      "default_function": "ESC telemetry",
+      "recommended_for": ["esc_telemetry"],
+      "connector": "8-pin ESC plug",
+      "inverted": false,
+      "notes": "RX5 зайнятий телеметрією ESC у стеку SpeedyBee"
+    },
+    {
+      "name": "UART6",
+      "pads": ["T6", "R6"],
+      "default_function": null,
+      "recommended_for": ["vtx_analog_control", "any"],
+      "connector": null,
+      "inverted": false,
+      "notes": "SmartAudio/Tramp для аналогового VTX"
+    }
+  ],
+  "motor_outputs": 8,
+  "i2c": [
+    {
+      "name": "I2C1",
+      "pads": ["SDA", "SCL"],
+      "recommended_for": ["compass"]
+    }
+  ],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "bluetooth"],
+  "known_issues": [
+    {
+      "issue": "F405 (як і всі F4) не має апаратних інверторів — SBUS-приймачі напряму на звичайний RX-пад не працюють",
+      "workaround": "Використовувати CRSF/ELRS, або SBUS-пад якщо виведений окремо",
+      "source_url": "https://betaflight.com/docs/wiki"
+    },
+    {
+      "issue": "При живленні від USB 9V BEC не активний — DJI юніт не вмикається без батареї",
+      "workaround": "Підключати LiPo для тестів відеолінку",
+      "source_url": ""
+    }
+  ],
+  "verified": {
+    "status": "draft",
+    "checked_by": "",
+    "date": "2026-06-10"
+  },
+  "source_url": "https://wiki.speedybee.com"
+}

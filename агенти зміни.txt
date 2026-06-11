@@ -1,0 +1,1899 @@
+Для красивих SaaS-сайтів, лендингів і Telegram/WebApp ботів тобі зараз не вистачає не “ще одного агента”, а саме DESIGN SYSTEM + FRONTEND UX PIPELINE.
+
+Зараз у тебе сильна backend/logic система. Але “дорогий вигляд” робиться іншими правилами.
+
+# Що конкретно треба поміняти
+
+---
+
+# 1. Додай UI/UX DESIGN AGENT — це критично
+
+Зараз Code Agent думає як програміст.
+
+Треба окремий агент який думає як:
+
+* product designer
+* SaaS designer
+* conversion designer
+
+---
+
+## Що має робити UI/UX Agent
+
+### Аналіз:
+
+* visual hierarchy
+* spacing consistency
+* typography scale
+* CTA visibility
+* mobile UX
+* cognitive overload
+
+### Автоматично:
+
+* підбирає layout
+* вибирає section order
+* контролює whitespace
+* не дає “налепити блоків”
+
+---
+
+# 2. Заборонити “backend-style frontend”
+
+Це найбільша проблема AI-generated сайтів.
+
+AI часто робить:
+
+* 20 бордерів
+* random colors
+* дуже багато тексту
+* маленькі відступи
+* все однакового розміру
+* кнопки без акцентів
+
+Треба прямо прописати правила.
+
+---
+
+# 3. Додай DESIGN RULES.md
+
+Це дуже важливо.
+
+Там повинні бути жорсткі правила.
+
+---
+
+## Наприклад:
+
+### Typography
+
+```txt id="7znwtv"
+НЕ використовувати більше:
+- 2 font families
+- 4 font sizes
+- 3 text colors
+```
+
+---
+
+### Spacing
+
+```txt id="58f96q"
+Всі відступи тільки:
+4 8 12 16 24 32 48 64 96
+```
+
+---
+
+### Cards
+
+```txt id="i8e8df"
+border-radius:
+rounded-2xl
+
+НЕ використовувати:
+- жорсткі чорні border
+- box-shadow-xl всюди
+- gradients на всьому
+```
+
+---
+
+### Layout
+
+```txt id="9h4l7w"
+max-width:
+1280px
+
+Контент:
+не більше 2-3 колонок
+```
+
+---
+
+# 4. Додай VISUAL REVIEW AGENT
+
+Оце дуже сильна штука.
+
+Він повинен:
+
+* робити screenshot
+* аналізувати UI
+* перевіряти alignment
+* consistency
+* contrast
+* whitespace
+
+---
+
+## Має бачити проблеми типу:
+
+* кнопка злиплась
+* різні padding
+* текст “стрибає”
+* немає visual focus
+* mobile overflow
+* занадто багато кольорів
+
+---
+
+# 5. Зміни стек для UI
+
+Якщо хочеш реально дорогий вигляд — стек дуже важливий.
+
+---
+
+## Для SaaS сайтів
+
+### Найкраще:
+
+* Next.js 15
+* Tailwind v4
+* shadcn/ui
+* Framer Motion
+* Lucide Icons
+
+---
+
+## Не використовуй:
+
+* Bootstrap для SaaS
+* jQuery
+* random CSS
+* inline styles
+* Material UI everywhere
+
+Bootstrap = “звичайний сайт”.
+shadcn + Tailwind = modern SaaS look.
+
+---
+
+# 6. Додай COMPONENT LIBRARY MEMORY
+
+Щоб AI не генерував кожен раз новий стиль.
+
+---
+
+## Структура:
+
+```txt id="w6vghm"
+components/
+  ui/
+  marketing/
+  dashboard/
+  pricing/
+  testimonials/
+```
+
+---
+
+## І агент повинен знати:
+
+```txt id="q7v4m3"
+Buttons:
+- primary
+- secondary
+- ghost
+
+Cards:
+- pricing
+- stats
+- feature
+- testimonial
+```
+
+---
+
+# 7. Заборони AI робити “random UI”
+
+Прямо правила:
+
+```txt id="8p0azr"
+НЕ створювати новий стиль кнопок якщо вже існує Button component
+```
+
+```txt id="rt3u5u"
+НЕ використовувати inline CSS
+```
+
+```txt id="k7zqpx"
+НЕ створювати custom colors без design tokens
+```
+
+---
+
+# 8. Додай DESIGN TOKENS
+
+Це mega important.
+
+---
+
+## colors.ts
+
+```ts id="v4a58v"
+primary
+secondary
+background
+muted
+border
+success
+danger
+```
+
+---
+
+## spacing.ts
+
+```ts id="2mn7th"
+xs
+sm
+md
+lg
+xl
+```
+
+---
+
+## typography.ts
+
+```ts id="h36x2j"
+h1
+h2
+body
+caption
+```
+
+---
+
+# 9. Додай LANDING PAGE SPECIALIST
+
+Бо SaaS landing ≠ dashboard.
+
+---
+
+## Він повинен знати:
+
+### Правильна структура:
+
+1. Hero
+2. Social proof
+3. Problem
+4. Solution
+5. Features
+6. Demo
+7. Pricing
+8. FAQ
+9. CTA
+
+---
+
+## І:
+
+* copywriting
+* CTA placement
+* conversion psychology
+* section rhythm
+
+---
+
+# 10. Додай MICRO-INTERACTIONS AGENT
+
+Саме це дає “дорогий” вигляд.
+
+---
+
+## Що робить:
+
+* hover animations
+* smooth transitions
+* stagger animations
+* loading skeletons
+* animated counters
+* modal transitions
+
+---
+
+## Але правило:
+
+```txt id="c7cs8n"
+animation-duration:
+150ms - 300ms
+```
+
+Не робити “ігровий сайт”.
+
+---
+
+# 11. Для Telegram WebApp
+
+Тут окремі правила.
+
+---
+
+## Треба:
+
+* великі tap zones
+* fixed bottom actions
+* skeleton loading
+* swipe-friendly UI
+* мінімум тексту
+* темна тема
+
+---
+
+## І:
+
+Telegram users люблять:
+
+* швидко
+* чисто
+* без перегрузу
+
+---
+
+# 12. Додай SCREENSHOT TRAINING
+
+Це дуже сильна штука.
+
+Збираєш:
+
+* Stripe
+* Linear
+* Notion
+* Vercel
+* Framer
+* Raycast
+* Supabase
+* OpenAI
+
+І агент аналізує:
+
+* spacing
+* typography
+* section rhythm
+* shadows
+* layout density
+
+---
+
+# 13. Найважливіше — QUALITY MODE
+
+Прямо режим:
+
+```txt id="5ppntc"
+MODE:
+PREMIUM_SAAS_UI
+```
+
+---
+
+## В ньому:
+
+* мінімум тексту
+* багато whitespace
+* одна акцентна кнопка
+* typography-first
+* clean sections
+* consistent radius
+* muted backgrounds
+* smooth motion
+
+---
+
+# 14. Додай “ANTI-UGLY RULES”
+
+Серйозно.
+
+---
+
+## Заборонити:
+
+* gradients everywhere
+* neon colors
+* 5+ colors
+* giant shadows
+* tiny text
+* centered long paragraphs
+* cards inside cards inside cards
+* 20 buttons on screen
+
+---
+
+# 15. Найсильніше що можеш зробити
+
+Додай:
+
+# DESIGN CRITIC AGENT
+
+Він не пише код.
+
+Він критикує дизайн.
+
+---
+
+## Наприклад:
+
+```txt id="jx9vzw"
+Проблеми:
+- Hero section занадто висока
+- CTA губиться
+- Немає visual hierarchy
+- Feature cards однакової ваги
+- Dashboard overloaded
+- Typography scale слабка
+
+Рекомендації:
+- Збільшити h1
+- Зменшити secondary text
+- Додати spacing між sections
+- Прибрати 2 кольори
+```
+
+---
+
+# Головне що реально змінить якість
+
+Оце топ-5:
+
+1. shadcn/ui + Tailwind
+2. Design Rules
+3. Visual Review Agent
+4. Component Library
+5. Screenshot-based inspiration system
+
+---
+
+# І ще дуже важлива річ
+
+Красиві SaaS сайти = НЕ “більше дизайну”.
+
+Навпаки.
+
+Це:
+
+* менше шуму
+* менше кольорів
+* більше whitespace
+* краща typography
+* кращий ритм
+* правильна композиція
+
+Саме це AI поки найчастіше ламає. Ні, це ще не “ідеальний стек”. Але це вже дуже сильна база.
+Те що ти будуєш — це вже рівень mini-IDE + AI engineering platform, а не просто “Claude Code setup”.
+
+Але зараз у тебе є одна велика проблема:
+
+# У тебе сильні агенти, але слабкий CONTROL LAYER
+
+Тобто:
+
+* агенти є
+* логіка є
+* памʼять є
+
+Але:
+
+* немає нормального orchestration UI
+* немає telemetry
+* немає execution graph
+* немає lifecycle management
+* немає learning pipeline
+
+Саме це зараз треба доробляти.
+
+---
+
+# Найважливіше що треба зараз
+
+# 1. WEB CONTROL PANEL — ОБОВʼЯЗКОВО
+
+Без цього система стане хаосом.
+
+Твоя панель зараз повинна бути не “красива html”, а центр управління AI-командою.
+
+---
+
+# Що має бути в панелі
+
+## Dashboard
+
+Показує:
+
+```txt id="m7h8jk"
+Tasks today: 14
+Success rate: 92%
+Avg task time: 11m
+Critical bugs: 1
+AI cost: $4.12
+Tests passed: 97%
+```
+
+---
+
+# Agent Status
+
+```txt id="9qjv4m"
+Orchestrator → ACTIVE
+Bug Hunter → SCANNING
+Reviewer → WAITING
+Security → PASSED
+```
+
+---
+
+# Live Logs
+
+Реально live stream:
+
+```txt id="5u3f84"
+[12:01] Reading MEMORY.md
+[12:02] Found 3 affected modules
+[12:03] Running Security Audit
+[12:03] WARNING: missing auth middleware
+```
+
+---
+
+# Task Graph (дуже важливо)
+
+Візуально:
+
+```txt id="m4k29n"
+Task
+ ├─ Code Agent
+ ├─ Test Agent
+ ├─ Security Agent
+ └─ Reviewer
+```
+
+І бачиш де зависло.
+
+---
+
+# Diff Viewer
+
+Показ:
+
+* що змінилось
+* який агент змінив
+* rollback
+* approve/reject
+
+---
+
+# Memory Center
+
+Не markdown-файли вручну.
+
+А UI:
+
+* lessons
+* bug history
+* architecture decisions
+* failed attempts
+* search
+
+---
+
+# 2. SELF-IMPROVEMENT SYSTEM
+
+Оце вже рівень “серйозної AI системи”.
+
+---
+
+## Але важливо:
+
+НЕ давати агентам самостійно міняти core rules.
+
+Інакше вони почнуть деградувати.
+
+---
+
+# Правильна модель:
+
+## Agents можуть:
+
+✅ пропонувати покращення
+✅ логувати патерни
+✅ виявляти проблеми
+✅ створювати recommendations
+
+---
+
+## Agents НЕ можуть:
+
+❌ самі міняти orchestration
+❌ самі міняти security rules
+❌ самі видаляти constraints
+❌ самі переписувати memory system
+
+---
+
+# Правильний pipeline
+
+```txt id="bkr58t"
+Agent proposal
+    ↓
+Review queue
+    ↓
+Human approve
+    ↓
+Apply changes
+```
+
+---
+
+# 3. EVENT BUS — дуже важливо
+
+Зараз у тебе агенти схожі на “окремі скрипти”.
+
+Треба event-driven architecture.
+
+---
+
+# Наприклад:
+
+```txt id="px8f9w"
+TASK_STARTED
+CODE_CHANGED
+BUG_FOUND
+SECURITY_FAILED
+TEST_FAILED
+TASK_COMPLETED
+LESSON_CREATED
+```
+
+---
+
+# Тоді агенти реагують на події.
+
+Наприклад:
+
+* Bug Hunter слухає CODE_CHANGED
+* Reviewer слухає TEST_PASSED
+* Memory Keeper слухає TASK_COMPLETED
+
+---
+
+# 4. CENTRAL DATABASE
+
+Markdown файли — ок на старті.
+
+Але далі треба:
+
+* PostgreSQL
+* або SQLite для локалки
+
+---
+
+# Чому:
+
+бо MEMORY.md скоро стане:
+
+* повільний
+* noisy
+* дублікати
+* context overflow
+
+---
+
+# Зберігати треба окремо:
+
+## tables:
+
+```txt id="xg4mnb"
+tasks
+agents
+lessons
+bugs
+reports
+decisions
+metrics
+prompts
+token_usage
+```
+
+---
+
+# 5. PROMPT VERSIONING
+
+Це дуже важливо.
+
+---
+
+# Бо:
+
+ти будеш міняти системні промпти агентів.
+
+І треба знати:
+
+* що змінилось
+* чому якість впала
+* яка версія краща
+
+---
+
+# Треба:
+
+```txt id="pnr3d6"
+orchestrator_prompt_v12
+reviewer_prompt_v7
+security_prompt_v4
+```
+
+---
+
+# 6. AI MEMORY ENGINE
+
+Зараз MEMORY.md — це “пасивна памʼять”.
+
+Треба:
+
+# ACTIVE MEMORY
+
+---
+
+# Вона повинна:
+
+* ранжувати lessons
+* шукати релевантні баги
+* compress old context
+* retrieve architecture patterns
+
+---
+
+# Найкраще:
+
+RAG memory.
+
+---
+
+# Наприклад:
+
+```txt id="3wtr4f"
+Current task:
+Telegram payments
+
+Retrieved:
+- previous payment race condition
+- subscription middleware lesson
+- webhook validation bug
+```
+
+---
+
+# 7. LOGGING SYSTEM
+
+ОБОВʼЯЗКОВО structured logging.
+
+---
+
+# Не:
+
+```python id="3dr7va"
+print("error")
+```
+
+---
+
+# А:
+
+```json id="nyh8mn"
+{
+  "agent": "security",
+  "event": "auth_failed",
+  "severity": "high",
+  "task_id": 194
+}
+```
+
+---
+
+# 8. AGENT PERFORMANCE TRACKING
+
+Ти повинен бачити:
+
+* який агент помиляється
+* хто найдовше працює
+* хто дає найбільше false positives
+
+---
+
+# Наприклад:
+
+```txt id="p5r4gv"
+Bug Hunter:
+precision 82%
+
+Reviewer:
+false positives 12%
+
+Security:
+critical catches 4
+```
+
+---
+
+# 9. PLAYBOOK SYSTEM
+
+Дуже сильна штука.
+
+---
+
+# Наприклад:
+
+## “Create SaaS Landing”
+
+це готовий сценарій:
+
+```txt id="e4jh7x"
+1. Generate layout
+2. Create sections
+3. Generate copy
+4. Create UI
+5. Responsive review
+6. SEO review
+7. Performance audit
+```
+
+---
+
+# І Orchestrator запускає playbook.
+
+---
+
+# 10. AUTONOMOUS MODE (але обережно)
+
+Можна зробити:
+
+```txt id="m4g92n"
+MODE:
+SAFE_AUTONOMOUS
+```
+
+---
+
+# Де:
+
+агенти самі:
+
+* роблять дрібні fixes
+* рефакторинг
+* cleanup
+* tests
+* optimization
+
+---
+
+# Але:
+
+тільки low-risk tasks.
+
+---
+
+# 11. SCREENSHOT + UI ANALYSIS
+
+Це мегаважливо для SaaS.
+
+---
+
+# Workflow:
+
+* агент запускає локальний сайт
+* робить screenshot
+* аналізує UI
+* шукає:
+
+  * overflow
+  * spacing issues
+  * ugly layout
+  * low contrast
+
+---
+
+# 12. MULTI-MODEL ROUTING
+
+Оце прям дуже сильний upgrade.
+
+---
+
+# Наприклад:
+
+```txt id="f8b7ut"
+Claude → architecture
+GPT → UI/copy
+Gemini → long context
+Kimi → fast edits
+```
+
+---
+
+# Orchestrator сам вибирає модель.
+
+---
+
+# Що реально зараз “топ”
+
+# Stack
+
+## Backend
+
+* Python 3.13
+* FastAPI
+* aiogram 3
+* SQLAlchemy 2
+* PostgreSQL
+* Redis
+* Celery/RQ
+
+---
+
+## Frontend
+
+* Next.js 15
+* Tailwind v4
+* shadcn/ui
+* Framer Motion
+
+---
+
+## AI Layer
+
+* Claude Code
+* Cursor/Kiro optional
+* OpenRouter
+* LiteLLM
+* LangGraph або власний orchestration
+
+---
+
+## Infra
+
+* Docker
+* Traefik/Nginx
+* GitHub Actions
+* Sentry
+* Prometheus/Grafana
+
+---
+
+# І головне
+
+НЕ намагайся зараз зробити “AGI studio”.
+
+Найкращі системи:
+
+* прості
+* модульні
+* контрольовані
+* observable
+
+---
+
+# Твоя головна задача зараз
+
+Не “ще більше агентів”.
+
+А:
+
+# reliability
+
+# observability
+
+# design quality
+
+# orchestration quality
+
+# memory quality
+
+Саме це відрізняє:
+“набір AI-скриптів”
+від
+“справжньої engineering platform”.
+
+Так, тут думка правильна.
+Але я б тобі це все трохи “приземлив” до production-рівня, бо багато хто робить помилку: ставить GSAP + Spline + Framer + 100 анімацій — і сайт стає красивим тільки на відео, а в реалі:
+
+* лагає
+* жерe CPU
+* погано SEO
+* слабкий mobile UX
+* низька конверсія
+
+Тому треба робити не “більше ефектів”, а:
+
+# controlled premium motion system
+
+---
+
+# Мій реальний топ стек для дорогих SaaS/AI сайтів у 2026
+
+## FRONTEND CORE
+
+* Next.js 15
+* TypeScript strict
+* Tailwind v4
+* shadcn/ui
+
+Це база.
+
+---
+
+# MOTION LAYER
+
+## GSAP
+
+Для:
+
+* hero animations
+* scroll storytelling
+* reveal effects
+* premium transitions
+
+### Найкращі штуки:
+
+* ScrollTrigger
+* SplitText
+* timeline orchestration
+* parallax
+* pin sections
+
+---
+
+## Lenis
+
+ЦЕ MUST HAVE.
+
+Саме Lenis дає:
+
+* “масляний” скрол
+* відчуття дорогого сайту
+* плавність motion system
+
+Без нього навіть хороший дизайн виглядає “дешевше”.
+
+---
+
+## Framer Motion
+
+НЕ для всього.
+
+Тільки:
+
+* modals
+* dropdowns
+* cards
+* hover states
+* layout transitions
+
+---
+
+# 3D LAYER
+
+## Spline
+
+Так — дуже круто.
+
+Але:
+
+# тільки 1 головна сцена
+
+---
+
+# Найкраще використання:
+
+## Hero section
+
+Наприклад:
+
+* AI orb
+* floating dashboard
+* futuristic device
+* abstract neural object
+
+---
+
+# Не роби:
+
+❌ spline у кожній секції
+❌ важкі сцени
+❌ 4K текстури
+❌ багато lights/shadows
+
+Бо мобілки помруть.
+
+---
+
+# Що реально робить сайт “дорогим”
+
+Не сам Spline.
+
+А:
+
+# композиція + motion timing + typography
+
+---
+
+# Найсильніші ефекти зараз
+
+## 1. Scroll storytelling
+
+Коли секція живе від скролу.
+
+Наприклад:
+
+* текст зʼявляється
+* обʼєкт обертається
+* UI збирається по частинах
+* background morphing
+
+---
+
+## 2. Layered motion
+
+Різні шари рухаються з різною швидкістю.
+
+Дає cinematic feeling.
+
+---
+
+## 3. Depth UI
+
+Glass + blur + soft shadows + gradients.
+
+Але:
+дуже дозовано.
+
+---
+
+## 4. Noise / grain
+
+Мікро-текстура поверх UI.
+
+Це реально додає “premium”.
+
+---
+
+## 5. Magnetic interactions
+
+Кнопки:
+
+* тягнуться до курсора
+* мають micro-bounce
+* glow on hover
+
+---
+
+# Що я б тобі ще додав у систему
+
+# FRONTEND ART DIRECTOR AGENT
+
+Оце буде дуже сильна штука.
+
+---
+
+# Він повинен контролювати:
+
+## Motion budget
+
+```txt id="md2h8f"
+max simultaneous animations: 3
+```
+
+---
+
+## GPU load
+
+```txt id="ef6w9x"
+disable blur > 40px
+disable multiple realtime shadows
+```
+
+---
+
+## Mobile optimization
+
+```txt id="a4t9zd"
+disable spline on low-end devices
+```
+
+---
+
+## Animation consistency
+
+```txt id="d7s4pk"
+all easing:
+power3.out
+
+duration:
+0.4 - 1.2s
+```
+
+---
+
+# Дуже важливо
+
+# Додай:
+
+## MOTION DESIGN SYSTEM
+
+---
+
+# motion.config.ts
+
+```ts id="g2r8kn"
+export const motion = {
+  fast: 0.2,
+  normal: 0.5,
+  slow: 1,
+}
+```
+
+---
+
+# easing.ts
+
+```ts id="t5x8hc"
+expo.out
+power3.out
+circ.out
+```
+
+---
+
+# Інакше AI буде:
+
+* одні елементи 0.2s
+* інші 2.7s
+* різні easing
+* хаос
+
+---
+
+# Що реально зараз топ по стилю
+
+## AI SaaS style:
+
+* dark UI
+* soft gradients
+* cinematic lighting
+* floating cards
+* grid backgrounds
+* subtle blur
+* large typography
+* huge spacing
+
+---
+
+# Найкращі референси стилю
+
+Для натхнення подивись:
+
+* Stripe
+* Linear
+* Vercel
+* Framer
+* Raycast
+* Supabase
+* OpenAI
+
+Вони всі:
+
+* мінімалістичні
+* motion-heavy
+* typography-first
+* дуже чисті
+
+---
+
+# Для Telegram WebApps
+
+Тут інша філософія.
+
+---
+
+# Telegram UX ≠ SaaS Landing
+
+Треба:
+
+* швидкість
+* великі кнопки
+* fixed bottom actions
+* мінімум анімацій
+* instant feedback
+
+---
+
+# Для WebApp я б використовував:
+
+## Stack
+
+* Next.js
+* Tailwind
+* Framer Motion
+* Telegram SDK
+
+І:
+мінімум GSAP.
+
+---
+
+# Що ще дуже рекомендую
+
+# VIEWPORT-BASED ANIMATION CONTROL
+
+---
+
+# Анімації запускаються:
+
+* тільки коли секція visible
+* pause offscreen animations
+* reduce motion on mobile
+
+---
+
+# Інакше:
+
+CPU usage буде шалений.
+
+---
+
+# Найбільша помилка AI frontend зараз
+
+Оце:
+
+```txt id="z4n7yr"
+"зроби красиво"
+```
+
+І AI:
+
+* додає 40 анімацій
+* 15 градієнтів
+* glow всюди
+* 3D на все
+* blur 100px
+
+---
+
+# Реальний premium design це:
+
+## 80%:
+
+* spacing
+* typography
+* hierarchy
+* rhythm
+
+## 20%:
+
+* motion
+* effects
+* 3D
+
+---
+
+# Якщо коротко — твій майже ідеальний стек
+
+## SaaS / AI Landing
+
+* Next.js 15
+* Tailwind v4
+* shadcn/ui
+* GSAP
+* Lenis
+* Framer Motion
+* Spline (1 scene max)
+
+---
+
+## Telegram WebApp
+
+* Next.js
+* Tailwind
+* Framer Motion
+* Telegram SDK
+* мінімум heavy animations
+
+---
+
+# І головне
+
+Тобі зараз потрібен не “ще один ефект”.
+
+А:
+
+# design discipline
+
+Бо саме вона відрізняє:
+“AI-generated flashy site”
+від
+“дорогого продуктового дизайну”.
+# FINAL ARCHITECTURE — AI ENGINEERING + PREMIUM SaaS DESIGN PLATFORM (2026)
+
+Те що тобі треба будувати — це не просто “агенти для коду”.
+А:
+
+# AI Product Engineering Operating System
+
+Система яка:
+
+* проектує
+* пише
+* тестує
+* аналізує
+* покращує
+* контролює дизайн
+* веде памʼять
+* моніторить якість
+* управляється через web panel
+
+І все це як єдина engineering platform.
+
+---
+
+# 1. ГОЛОВНА АРХІТЕКТУРА
+
+# CORE LAYERS
+
+```txt id="6q2xcm"
+┌──────────────────────────┐
+│      WEB CONTROL UI      │
+└────────────┬─────────────┘
+             ↓
+┌──────────────────────────┐
+│      ORCHESTRATOR        │
+└────────────┬─────────────┘
+             ↓
+┌──────────────────────────┐
+│        EVENT BUS         │
+└────────────┬─────────────┘
+             ↓
+┌──────────────────────────┐
+│         AGENTS           │
+└────────────┬─────────────┘
+             ↓
+┌──────────────────────────┐
+│ MEMORY + DATABASE + RAG  │
+└──────────────────────────┘
+```
+
+---
+
+# 2. ІДЕАЛЬНИЙ STACK
+
+# BACKEND
+
+```txt id="j3x
+```
+Продовжую, але вже зібрано як фінальна “production-версія системи”, без зайвих ідей — тільки те, що реально треба щоб воно працювало стабільно і давало тобі рівень “дорогих SaaS + якісний AI dev system”.
+
+---
+
+# 2. ІДЕАЛЬНИЙ STACK (ФІНАЛЬНА ВЕРСІЯ)
+
+## BACKEND LAYER
+
+```txt id="b9k3qv"
+- Python 3.13
+- FastAPI (core API + orchestration API)
+- aiogram 3 (Telegram bots)
+- SQLAlchemy 2 (async ORM)
+- PostgreSQL (main DB)
+- Redis (cache + event queue)
+- Celery / RQ (background jobs)
+- WebSockets (live logs + agent stream)
+```
+
+---
+
+## FRONTEND LAYER (WEB PANEL)
+
+```txt id="k4n8sd"
+- Next.js 15 (App Router)
+- TypeScript strict
+- Tailwind v4
+- shadcn/ui (UI system)
+- Framer Motion (UI animations)
+- TanStack Query (server state)
+- Zustand (local state)
+- React Flow (agent graphs)
+```
+
+---
+
+## MOTION / 3D LAYER
+
+```txt id="m7x2lp"
+- GSAP (ScrollTrigger + timelines)
+- Lenis (smooth scroll)
+- Spline (1 hero scene max)
+- Framer Motion (UI micro animations)
+```
+
+---
+
+## AI / ORCHESTRATION LAYER
+
+```txt id="a2v9qw"
+- LangGraph OR custom orchestrator
+- OpenRouter / Claude API
+- Tool calling system
+- Prompt versioning system
+- Agent registry system
+```
+
+---
+
+## INFRASTRUCTURE
+
+```txt id="p8d4ts"
+- Docker (all services)
+- Nginx / Traefik (reverse proxy)
+- GitHub Actions (CI/CD)
+- Sentry (error tracking)
+- Prometheus + Grafana (metrics)
+```
+
+---
+
+# 3. WEB CONTROL PANEL (ЦЕНТР СИСТЕМИ)
+
+Це не “дашборд”.
+Це **операційна система агентів**.
+
+---
+
+## ОБОВʼЯЗКОВІ МОДУЛІ
+
+### 1. LIVE AGENT ROOM
+
+```txt id="r3t8yx"
+- real-time logs (WebSocket)
+- agent status (active / blocked / idle)
+- current task view
+- step-by-step execution trace
+```
+
+---
+
+### 2. TASK GRAPH VIEW
+
+```txt id="g5n2kz"
+- nodes = agents
+- edges = dependencies
+- live execution highlight
+- bottleneck detection
+```
+
+(через React Flow)
+
+---
+
+### 3. MEMORY CENTER
+
+```txt id="v1q7md"
+- lessons (LESSONS.md → UI)
+- bugs (BUG_REGISTRY → UI)
+- decisions log
+- architecture history
+- search + filters
+```
+
+---
+
+### 4. DIFF VIEWER
+
+```txt id="c8x4pl"
+- before / after code
+- agent who changed it
+- approve / reject
+- rollback button
+```
+
+---
+
+### 5. COST + PERFORMANCE PANEL
+
+```txt id="t9h2sa"
+- tokens per agent
+- cost per task
+- slow agents detection
+- error rate
+```
+
+---
+
+# 4. КЛЮЧОВА РЕЧЬ: EVENT-DRIVEN SYSTEM
+
+Це серце всього.
+
+---
+
+## EVENT BUS
+
+```txt id="e4k9zn"
+TASK_CREATED
+TASK_STARTED
+CODE_CHANGED
+TEST_FAILED
+TEST_PASSED
+BUG_FOUND
+SECURITY_ALERT
+TASK_COMPLETED
+MEMORY_UPDATED
+```
+
+---
+
+## ЯК ПРАЦЮЄ
+
+```txt id="h6p2xc"
+Orchestrator → emits event
+      ↓
+Redis Event Bus
+      ↓
+Agents subscribe
+      ↓
+Actions triggered automatically
+```
+
+---
+
+# 5. SELF-IMPROVEMENT (АЛЕ БЕЗ ХАОСУ)
+
+## ВАЖЛИВО ПРАВИЛО:
+
+Агенти НЕ змінюють систему напряму.
+
+---
+
+## Правильна модель:
+
+```txt id="s3m8vn"
+Agent → Suggestion → Review Queue → Human → Apply
+```
+
+---
+
+## Що вони МОЖУТЬ:
+
+* знайти проблему
+* запропонувати покращення
+* створити PR
+* написати report
+
+---
+
+## Що НЕ МОЖУТЬ:
+
+* змінити security rules
+* змінити orchestrator
+* змінити memory engine
+* видалити дані
+
+---
+
+# 6. DESIGN SYSTEM (КРИТИЧНО ДЛЯ “ДОРОГОГО ВИГЛЯДУ”)
+
+---
+
+## DESIGN TOKENS
+
+```txt id="d8n4qp"
+colors:
+- background
+- surface
+- primary
+- muted
+- border
+
+spacing:
+4 / 8 / 12 / 16 / 24 / 32 / 48 / 64
+
+radius:
+sm / md / lg / xl
+
+typography:
+h1 / h2 / h3 / body / caption
+```
+
+---
+
+## DESIGN RULES (ЖОРСТКІ)
+
+```txt id="u3k8mz"
+- max 2 fonts
+- max 3 colors on screen
+- max 1 primary CTA per section
+- no gradients everywhere
+- no random shadows
+- consistent spacing system
+```
+
+---
+
+## UI PRINCIPLE
+
+```txt id="z5v2td"
+80% layout + typography
+20% motion + effects
+```
+
+---
+
+# 7. AGENT STRUCTURE (ФІНАЛ)
+
+## CORE AGENTS
+
+```txt id="c1m9pq"
+- Orchestrator (brain)
+- Code Agent (implementation)
+- Bug Hunter (static analysis)
+- Security Agent (OWASP)
+- Reviewer (quality gate)
+- Memory Keeper (learning)
+```
+
+---
+
+## UI/UX LAYER (ДОДАЄМО ОБОВʼЯЗКОВО)
+
+```txt id="u7k3lm"
+- UI/UX Designer Agent
+- Design Critic Agent
+- Landing Page Specialist
+- Motion Designer Agent
+```
+
+---
+
+## SYSTEM AGENTS
+
+```txt id="s8n2qd"
+- Test Agent
+- Performance Agent
+- DevOps Agent
+- Observability Agent
+```
+
+---
+
+# 8. QUALITY PIPELINE (ГОЛОВНИЙ WORKFLOW)
+
+```txt id="q4v8xk"
+1. Orchestrator creates plan
+2. UI/UX Agent designs layout
+3. Code Agent implements
+4. Test Agent validates
+5. Bug Hunter scans
+6. Security Agent checks
+7. Reviewer approves
+8. Memory Keeper logs
+9. Web Panel updates live
+```
+
+---
+
+# 9. MOTION RULES (ЩО РОБИТЬ “ДОРОГО”)
+
+```txt id="m2p7qv"
+- GSAP only for hero + scroll storytelling
+- Lenis always enabled
+- Spline only 1 scene
+- Framer Motion for UI only
+- max 3 animations simultaneously
+- 150–800ms duration range
+```
+
+---
+
+# 10. TELEGRAM / WEBAPP MODE
+
+```txt id="t6x3pn"
+- no heavy animation
+- instant response UI
+- bottom action bar
+- minimal text
+- fast loading skeletons
+```
+
+---
+
+# 11. MEMORY SYSTEM (ЗАМІНА MARKDOWN)
+
+## ПЕРЕХІД:
+
+```txt id="r8m4xz"
+FROM:
+MEMORY.md
+
+TO:
+PostgreSQL + RAG Memory Engine
+```
+
+---
+
+## MEMORY STRUCTURE:
+
+```txt id="n2v7kc"
+- tasks
+- decisions
+- lessons
+- bugs
+- agent logs
+- embeddings (semantic search)
+```
+
+---
+
+# 12. НАЙВАЖЛИВІШЕ
+
+Твоя система зараз стає не “набором агентів”.
+
+А:
+
+# AI SOFTWARE ENGINEERING PLATFORM
+
+---
+
+## РІВНІ:
+
+```txt id="f5k8mz"
+Level 1: agents write code
+Level 2: agents test + review
+Level 3: agents design UI
+Level 4: system self-improves (controlled)
+Level 5: full engineering OS (your target)
+```
+
+---
+
+# ФІНАЛЬНА ПРАВДА
+
+Якщо коротко:
+
+* агенти у тебе вже сильні
+* логіка вже хороша
+* але “дорогий продукт” робить:
+
+## НЕ агенти
+
+## А:
+
+* дизайн система
+* контроль виконання
+* web панель
+* дисципліна UI
+* observability
+* event-driven architecture
+
+---
+
+Якщо хочеш далі — я можу тобі наступним кроком зібрати:
+
+# “ФАЙЛ СТРУКТУРУ ПРОЕКТУ (як папки + сервіси + як запускати)”
+
+або
+
+# “як це зібрати поетапно за 7–10 днів без хаосу”

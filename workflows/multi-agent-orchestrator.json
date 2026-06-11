@@ -1,0 +1,313 @@
+{
+  "name": "Multi-Agent Orchestrator — Сайти / Боти / SaaS",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "task",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Нове завдання",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 200,
+          "systemMessage": "Ти класифікатор завдань. Отримуєш текст завдання та повертаєш ТІЛЬКИ одне слово:\n- web — якщо завдання стосується сайту, HTML, CSS, Next.js, Flask templates, верстки\n- bot — якщо стосується Telegram бота, команд, handlers, aiogram\n- saas — якщо стосується підписок, платежів, адмін-панелі, тирів\n- db — якщо стосується бази даних, моделей, міграцій\n- deploy — якщо стосується деплою, Railway, Vercel, Docker\n- general — все інше\n\nПоверни ТІЛЬКИ одне слово без пояснень."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.body.task }}"
+            }
+          ]
+        }
+      },
+      "id": "classifier",
+      "name": "Класифікатор завдань",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": false },
+                "conditions": [
+                  {
+                    "id": "web-rule",
+                    "leftValue": "={{ $json.message.content.trim().toLowerCase() }}",
+                    "rightValue": "web",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "web"
+            },
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": false },
+                "conditions": [
+                  {
+                    "id": "bot-rule",
+                    "leftValue": "={{ $json.message.content.trim().toLowerCase() }}",
+                    "rightValue": "bot",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "bot"
+            },
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": false },
+                "conditions": [
+                  {
+                    "id": "saas-rule",
+                    "leftValue": "={{ $json.message.content.trim().toLowerCase() }}",
+                    "rightValue": "saas",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "saas"
+            },
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": false },
+                "conditions": [
+                  {
+                    "id": "db-rule",
+                    "leftValue": "={{ $json.message.content.trim().toLowerCase() }}",
+                    "rightValue": "db",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "db"
+            },
+            {
+              "conditions": {
+                "options": { "leftValue": "", "caseSensitive": false },
+                "conditions": [
+                  {
+                    "id": "deploy-rule",
+                    "leftValue": "={{ $json.message.content.trim().toLowerCase() }}",
+                    "rightValue": "deploy",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "deploy"
+            }
+          ]
+        },
+        "fallbackOutput": "extra"
+      },
+      "id": "router",
+      "name": "Маршрутизатор",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 4000,
+          "systemMessage": "Ти Web Agent — експерт з розробки сайтів.\nСтек: HTML5, CSS3, JavaScript, Next.js, Flask+Jinja2, Bootstrap 5, Tailwind CSS.\nПишеш чистий, семантичний, адаптивний код.\nДля Flask — шаблони Jinja2 з блоками ({% block %}).\nДля Next.js — TypeScript + Tailwind.\nЗавжди пояснюй де і як підключити код."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Завдання: {{ $('Webhook: Нове завдання').item.json.body.task }}\n\nКонтекст проєкту: {{ $('Webhook: Нове завдання').item.json.body.context ?? 'не вказано' }}"
+            }
+          ]
+        }
+      },
+      "id": "web-agent",
+      "name": "Web Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [960, 160]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 4000,
+          "systemMessage": "Ти Bot Agent — експерт з розробки Telegram ботів.\nСтек: Python, aiogram 3.x, python-telegram-bot, FSM.\nПишеш handlers, keyboards, команди, middleware.\nВикористовуєш async/await, Router, StatesGroup.\nПояснюєш де розмістити файл та як зареєструвати handler."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Завдання: {{ $('Webhook: Нове завдання').item.json.body.task }}\n\nКонтекст проєкту: {{ $('Webhook: Нове завдання').item.json.body.context ?? 'не вказано' }}"
+            }
+          ]
+        }
+      },
+      "id": "bot-agent",
+      "name": "Bot Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [960, 320]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 4000,
+          "systemMessage": "Ти SaaS Agent — експерт з підписок, платежів та адмін-панелей.\nСтек: Flask, SQLAlchemy, Stripe, LiqPay, Flask-Admin.\nРеалізуєш тири (FREE/BASIC/PRO), перевірки підписок, платіжні webhook.\nПишеш Flask routes, Jinja2 templates для адмін-панелей.\nПояснюєш бізнес-логіку і де підключити middleware."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Завдання: {{ $('Webhook: Нове завдання').item.json.body.task }}\n\nКонтекст проєкту: {{ $('Webhook: Нове завдання').item.json.body.context ?? 'не вказано' }}"
+            }
+          ]
+        }
+      },
+      "id": "saas-agent",
+      "name": "SaaS Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [960, 480]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 4000,
+          "systemMessage": "Ти DB Agent — експерт з баз даних.\nСтек: SQLite, PostgreSQL, SQLAlchemy 2.x, Alembic.\nПроєктуєш моделі, пишеш міграції, оптимізуєш запити.\nВикористовуєш async sessions, relationship(), index().\nПопереджаєш про небезпечні міграції (DROP COLUMN, etc.)."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Завдання: {{ $('Webhook: Нове завдання').item.json.body.task }}\n\nКонтекст проєкту: {{ $('Webhook: Нове завдання').item.json.body.context ?? 'не вказано' }}"
+            }
+          ]
+        }
+      },
+      "id": "db-agent",
+      "name": "DB Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [960, 640]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 4000,
+          "systemMessage": "Ти Deploy Agent — експерт з деплою та DevOps.\nСтек: Railway, Vercel, Docker, GitHub Actions.\nНалаштовуєш environment variables, health checks, CI/CD.\nПишеш Dockerfile, railway.json, vercel.json.\nПопереджаєш про небезпечні операції (force push, drop DB)."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Завдання: {{ $('Webhook: Нове завдання').item.json.body.task }}\n\nКонтекст проєкту: {{ $('Webhook: Нове завдання').item.json.body.context ?? 'не вказано' }}"
+            }
+          ]
+        }
+      },
+      "id": "deploy-agent",
+      "name": "Deploy Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [960, 800]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "maxTokens": 4000,
+          "systemMessage": "Ти головний AI-асистент для розробки. Відповідаєш на загальні питання щодо сайтів, ботів та SaaS систем. Даєш архітектурні поради та найкращі практики."
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Завдання: {{ $('Webhook: Нове завдання').item.json.body.task }}\n\nКонтекст проєкту: {{ $('Webhook: Нове завдання').item.json.body.context ?? 'не вказано' }}"
+            }
+          ]
+        }
+      },
+      "id": "general-agent",
+      "name": "General Agent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [960, 960]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"agent\": \"{{ $json.agent_type ?? 'general' }}\",\n  \"task\": \"{{ $('Webhook: Нове завдання').item.json.body.task }}\",\n  \"result\": {{ JSON.stringify($json.message?.content ?? $json.text ?? '') }},\n  \"timestamp\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {}
+      },
+      "id": "response",
+      "name": "Відповідь",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1200, 560]
+    }
+  ],
+  "connections": {
+    "Webhook: Нове завдання": {
+      "main": [[{ "node": "Класифікатор завдань", "type": "main", "index": 0 }]]
+    },
+    "Класифікатор завдань": {
+      "main": [[{ "node": "Маршрутизатор", "type": "main", "index": 0 }]]
+    },
+    "Маршрутизатор": {
+      "main": [
+        [{ "node": "Web Agent", "type": "main", "index": 0 }],
+        [{ "node": "Bot Agent", "type": "main", "index": 0 }],
+        [{ "node": "SaaS Agent", "type": "main", "index": 0 }],
+        [{ "node": "DB Agent", "type": "main", "index": 0 }],
+        [{ "node": "Deploy Agent", "type": "main", "index": 0 }],
+        [{ "node": "General Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Web Agent": {
+      "main": [[{ "node": "Відповідь", "type": "main", "index": 0 }]]
+    },
+    "Bot Agent": {
+      "main": [[{ "node": "Відповідь", "type": "main", "index": 0 }]]
+    },
+    "SaaS Agent": {
+      "main": [[{ "node": "Відповідь", "type": "main", "index": 0 }]]
+    },
+    "DB Agent": {
+      "main": [[{ "node": "Відповідь", "type": "main", "index": 0 }]]
+    },
+    "Deploy Agent": {
+      "main": [[{ "node": "Відповідь", "type": "main", "index": 0 }]]
+    },
+    "General Agent": {
+      "main": [[{ "node": "Відповідь", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bogdan-dev"
+  },
+  "tags": ["multi-agent", "orchestrator", "web", "bot", "saas"]
+}

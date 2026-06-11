@@ -1,0 +1,33 @@
+{
+  "$comment": "DRAFT — звірити з http://www.mateksys.com/?portfolio=m10q-5883 перед публікацією",
+  "id": "matek-m10q-5883",
+  "type": "gps",
+  "brand": "Mateksys",
+  "model": "M10Q-5883",
+  "protocol": "UBX (GPS) + I2C (компас QMC5883L)",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["5V"],
+    "current_draw_ma": 100,
+    "needs_inversion": false,
+    "needs_i2c": true
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "SDA", "connects_to": "FC SDA (I2C)" },
+    { "component_pin": "SCL", "connects_to": "FC SCL (I2C)" },
+    { "component_pin": "5V", "connects_to": "5V BEC" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Sensor: GPS; Configuration → GPS UBLOX; компас через I2C (Magnetometer: QMC5883)",
+  "known_issues": [
+    {
+      "issue": "Компас ловить завади від силових проводів",
+      "workaround": "Монтувати GPS на щоглі, подалі від ESC і батареї"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
+  "source_url": "http://www.mateksys.com/?portfolio=m10q-5883"
+}

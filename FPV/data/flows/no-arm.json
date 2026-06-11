@@ -1,0 +1,162 @@
+{
+  "$comment": "DRAFT-дерево. Діагностика по Arming Disable Flags Betaflight — польотник прямо каже причину, ми її розшифровуємо. НЕ звірено живим ремонтом.",
+  "id": "no-arm",
+  "symptom": "Не армиться (не запускається)",
+  "summary": "Дрон не армиться. Betaflight сам показує прапор блокування — йдемо від нього, а не вгадуємо.",
+  "applies_to": {},
+  "entry": "arm_flag",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Arming-Sequence-and-Safety",
+  "nodes": {
+    "arm_flag": {
+      "type": "check",
+      "id": "arm_flag",
+      "instruction": "Який Arming Disable Flag горить? (Setup-екран, OSD, або CLI `status`)",
+      "method": "configurator",
+      "note": "Betaflight прямо називає причину. Setup → 'Arming Disabled' + прапор. CLI: `status` → рядок 'Arming disable flags'.",
+      "outcomes": [
+        { "label": "MSP", "next": "c_msp" },
+        { "label": "THROTTLE", "next": "c_throttle" },
+        { "label": "ARMSWITCH / не призначено", "next": "arm_switch" },
+        { "label": "RXLOSS / NORX / BADRX", "next": "c_rxloss" },
+        { "label": "ANGLE", "next": "c_angle" },
+        { "label": "GYROCAL / ACC", "next": "c_gyrocal" },
+        { "label": "Прапора не видно, але не армиться", "next": "arm_other" }
+      ]
+    },
+    "arm_switch": {
+      "type": "check",
+      "id": "arm_switch",
+      "instruction": "Modes → ARM призначено на тумблер? Тумблер потрапляє в заданий діапазон?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "ARM не призначено / межі range невірні", "next": "c_arm_mode" },
+        { "label": "Призначено, але прапор не зникає", "next": "c_aux_range" }
+      ]
+    },
+    "arm_other": {
+      "type": "check",
+      "id": "arm_other",
+      "instruction": "Що при спробі arm: ESC пищать тон-помилку чи повна тиша?",
+      "method": "listen",
+      "note": "Перевіряй мотори ТІЛЬКИ без пропелерів.",
+      "outcomes": [
+        { "label": "ESC пищать помилку / не ініціалізуються", "next": "c_esc_init" },
+        { "label": "Тиша, FC не реагує на ARM", "next": "c_aux_range" }
+      ]
+    },
+
+    "c_msp": {
+      "type": "cause",
+      "id": "c_msp",
+      "cause": "Підключений USB/конфігуратор блокує arm (прапор MSP) — це захист, не поломка",
+      "fix_steps": [
+        "Відключи USB-кабель.",
+        "Армуй від батареї (пропи зняті для тесту).",
+        "Якщо треба armed по USB для тесту — обережно, увімкни 'Allow arming without battery' лише свідомо."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Arming-Sequence-and-Safety",
+      "est_minutes": 2
+    },
+    "c_throttle": {
+      "type": "cause",
+      "id": "c_throttle",
+      "cause": "Газ не в нулі при arm (прапор THROTTLE)",
+      "fix_steps": [
+        "Опусти газ повністю; перевір тримінг газу на пульті.",
+        "У Receiver звір, що throttle на мінімумі ≤ min_check.",
+        "Перевір channel map (AETR/TAER)."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Arming-Sequence-and-Safety",
+      "est_minutes": 5
+    },
+    "c_arm_mode": {
+      "type": "cause",
+      "id": "c_arm_mode",
+      "cause": "ARM не призначено на тумблер або невірний діапазон",
+      "fix_steps": [
+        "Modes → ARM → Add Range на потрібний AUX-канал.",
+        "Встанови діапазон ~1700-2100 для ввімкненого стану.",
+        "Save."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Modes",
+      "est_minutes": 5
+    },
+    "c_aux_range": {
+      "type": "cause",
+      "id": "c_aux_range",
+      "cause": "Тумблер ARM не потрапляє у заданий діапазон / невірний AUX",
+      "fix_steps": [
+        "У Receiver глянь значення AUX при ввімкненому тумблері.",
+        "Підстав діапазон ARM під реальне значення.",
+        "Перевір, що тумблер не конфліктує з іншим режимом."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Modes",
+      "est_minutes": 5
+    },
+    "c_rxloss": {
+      "type": "cause",
+      "id": "c_rxloss",
+      "cause": "Немає сигналу приймача (RXLOSS / failsafe)",
+      "fix_steps": [
+        "Спершу віднови лінк приймача — див. симптом «Немає лінку з пультом».",
+        "Перевір, що канали рухаються у вкладці Receiver.",
+        "Налаштуй failsafe."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Arming-Sequence-and-Safety",
+      "est_minutes": 10
+    },
+    "c_angle": {
+      "type": "cause",
+      "id": "c_angle",
+      "cause": "Дрон не в рівні при arm (прапор ANGLE)",
+      "fix_steps": [
+        "Постав дрон рівно перед arm.",
+        "Перекалібруй акселерометр на рівній поверхні.",
+        "За потреби збільш small_angle (CLI) свідомо."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Arming-Sequence-and-Safety",
+      "est_minutes": 5
+    },
+    "c_gyrocal": {
+      "type": "cause",
+      "id": "c_gyrocal",
+      "cause": "Гіро/акселерометр калібрується або не відкалібровано",
+      "fix_steps": [
+        "Тримай дрон нерухомо при подачі живлення (гіро калібрується ~3 сек).",
+        "Setup → Calibrate Accelerometer на рівній поверхні.",
+        "Якщо гіро 'плаває' постійно — можливий дефект IMU."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Arming-Sequence-and-Safety",
+      "est_minutes": 5
+    },
+    "c_esc_init": {
+      "type": "cause",
+      "id": "c_esc_init",
+      "cause": "ESC не ініціалізується або дає тон-помилку",
+      "fix_steps": [
+        "Звір протокол ESC (DSHOT300/600) у Motors-вкладці.",
+        "Перевір пайку сигналу моторів і живлення ESC.",
+        "Онови прошивку ESC (BLHeli_S/32) за потреби."
+      ],
+      "fix_action": "rewire",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    }
+  }
+}

@@ -1,23 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4>📡 Сигнали</h4>
-  <span class="text-muted small">Всього: {{ total }}</span>
+  <h4>📡 {{ UI.nav_signals }}</h4>
+  <span class="text-muted small">{{ 'Всього' if lang=='ua' else 'Total' }}: {{ total }}</span>
 </div>
 
 <form class="d-flex gap-2 mb-3">
   <select name="chain" class="form-select form-select-sm" style="width:auto">
-    <option value="">Всі ланцюги</option>
+    <option value="">{{ UI.all_chains }}</option>
     <option value="solana" {{ 'selected' if chain=='solana' }}>◎ Solana</option>
     <option value="bsc"    {{ 'selected' if chain=='bsc' }}>🔶 BSC</option>
   </select>
   <select name="type" class="form-select form-select-sm" style="width:auto">
-    <option value="">Всі типи</option>
+    <option value="">{{ 'Всі типи' if lang=='ua' else 'All types' }}</option>
     <option value="STRONG_BUY" {{ 'selected' if sig_type=='STRONG_BUY' }}>🟢 STRONG BUY</option>
     <option value="BUY"        {{ 'selected' if sig_type=='BUY' }}>🟡 BUY</option>
     <option value="WATCH"      {{ 'selected' if sig_type=='WATCH' }}>👀 WATCH</option>
+    <option value="LAUNCH"     {{ 'selected' if sig_type=='LAUNCH' }}>🚀 LAUNCH (pump.fun)</option>
   </select>
-  <button type="submit" class="btn btn-sm btn-outline-secondary">Фільтр</button>
+  <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'Фільтр' if lang=='ua' else 'Filter' }}</button>
   <a href="{{ url_for('signals') }}" class="btn btn-sm btn-outline-danger">✕</a>
 </form>
 
@@ -25,15 +26,15 @@
   <table class="table table-hover mb-0">
     <thead>
       <tr>
-        <th>Ланцюг</th>
-        <th>Токен / Адреса</th>
-        <th>Score</th>
-        <th>Тип</th>
-        <th>Ліквідність</th>
-        <th>Зміна 1h</th>
-        <th>Створено (токен)</th>
-        <th>Час сигналу</th>
-        <th>Посилання</th>
+        <th>{{ UI.sig_chain }}</th>
+        <th>{{ UI.sig_token }}</th>
+        <th>{{ UI.sig_score }}</th>
+        <th>{{ UI.sig_type }}</th>
+        <th>{{ UI.sig_liq }}</th>
+        <th>{{ UI.sig_chg }}</th>
+        <th>{{ 'Створено (токен)' if lang=='ua' else 'Token created' }}</th>
+        <th>{{ 'Час сигналу' if lang=='ua' else 'Signal time' }}</th>
+        <th>{{ 'Посилання' if lang=='ua' else 'Link' }}</th>
       </tr>
     </thead>
     <tbody>
@@ -61,7 +62,8 @@
         {% if s.signal_type=='STRONG_BUY' %}<span class="badge badge-strong">STRONG BUY</span>
         {% elif s.signal_type=='BUY' %}<span class="badge badge-buy">BUY</span>
         {% elif s.signal_type=='WATCH' %}<span class="badge badge-watch">WATCH</span>
-        {% else %}<span class="badge badge-skip">SKIP</span>{% endif %}
+        {% elif s.signal_type=='LAUNCH' %}<span class="badge" style="background:#9b59b6;color:#fff">🚀 LAUNCH</span>
+        {% else %}<span class="badge badge-skip">{{ s.signal_type or 'SKIP' }}</span>{% endif %}
       </td>
       <td>${{ '{:,.0f}'.format(s.liquidity_usd or 0) }}</td>
       <td>

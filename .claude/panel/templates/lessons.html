@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Уроки{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between page-header" style="margin-bottom:20px">
+  <div>
+    <h1>🎓 Lessons Learned</h1>
+    <p>{{ lessons|length }} урок(ів) — Memory Keeper записує після кожної помилки</p>
+  </div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLesson">
+    <i class="fa fa-plus"></i> Новий урок
+  </button>
+</div>
+
+{% if lessons %}
+  {% for lesson in lessons %}
+  <div style="
+    background:var(--bg2);
+    border-left:3px solid var(--purple);
+    border-radius:0 12px 12px 0;
+    border:1px solid var(--border);
+    border-left:3px solid var(--purple);
+    padding:18px 22px;
+    margin-bottom:12px;
+  ">
+    <div style="font-size:11px; color:var(--purple); font-weight:700; text-transform:uppercase; letter-spacing:.5px">Урок #{{ lesson.num }}</div>
+    <div style="font-size:16px; font-weight:700; margin:4px 0 14px; color:var(--text)">{{ lesson.title }}</div>
+    <div class="grid-2" style="gap:14px">
+      <div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text3); margin-bottom:4px">❌ Що сталось</div>
+        <div style="font-size:13px; color:var(--text2)">{{ lesson.what }}</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text3); margin:10px 0 4px">🔍 Чому</div>
+        <div style="font-size:13px; color:var(--text2)">{{ lesson.why }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text3); margin-bottom:4px">✅ Рішення</div>
+        <div style="font-size:13px; color:var(--text2)">{{ lesson.solution }}</div>
+        <div style="background:var(--bg4); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-top:10px">
+          <div style="font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--purple); margin-bottom:3px">📌 Правило</div>
+          <div style="font-size:12px; color:var(--text2)">{{ lesson.rule }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="card" style="text-align:center; padding:48px">
+  <i class="fa fa-graduation-cap" style="font-size:48px; color:var(--lavender); display:block; margin-bottom:12px"></i>
+  <div style="font-size:18px; font-weight:600">Уроків ще немає</div>
+  <div style="color:var(--text3); margin-top:6px">Memory Keeper запише їх після помилок у сесіях</div>
+</div>
+{% endif %}
+
+<!-- Add Lesson Modal -->
+<div class="modal fade" id="addLesson" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">📚 Записати урок</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/lessons/add">
+        <div class="modal-body" style="padding:20px; display:flex; flex-direction:column; gap:12px">
+          <div>
+            <label class="form-label">Назва уроку *</label>
+            <input type="text" name="title" class="form-control" required placeholder="Коротка назва">
+          </div>
+          <div class="grid-2" style="gap:12px">
+            <div>
+              <label class="form-label">Що сталось *</label>
+              <textarea name="what" class="form-control" rows="2" required placeholder="Опис помилки"></textarea>
+            </div>
+            <div>
+              <label class="form-label">Чому *</label>
+              <textarea name="why" class="form-control" rows="2" required placeholder="Root cause"></textarea>
+            </div>
+            <div>
+              <label class="form-label">Рішення *</label>
+              <textarea name="solution" class="form-control" rows="2" required placeholder="Як виправили"></textarea>
+            </div>
+            <div>
+              <label class="form-label">Правило *</label>
+              <textarea name="rule" class="form-control" rows="2" required placeholder="Що робити в майбутньому"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Скасувати</button>
+          <button type="submit" class="btn btn-primary">Зберегти урок</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,122 @@
+{
+  "$comment": "DRAFT-дерево. Перегрів компонента (мотори/ESC/VTX/FC/BEC). НЕ звірено живим ремонтом.",
+  "id": "overheat",
+  "symptom": "Перегрів компонентів",
+  "summary": "Щось гріється понад норму. Спершу визнач ЩО саме — далі причина перевантаження.",
+  "applies_to": {},
+  "entry": "heat_what",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+  "nodes": {
+    "heat_what": {
+      "type": "check",
+      "id": "heat_what",
+      "instruction": "Що саме перегрівається?",
+      "method": "visual",
+      "note": "Обережно — гарячі елементи можуть обпекти. Перевіряй після короткого тесту, не доводь до диму.",
+      "outcomes": [
+        { "label": "Мотори гарячі після короткого польоту", "next": "motor_heat" },
+        { "label": "ESC гарячі / горять", "next": "c_esc_heat" },
+        { "label": "VTX дуже гарячий", "next": "c_vtx_heat" },
+        { "label": "FC/процесор або BEC гарячі", "next": "c_fc_heat" }
+      ]
+    },
+    "motor_heat": {
+      "type": "check",
+      "id": "motor_heat",
+      "instruction": "Пропи правильного розміру/кроку? Немає закусу? Немає осциляцій?",
+      "method": "configurator",
+      "note": "Гарячі мотори = перевантаження: завеликі пропи, заклин, биті підшипники, або осциляції від задертих PID.",
+      "outcomes": [
+        { "label": "Завеликі / важкі пропи для цих моторів", "next": "c_motor_overprop" },
+        { "label": "Закус / биті підшипники", "next": "c_motor_bearing" },
+        { "label": "Осциляції / задерті PID", "next": "c_motor_pid" }
+      ]
+    },
+
+    "c_esc_heat": {
+      "type": "cause",
+      "id": "c_esc_heat",
+      "cause": "ESC перегрівається (перевантаження / поганий тепловідвід / деградація)",
+      "fix_steps": [
+        "Звір робочий струм із номіналом ESC; не задирай пропи.",
+        "Забезпеч обдув / тепловідвід на ESC.",
+        "Перевір MOSFET на пробій; за деградації — заміна ESC."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 25
+    },
+    "c_vtx_heat": {
+      "type": "cause",
+      "id": "c_vtx_heat",
+      "cause": "VTX гріється — потужним VTX це властиво, але потрібен тепловідвід і обдув",
+      "fix_steps": [
+        "НІКОЛИ не вмикай VTX без антени і без обдуву (на столі горить швидко).",
+        "Додай тепловідвід, забезпеч потік повітря у польоті.",
+        "На землі тримай знижену потужність (pit/25mW)."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 10
+    },
+    "c_fc_heat": {
+      "type": "cause",
+      "id": "c_fc_heat",
+      "cause": "Гарячий FC / BEC — перевантаження BEC або частковий КЗ",
+      "fix_steps": [
+        "Звір сумарне навантаження на BEC із лімітом у профілі плати.",
+        "Прибери зайвих споживачів, рознеси на різні шини.",
+        "Шукай частковий КЗ / гарячу точку — за наявності не вмикай далі."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    },
+    "c_motor_overprop": {
+      "type": "cause",
+      "id": "c_motor_overprop",
+      "cause": "Завеликі / важкі пропелери для моторів (overpropping)",
+      "fix_steps": [
+        "Постав пропи відповідно до KV і розміру моторів.",
+        "Перевір температуру моторів після короткого тесту.",
+        "Не використовуй важкі 'кусачі' пропи на слабких моторах."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 5
+    },
+    "c_motor_bearing": {
+      "type": "cause",
+      "id": "c_motor_bearing",
+      "cause": "Закус / биті підшипники створюють зайве навантаження",
+      "fix_steps": [
+        "Прокрути мотор рукою — має йти вільно, без хрускоту.",
+        "Почисти від сміття, заміни підшипники.",
+        "За гнутого валу — заміна мотора."
+      ],
+      "fix_action": "clean",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 15
+    },
+    "c_motor_pid": {
+      "type": "cause",
+      "id": "c_motor_pid",
+      "cause": "Осциляції від задертих PID гріють мотори",
+      "fix_steps": [
+        "Знизь P/D-term, перевір фільтри.",
+        "Слухай 'спів' моторів — ознака осциляцій.",
+        "Зроби тюн заново або візьми перевірений пресет під раму."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 15
+    }
+  }
+}

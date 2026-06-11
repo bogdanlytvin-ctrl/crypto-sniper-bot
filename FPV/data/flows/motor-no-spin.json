@@ -1,0 +1,170 @@
+{
+  "$comment": "DRAFT-дерево. Діагностика моторів через вкладку Motors Betaflight. КРИТИЧНО: тест моторів лише зі знятими пропелерами. НЕ звірено живим ремонтом.",
+  "id": "motor-no-spin",
+  "symptom": "Мотор не крутить / крутить не туди",
+  "summary": "Один або всі мотори не реагують чи крутять неправильно. Тест — у вкладці Motors, ЗАВЖДИ без пропелерів.",
+  "applies_to": {},
+  "entry": "motor_scope",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+  "nodes": {
+    "motor_scope": {
+      "type": "check",
+      "id": "motor_scope",
+      "instruction": "У вкладці Motors (БЕЗ ПРОПЕЛЕРІВ!) як поводяться мотори?",
+      "method": "configurator",
+      "note": "Зніми пропелери перед будь-яким тестом моторів. Завжди.",
+      "outcomes": [
+        { "label": "Один мотор не крутить, решта так", "next": "one_motor" },
+        { "label": "Крутять не ті позиції / не в тому порядку", "next": "c_motor_order" },
+        { "label": "Крутять у неправильний бік", "next": "c_motor_dir" },
+        { "label": "Жоден не крутить", "next": "all_motors" }
+      ]
+    },
+    "one_motor": {
+      "type": "check",
+      "id": "one_motor",
+      "instruction": "Проблемний мотор гуде/смикається але не крутить, чи повна тиша?",
+      "method": "listen",
+      "outcomes": [
+        { "label": "Гуде / смикається, ніби заклинений", "next": "c_motor_jam" },
+        { "label": "Повна тиша", "next": "one_motor_wire" }
+      ]
+    },
+    "one_motor_wire": {
+      "type": "check",
+      "id": "one_motor_wire",
+      "instruction": "Огляньте 3 фазні дроти мотора і пайку сигналу до ESC",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Обрив / підгоріла пайка фази", "next": "c_motor_phase" },
+        { "label": "Пайка ціла", "next": "c_esc_or_motor" }
+      ]
+    },
+    "all_motors": {
+      "type": "check",
+      "id": "all_motors",
+      "instruction": "Батарея підключена (не лише USB)? ESC дали стартову мелодію?",
+      "method": "listen",
+      "note": "Від USB мотори не крутять — потрібна батарея. Слухай мелодію ініціалізації ESC.",
+      "outcomes": [
+        { "label": "Лише USB, без батареї", "next": "c_no_battery" },
+        { "label": "Батарея є, ESC мовчать", "next": "c_esc_power" },
+        { "label": "ESC пищать помилку", "next": "c_esc_proto" }
+      ]
+    },
+
+    "c_motor_order": {
+      "type": "cause",
+      "id": "c_motor_order",
+      "cause": "Невірний порядок/розкладка моторів (motor mapping)",
+      "fix_steps": [
+        "Betaflight Motors → перевір нумерацію по схемі квадрокоптера.",
+        "Виправ через Motor Remap (BF 4.5+) або CLI `resource MOTOR`.",
+        "Перевір кожен мотор по черзі у Motors-вкладці."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 10
+    },
+    "c_motor_dir": {
+      "type": "cause",
+      "id": "c_motor_dir",
+      "cause": "Невірний напрямок обертання моторів",
+      "fix_steps": [
+        "У Motors-вкладці (правий клік по мотору) зміни напрямок, якщо ESC підтримує.",
+        "Або переший напрямок у BLHeli / поміняй місцями 2 фазних дроти мотора.",
+        "Звір напрямки зі схемою 'props in/out'."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 5
+    },
+    "c_motor_jam": {
+      "type": "cause",
+      "id": "c_motor_jam",
+      "cause": "Мотор механічно заклинений (сміття, підшипник, гнутий вал)",
+      "fix_steps": [
+        "Прокрути мотор рукою — має йти вільно.",
+        "Витягни намотану траву/дріт з-під дзвона, почисти.",
+        "За хрускоту — заміна підшипника або мотора."
+      ],
+      "fix_action": "clean",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 15
+    },
+    "c_motor_phase": {
+      "type": "cause",
+      "id": "c_motor_phase",
+      "cause": "Обрив фази мотора або холодна пайка на ESC",
+      "fix_steps": [
+        "Перепай 3 фазні майданчики мотора на ESC.",
+        "Прозвони фази мотора між собою (мають дзвонитися).",
+        "Перевір вихідні MOSFET відповідного каналу ESC."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 15
+    },
+    "c_esc_or_motor": {
+      "type": "cause",
+      "id": "c_esc_or_motor",
+      "cause": "Несправний канал ESC або сам мотор",
+      "fix_steps": [
+        "Підмінь мотор завідомо робочим на цей же канал.",
+        "Крутить — мертвий мотор; тиша — мертвий канал ESC.",
+        "Заміна несправного елемента."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 25
+    },
+    "c_no_battery": {
+      "type": "cause",
+      "id": "c_no_battery",
+      "cause": "Немає батареї — від USB мотори не запускаються",
+      "fix_steps": [
+        "Зніми пропелери.",
+        "Підключи LiPo.",
+        "Повтори тест у Motors-вкладці."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 2
+    },
+    "c_esc_power": {
+      "type": "cause",
+      "id": "c_esc_power",
+      "cause": "ESC без живлення або не ініціалізуються",
+      "fix_steps": [
+        "Перевір пайку XT60 і живлення ESC, цілість конденсатора.",
+        "Прозвони живлення стека на КЗ.",
+        "Звір протокол ESC у Configuration."
+      ],
+      "fix_action": "rewire",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 20
+    },
+    "c_esc_proto": {
+      "type": "cause",
+      "id": "c_esc_proto",
+      "cause": "Невірний протокол ESC або помилка прошивки ESC",
+      "fix_steps": [
+        "Вистав DSHOT300/600 відповідно до можливостей ESC.",
+        "Онови прошивку BLHeli_S/BLHeli_32.",
+        "Перевір тон-коди помилок ESC у мануалі."
+      ],
+      "fix_action": "reflash",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 20
+    }
+  }
+}

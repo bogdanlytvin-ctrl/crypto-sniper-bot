@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — звірити з документацією HappyModel",
+  "id": "happymodel-ep2-elrs",
+  "type": "receiver",
+  "brand": "HappyModel",
+  "model": "EP2 (ELRS 2.4G)",
+  "protocol": "CRSF",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["5V"],
+    "current_draw_ma": 70,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "5V", "connects_to": "5V BEC" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Serial RX; Receiver: Serial (CRSF)",
+  "known_issues": [
+    {
+      "issue": "Дрібні пади — легко відірвати при пайці",
+      "workaround": "Фіксувати дроти краплею клею/UV-смоли"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
+  "source_url": "https://www.happymodel.cn"
+}

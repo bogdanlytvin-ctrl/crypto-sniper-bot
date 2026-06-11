@@ -129,7 +129,7 @@ def execute_sell(token_address: str, amount_tokens_raw: int, private_key: str,
         path = [w3.to_checksum_address(token_address), w3.to_checksum_address(WBNB)]
         deadline = int(time.time()) + 300
 
-        # Check allowance and approve if needed (send exactly once)
+        # Check allowance and approve if needed
         allowance = token.functions.allowance(
             account.address, w3.to_checksum_address(PANCAKE_ROUTER)).call()
         if allowance < amount_tokens_raw:
@@ -142,8 +142,9 @@ def execute_sell(token_address: str, amount_tokens_raw: int, private_key: str,
                 "chainId": 56,
             })
             signed_approve = w3.eth.account.sign_transaction(approve_tx, private_key)
-            approve_hash = w3.eth.send_raw_transaction(signed_approve.raw_transaction)
-            w3.eth.wait_for_transaction_receipt(approve_hash, timeout=60)
+            w3.eth.send_raw_transaction(signed_approve.raw_transaction)
+            w3.eth.wait_for_transaction_receipt(
+                w3.eth.send_raw_transaction(signed_approve.raw_transaction), timeout=60)
 
         amounts = router.functions.getAmountsOut(amount_tokens_raw, path).call()
         amount_out_min = int(amounts[-1] * (1 - slippage_pct / 100))
