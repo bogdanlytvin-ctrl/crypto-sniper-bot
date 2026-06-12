@@ -77,8 +77,8 @@ const ROLE_KEY: Record<Component['type'], string> = {
   gps: 'gps',
 };
 
-// UART-и з цими default_function вважаємо зарезервованими
-const RESERVED_FUNCTIONS = ['ESC telemetry'];
+// UART-и з цими default_function вважаємо зарезервованими (не пропонуємо під периферію)
+const RESERVED_FUNCTIONS = ['ESC telemetry', 'Bluetooth'];
 
 // Порядок призначення: спершу найвимогливіші (цифровий VTX часто прив'язаний до роз'єму)
 const ASSIGN_ORDER: Component['type'][] = ['vtx_digital', 'receiver', 'gps', 'vtx_analog'];

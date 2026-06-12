@@ -1,5 +1,5 @@
 {
-  "$comment": "DRAFT — заповнено по типовій конфігурації, ОБОВ'ЯЗКОВО звірити з http://www.mateksys.com/?portfolio=f405-te перед публікацією",
+  "$comment": "MANUAL_CHECKED — залізо звірено з ArduPilot (6 UART, target MATEKF405TE, I2C-компас, BEC 5V+9V+3V3, STM32F405, baro SPL06). UART-пади вільно призначувані (немає хардкодних спец-портів) — recommended_for тут це порада. Field-перевірка ще потрібна.",
   "id": "matek-f405-te",
   "type": "flight_controller",
   "brand": "Mateksys",
@@ -32,9 +32,13 @@
     {
       "issue": "F405 без апаратних інверторів — SBUS напряму на RX-пад не працює",
       "workaround": "Використовувати CRSF/ELRS",
-      "source_url": ""
+      "source_url": "https://betaflight.com/docs/wiki"
     }
   ],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-10" },
-  "source_url": "http://www.mateksys.com/?portfolio=f405-te"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: ArduPilot + Matek docs",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://ardupilot.org/copter/docs/common-matekf405-te.html"
 }
