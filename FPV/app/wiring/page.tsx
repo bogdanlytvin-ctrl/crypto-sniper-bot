@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { buildPlan, type Component } from '@/lib/engine';
 import { BOARDS, RECEIVERS, VTXS, GPSES } from '@/lib/data';
+import { BoardPads } from './pad-map';
 
 const NONE = '—';
 
@@ -49,6 +50,7 @@ export default function WiringPage() {
   const [rxId, setRxId] = useState(RECEIVERS[0]?.id ?? NONE);
   const [vtxId, setVtxId] = useState(VTXS[0]?.id ?? NONE);
   const [gpsId, setGpsId] = useState(NONE);
+  const [showPads, setShowPads] = useState(false);
 
   const board = BOARDS.find((b) => b.id === boardId)!;
 
@@ -118,6 +120,9 @@ export default function WiringPage() {
             hint="Модулі з компасом додатково займають шину I2C."
             options={GPSES.map((c) => ({ id: c.id, name: `${c.brand} ${c.model}` }))}
           />
+          <button className="ghost pads-toggle" onClick={() => setShowPads((s) => !s)}>
+            {showPads ? 'сховати схему падів' : '▦ схема падів плати'}
+          </button>
         </section>
 
         <section className="plan" aria-label="План підключення" aria-live="polite">
@@ -189,6 +194,8 @@ export default function WiringPage() {
           )}
         </section>
       </div>
+
+      {showPads && <BoardPads board={board} />}
 
       <footer className="colophon">
         <span>плат у базі: {BOARDS.length}</span>

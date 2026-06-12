@@ -34,6 +34,7 @@ export default function JournalPage() {
   const [editing, setEditing] = useState<RepairRecord | null>(null);
   const [boardFilter, setBoardFilter] = useState(ALL);
   const [statusFilter, setStatusFilter] = useState(ALL);
+  const [showStats, setShowStats] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   async function reload() {
@@ -78,6 +79,26 @@ export default function JournalPage() {
     }),
     [repairs],
   );
+
+  const analytics = useMemo(() => {
+    const byCause = new Map<string, number>();
+    const byBoard = new Map<string, number>();
+    const byPart = new Map<string, number>();
+    let minutes = 0;
+    for (const r of repairs) {
+      if (r.causeLabel) byCause.set(r.causeLabel, (byCause.get(r.causeLabel) ?? 0) + 1);
+      if (r.boardLabel) byBoard.set(r.boardLabel, (byBoard.get(r.boardLabel) ?? 0) + 1);
+      r.parts
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .forEach((p) => byPart.set(p, (byPart.get(p) ?? 0) + 1));
+      minutes += r.minutesSpent ?? 0;
+    }
+    const top = (m: Map<string, number>, n = 5) =>
+      Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, n);
+    return { causes: top(byCause), boards: top(byBoard), parts: top(byPart), minutes };
+  }, [repairs]);
 
   function startNew() {
     setEditing(newRepair({ boardId: BOARDS[0].id, boardLabel: boardLabelOf(BOARDS[0].id) }));
@@ -297,6 +318,11 @@ export default function JournalPage() {
             <option value="scrapped">у брак</option>
           </select>
           <div className="jr-io">
+            {repairs.length > 0 && (
+              <button className="ghost" onClick={() => setShowStats((s) => !s)}>
+                📊 аналітика
+              </button>
+            )}
             <button className="ghost" onClick={exportJournal}>
               ↓ експорт
             </button>
@@ -312,6 +338,46 @@ export default function JournalPage() {
             />
           </div>
         </div>
+      )}
+
+      {/* Аналітика по парку */}
+      {!editing && showStats && repairs.length > 0 && (
+        <section className="jr-analytics" aria-label="Аналітика">
+          <div className="jr-an-time">
+            Сумарний час ремонтів: <b>{Math.round(analytics.minutes / 60)} год {analytics.minutes % 60} хв</b>
+          </div>
+          <div className="jr-an-cols">
+            <div className="jr-an-col">
+              <h4>Найчастіші причини</h4>
+              {analytics.causes.length === 0 && <p className="jr-an-empty">нема даних</p>}
+              {analytics.causes.map(([name, n]) => (
+                <div className="jr-an-row" key={name}>
+                  <span>{name}</span>
+                  <b>{n}</b>
+                </div>
+              ))}
+            </div>
+            <div className="jr-an-col">
+              <h4>Найчастіші плати</h4>
+              {analytics.boards.map(([name, n]) => (
+                <div className="jr-an-row" key={name}>
+                  <span>{name}</span>
+                  <b>{n}</b>
+                </div>
+              ))}
+            </div>
+            <div className="jr-an-col">
+              <h4>Запчастини</h4>
+              {analytics.parts.length === 0 && <p className="jr-an-empty">нема даних</p>}
+              {analytics.parts.map(([name, n]) => (
+                <div className="jr-an-row" key={name}>
+                  <span>{name}</span>
+                  <b>{n}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* Список */}

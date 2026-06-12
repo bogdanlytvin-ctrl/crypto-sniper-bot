@@ -26,6 +26,12 @@ build/
 .turbo/
 *.tsbuildinfo
 
+# === бази даних / рантайм-дані (регенеруються, можуть містити чутливе) ===
+*.db
+*.sqlite
+*.sqlite3
+SITESCACER/logs/
+
 # === логи / тимчасове ===
 *.log
 .DS_Store

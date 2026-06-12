@@ -1,0 +1,137 @@
+{
+  "$comment": "DRAFT-дерево. ESC desync — мотор зупиняється в польоті, борт перекидається. Один з топ-відмов FPV. Фікс-значення за Oscar Liang / Betaflight. НЕ звірено живим ремонтом.",
+  "id": "esc-desync",
+  "symptom": "Мотор зупиняється в польоті (desync)",
+  "summary": "ESC втрачає синхронізацію з мотором — мотор стопориться/смикається, дрон перекидається. Спершу софт (rampup/demag), потім залізо.",
+  "applies_to": {},
+  "entry": "desync_when",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://oscarliang.com/fix-esc-desync/",
+  "nodes": {
+    "desync_when": {
+      "type": "check",
+      "id": "desync_when",
+      "instruction": "Коли стається зрив синхронізації?",
+      "method": "configurator",
+      "note": "Desync = ESC втратив синхронізацію з мотором: мотор стопориться/смикається, борт перекидається. Найчастіше на різких змінах газу.",
+      "outcomes": [
+        { "label": "На різкому газі / рапідному тротлі", "next": "desync_rampup" },
+        { "label": "Хаотично, ESC/мотор грілись", "next": "desync_hardware" },
+        { "label": "Після удару / краша", "next": "desync_mech" }
+      ]
+    },
+    "desync_rampup": {
+      "type": "check",
+      "id": "desync_rampup",
+      "instruction": "Які налаштування ESC: rampup power і demag compensation?",
+      "method": "configurator",
+      "note": "Класичний софт-фікс desync — почни з нього перед розбиранням.",
+      "outcomes": [
+        { "label": "Rampup зависокий / demag = Low або Off", "next": "c_desync_rampup" },
+        { "label": "Вже крутив rampup/demag — не допомогло", "next": "desync_timing" }
+      ]
+    },
+    "desync_timing": {
+      "type": "check",
+      "id": "desync_timing",
+      "instruction": "Motor timing і протокол (DSHOT) відповідають мотору?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Timing/протокол не оптимальні", "next": "c_desync_timing" },
+        { "label": "Софт налаштовано вірно — дивись залізо", "next": "desync_hardware" }
+      ]
+    },
+    "desync_hardware": {
+      "type": "check",
+      "id": "desync_hardware",
+      "instruction": "Огляньте фази мотора, пайку на ESC і ознаки перегріву",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Холодна пайка фази / окислення", "next": "c_desync_solder" },
+        { "label": "ESC грівся / деградація MOSFET", "next": "c_desync_esc" },
+        { "label": "Мотор грівся / закус", "next": "c_desync_motor" }
+      ]
+    },
+    "desync_mech": {
+      "type": "check",
+      "id": "desync_mech",
+      "instruction": "Після удару: вал, підшипники, магніти мотора цілі?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Гнутий вал / биті підшипники / зміщені магніти", "next": "c_desync_motor" },
+        { "label": "Механіка ціла", "next": "desync_hardware" }
+      ]
+    },
+
+    "c_desync_rampup": {
+      "type": "cause",
+      "id": "c_desync_rampup",
+      "cause": "Завеликий rampup power / низький demag compensation",
+      "fix_steps": [
+        "BLHeli_S: rampup power ≈ 0.125 (BLHeli_32: ≈ 12%); підіймай потроху, якщо пропи мнуться при armed.",
+        "Demag Compensation = High — допомагає виходити з desync, а не падати.",
+        "Збережи і протестуй на рампах газу (без пропелерів спершу)."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/fix-esc-desync/",
+      "est_minutes": 10
+    },
+    "c_desync_timing": {
+      "type": "cause",
+      "id": "c_desync_timing",
+      "cause": "Невідповідний motor timing або протокол ESC",
+      "fix_steps": [
+        "Підбери motor timing під мотор (часто Auto/Medium-High).",
+        "Перевір протокол (DSHOT300/600) і онови прошивку ESC (BLHeli_S/32).",
+        "Тест на рампах газу."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://oscarliang.com/fix-esc-desync/",
+      "est_minutes": 15
+    },
+    "c_desync_solder": {
+      "type": "cause",
+      "id": "c_desync_solder",
+      "cause": "Холодна пайка / окислення фази мотора",
+      "fix_steps": [
+        "Перепай 3 фазні майданчики мотора на ESC з флюсом.",
+        "Прозвони фази; почисти окислення.",
+        "Перевір на рампах газу."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 15
+    },
+    "c_desync_esc": {
+      "type": "cause",
+      "id": "c_desync_esc",
+      "cause": "Деградація/перегрів каналу ESC (MOSFET)",
+      "fix_steps": [
+        "Забезпеч тепловідвід/обдув ESC.",
+        "Перевір MOSFET каналу на пробій.",
+        "За деградації — заміна ESC."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://oscarliang.com/fix-esc-desync/",
+      "est_minutes": 25
+    },
+    "c_desync_motor": {
+      "type": "cause",
+      "id": "c_desync_motor",
+      "cause": "Несправний мотор (вал / підшипники / магніти)",
+      "fix_steps": [
+        "Прокрути мотор рукою — вільно, без хрускоту й закусу.",
+        "За гнутого валу / зміщених магнітів — заміна мотора.",
+        "Підтверди підміною завідомо робочим."
+      ],
+      "fix_action": "replace",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 20
+    }
+  }
+}

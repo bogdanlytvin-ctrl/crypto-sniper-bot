@@ -34,6 +34,22 @@ const TOOLS = [
     cta: 'Підібрати прошивку',
     accent: 'ground' as const,
   },
+  {
+    href: '/connect',
+    code: 'USB',
+    title: 'Опитати плату',
+    desc: 'Підключи FC по USB — плата сама скаже хто вона, прошивку й версію. Desktop Chrome.',
+    cta: 'Підключити плату',
+    accent: 'copper' as const,
+  },
+  {
+    href: '/checklist',
+    code: 'CHK',
+    title: 'Чек-листи',
+    desc: 'Передполітний, приймання після ремонту, профілактика — за реальними причинами відмов.',
+    cta: 'Відкрити чек-листи',
+    accent: 'ok' as const,
+  },
 ];
 
 export default function HomePage() {

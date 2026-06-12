@@ -28,6 +28,8 @@ import overheat from '@/data/flows/overheat.json';
 import noOsd from '@/data/flows/no-osd.json';
 import noTelemetry from '@/data/flows/no-telemetry.json';
 import voltageSag from '@/data/flows/voltage-sag.json';
+import escDesync from '@/data/flows/esc-desync.json';
+import rebootInflight from '@/data/flows/reboot-inflight.json';
 
 import rp3 from '@/data/components/radiomaster-rp3-elrs.json';
 import ep2 from '@/data/components/happymodel-ep2-elrs.json';
@@ -71,6 +73,8 @@ export const FLOWS = [
   noOsd,
   noTelemetry,
   voltageSag,
+  escDesync,
+  rebootInflight,
 ] as unknown as DiagnosticFlow[];
 
 // Дев-перевірка цілісності дерев: биті next/відсутні source ловимо до деплою,

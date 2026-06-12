@@ -245,6 +245,8 @@ footer.colophon {
 .tool.power { border-left-color: var(--wire-power); }
 .tool.i2c { border-left-color: var(--wire-i2c); }
 .tool.ground { border-left-color: var(--wire-ground); }
+.tool.copper { border-left-color: var(--copper); }
+.tool.ok { border-left-color: var(--ok); }
 .tool .tool-code {
   font-family: var(--mono);
   font-size: 11px;
@@ -521,6 +523,26 @@ footer.colophon {
 .jr-form .field { margin-bottom: 0; }
 .jr-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
+/* ===== Аналітика журналу ===== */
+.jr-analytics {
+  background: var(--card); border: 1px solid var(--card-edge);
+  border-top: 3px solid var(--wire-i2c); border-radius: 12px; padding: 18px; margin-bottom: 18px;
+}
+.jr-an-time { font-size: 14px; color: var(--silk-dim); margin-bottom: 14px; }
+.jr-an-time b { color: var(--silk); font-family: var(--mono); }
+.jr-an-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.jr-an-col h4 {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--copper); margin-bottom: 8px;
+}
+.jr-an-row {
+  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  font-size: 13px; padding: 4px 0; border-bottom: 1px dashed var(--card-edge);
+}
+.jr-an-row span { color: var(--silk); }
+.jr-an-row b { font-family: var(--mono); color: var(--ok); }
+.jr-an-empty { font-size: 13px; color: var(--silk-dim); }
+
 .jr-list { display: flex; flex-direction: column; gap: 12px; }
 .jr-card {
   background: var(--card);
@@ -603,3 +625,96 @@ footer.colophon {
   color: var(--ok);
 }
 .fw-preset p { margin-top: 8px; font-size: 13px; color: var(--silk-dim); }
+
+/* ===== Схема падів плати ===== */
+.pads-toggle { width: 100%; margin-top: 4px; }
+.padmap { margin-top: 22px; }
+.padmap-board {
+  background:
+    radial-gradient(circle, rgba(26, 46, 33, 0.6) 1px, transparent 1px) 0 0 / 18px 18px,
+    var(--inset);
+  border: 2px solid var(--copper-soft);
+  border-radius: 14px;
+  padding: 18px;
+}
+.padmap-mcu {
+  font-family: var(--mono); font-size: 13px; color: var(--copper);
+  letter-spacing: 0.04em; margin-bottom: 14px;
+}
+.padmap-section { margin-bottom: 16px; }
+.padmap-section:last-child { margin-bottom: 0; }
+.padmap-section h4 {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--silk-dim); margin-bottom: 8px;
+}
+.pm-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 5px 0; border-bottom: 1px dashed var(--card-edge);
+}
+.pm-name { font-family: var(--mono); font-size: 13px; color: var(--silk); min-width: 54px; }
+.pm-pad {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  background: var(--board); border: 1px solid; border-radius: 5px;
+  width: 44px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+}
+.pm-pad.signal { color: var(--wire-signal); border-color: var(--wire-signal); }
+.pm-pad.power { color: var(--wire-power); border-color: var(--wire-power); width: auto; padding: 0 10px; }
+.pm-pad.ground { color: var(--wire-ground); border-color: var(--wire-ground); }
+.pm-pad.i2c { color: var(--wire-i2c); border-color: var(--wire-i2c); width: auto; padding: 0 10px; }
+.pm-role { font-size: 12px; color: var(--silk-dim); }
+.padmap-note { margin-top: 12px; font-size: 12px; color: var(--silk-dim); }
+
+/* ===== Чек-листи ===== */
+.cl-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 18px; font-family: var(--mono); font-size: 13px; color: var(--silk-dim);
+}
+.cl-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.cl-card {
+  background: var(--card); border: 1px solid var(--card-edge);
+  border-top: 3px solid var(--ok); border-radius: 12px; padding: 18px;
+}
+.cl-card > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cl-card h2 { font-family: var(--mono); font-size: 16px; }
+.cl-count { font-family: var(--mono); font-size: 13px; color: var(--copper); }
+.cl-hint { font-size: 12px; color: var(--silk-dim); margin: 4px 0 12px; }
+.cl-card ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.cl-card label {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer;
+  font-size: 14px; line-height: 1.4;
+  border: 1px solid transparent;
+}
+.cl-card label:hover { background: var(--inset); }
+.cl-card label.on { color: var(--silk-dim); }
+.cl-card label.on span { text-decoration: line-through; }
+.cl-card input[type='checkbox'] {
+  width: 22px; height: 22px; margin-top: 1px; flex: none;
+  accent-color: var(--ok); cursor: pointer;
+}
+
+/* ===== Опитування плати по USB ===== */
+.cn { display: flex; flex-direction: column; gap: 16px; }
+.cn-card {
+  background: var(--card); border: 1px solid var(--card-edge);
+  border-top: 3px solid var(--copper); border-radius: 12px; padding: 20px;
+}
+.cn-card h2 { font-family: var(--mono); font-size: 17px; margin-bottom: 14px; }
+.cn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+@media (max-width: 520px) { .cn-grid { grid-template-columns: 1fr; } }
+.cn-grid .cn-wide { grid-column: 1 / -1; }
+.cn-grid dt {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--copper);
+}
+.cn-grid dd { font-family: var(--mono); font-size: 16px; color: var(--silk); margin-top: 3px; }
+.cn-match {
+  margin-top: 16px; padding: 12px 14px; border-radius: 8px; font-size: 14px;
+  border: 1px solid var(--card-edge);
+}
+.cn-match.ok { border-color: var(--ok); background: rgba(111, 191, 115, 0.07); }
+.cn-match.miss { border-color: var(--warn); background: rgba(224, 169, 62, 0.07); color: var(--warn); }
+.cn-match.miss code { color: var(--silk); }
+.cn-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cn-links .ghost { padding: 8px 12px; min-height: 0; font-size: 13px; }
+.cn-hint { font-size: 12px; color: var(--silk-dim); margin-top: 8px; }

@@ -1,0 +1,149 @@
+{
+  "$comment": "DRAFT-дерево. Плата перезавантажується/вимикається в польоті (brownout) або від КЗ/вологи. НЕ звірено живим ремонтом.",
+  "id": "reboot-inflight",
+  "symptom": "Перезавантаження / вимикання в польоті",
+  "summary": "FC ресетиться в повітрі (втрата керування на секунду, падіння). Brownout від просадки живлення, КЗ, вологи або тріщини після краша.",
+  "applies_to": {},
+  "entry": "reboot_when",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+  "nodes": {
+    "reboot_when": {
+      "type": "check",
+      "id": "reboot_when",
+      "instruction": "Коли перезавантажується?",
+      "method": "configurator",
+      "note": "Brownout = просадка напруги нижче порога живлення FC, плата ресетиться. Перевір Blackbox на розриви логів.",
+      "outcomes": [
+        { "label": "На піках газу / різкому маневрі", "next": "reboot_power" },
+        { "label": "Постійно/хаотично, навіть на столі", "next": "reboot_short" },
+        { "label": "Після вологи / удару", "next": "reboot_phys" }
+      ]
+    },
+    "reboot_power": {
+      "type": "check",
+      "id": "reboot_power",
+      "instruction": "Напруга сильно просідає під навантаженням? Конденсатор живлення стоїть?",
+      "method": "multimeter",
+      "outcomes": [
+        { "label": "Сильно просідає / немає конденсатора", "next": "c_reboot_sag" },
+        { "label": "Напруга тримається — дивись пайку", "next": "reboot_solder" }
+      ]
+    },
+    "reboot_solder": {
+      "type": "check",
+      "id": "reboot_solder",
+      "instruction": "Огляньте пайку живлення FC, роз'єм, силові шлейфи",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Холодна пайка живлення / тріщина", "next": "c_reboot_solder" },
+        { "label": "Ціле", "next": "reboot_short" }
+      ]
+    },
+    "reboot_short": {
+      "type": "check",
+      "id": "reboot_short",
+      "instruction": "Частковий КЗ, гарячі точки, металева стружка від краша?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Є гаряча точка / стружка / міст припою", "next": "c_reboot_short" },
+        { "label": "Чисто", "next": "c_reboot_fc" }
+      ]
+    },
+    "reboot_phys": {
+      "type": "check",
+      "id": "reboot_phys",
+      "instruction": "Після вологи/удару: корозія, тріщини плати чи доріжок?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Волога / корозія / зелений наліт", "next": "c_reboot_moisture" },
+        { "label": "Тріщина плати або доріжки", "next": "c_reboot_crack" }
+      ]
+    },
+
+    "c_reboot_sag": {
+      "type": "cause",
+      "id": "c_reboot_sag",
+      "cause": "Просадка напруги під навантаженням (акумулятор / відсутній конденсатор)",
+      "fix_steps": [
+        "Деталі — у симптомі «Просідає живлення».",
+        "Постав low-ESR конденсатор на вхід живлення (гасить піки/шум).",
+        "Перевір акумулятор під навантаженням; бери достатній C-rating."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+      "est_minutes": 15
+    },
+    "c_reboot_solder": {
+      "type": "cause",
+      "id": "c_reboot_solder",
+      "cause": "Холодна пайка / тріщина на лінії живлення FC",
+      "fix_steps": [
+        "Перепай майданчики живлення FC і XT60.",
+        "Перевір на мікротріщини в пайці під вібрацією.",
+        "Тест: поворуши дроти під напругою — ресет = знайдено."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Power-and-Battery",
+      "est_minutes": 15
+    },
+    "c_reboot_short": {
+      "type": "cause",
+      "id": "c_reboot_short",
+      "cause": "Частковий КЗ (стружка / міст припою) ресетить плату",
+      "fix_steps": [
+        "Почисти плату від металевої стружки після краша (часта причина).",
+        "Шукай містки припою між падами під мікроскопом/лупою.",
+        "Прозвони живлення на КЗ."
+      ],
+      "fix_action": "clean",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 20
+    },
+    "c_reboot_fc": {
+      "type": "cause",
+      "id": "c_reboot_fc",
+      "cause": "Несправний FC або регулятор живлення",
+      "fix_steps": [
+        "Підтверди backup-ом і повторним тестом на столі з вібрацією.",
+        "Якщо ресет без видимих причин — деградація регулятора/MCU.",
+        "Заміна FC."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    },
+    "c_reboot_moisture": {
+      "type": "cause",
+      "id": "c_reboot_moisture",
+      "cause": "Волога / корозія — КЗ при вібрації",
+      "fix_steps": [
+        "Промий плату ізопропанолом (99%), просуши повністю.",
+        "Почисти корозію (зелений наліт) щіткою.",
+        "Після сушіння — conformal coating проти повторного намокання."
+      ],
+      "fix_action": "clean",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 25
+    },
+    "c_reboot_crack": {
+      "type": "cause",
+      "id": "c_reboot_crack",
+      "cause": "Тріщина плати або доріжки після удару",
+      "fix_steps": [
+        "Знайди розрив доріжки (лупа/прозвонка).",
+        "Відновити перемичкою тонким дротом.",
+        "За магістральних розривів — заміна FC."
+      ],
+      "fix_action": "resolder",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 30
+    }
+  }
+}
