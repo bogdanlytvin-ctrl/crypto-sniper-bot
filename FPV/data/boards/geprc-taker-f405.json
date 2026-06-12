@@ -1,5 +1,5 @@
 {
-  "$comment": "DRAFT — типова конфігурація GEPRC TAKER F405. НЕ звірено з мануалом. Звірити перед пайкою: https://geprc.com",
+  "$comment": "MANUAL_CHECKED — звірено з мануалом GEPRC Taker F405 (2026-06-12): BEC 9V 2.5A + 5V 3A, target GEPRCF405, 6 UART, 3-6S. Типова розводка з мануала: VTX=UART1, GPS=UART2, RX=UART3, камера=UART4. Field-перевірка ще потрібна.",
   "id": "geprc-taker-f405",
   "type": "flight_controller",
   "brand": "GEPRC",
@@ -10,14 +10,15 @@
   "voltage": {
     "input_cells": "3S-6S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 3.0, "notes": "для цифрового VTX (HD-версія)" }
+      { "voltage": "5V", "max_current_a": 3.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.5, "notes": "для цифрового VTX (HD-версія)" }
     ]
   },
   "uarts": [
-    { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади + plug", "inverted": false },
-    { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (HD VTX)", "inverted": false },
-    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (HD VTX)", "inverted": false, "notes": "За мануалом — VTX на TX1/RX1" },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false, "notes": "За мануалом — GPS на TX2/RX2" },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади + plug", "inverted": false, "notes": "За мануалом — приймач на RX3/TX3" },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false, "notes": "За мануалом — керування камерою на TX4/RX4" },
     { "name": "UART5", "pads": ["T5", "R5"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false },
     { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
   ],
@@ -27,6 +28,10 @@
   "known_issues": [
     { "issue": "F405 без апаратних інверторів — SBUS напряму не працює", "workaround": "ELRS/CRSF або SBUS-пад", "source_url": "https://betaflight.com/docs/wiki" }
   ],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://geprc.com"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: мануал GEPRC + огляд Oscar Liang",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://oscarliang.com/geprc-taker-f405/"
 }

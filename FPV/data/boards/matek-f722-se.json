@@ -1,5 +1,5 @@
 {
-  "$comment": "DRAFT — типова конфігурація Mateksys F722-SE. НЕ звірено з мануалом. Звірити перед пайкою: https://www.mateksys.com",
+  "$comment": "MANUAL_CHECKED — звірено з мануалом Matek F722-SE (2026-06-12). ВАЖЛИВО: НЕМАЄ 9V BEC (тільки 5V/4V5/3V3) — для цифрового VTX потрібен зовнішній 9V. 5 UART (1,2,3,4,6), не 6. Field-перевірка ще потрібна.",
   "id": "matek-f722-se",
   "type": "flight_controller",
   "brand": "Mateksys",
@@ -8,26 +8,31 @@
   "mcu": "STM32F722",
   "firmware_target": { "betaflight": "MATEKF722SE", "inav": "MATEKF722SE" },
   "voltage": {
-    "input_cells": "2S-6S",
+    "input_cells": "3S-8S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 2.0, "notes": "VTX/периферія (за джампером)" }
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для FC/RX/GPS/камери (cont. 2A, пік 3A). Окремого 9V НЕМАЄ — цифровий VTX від зовнішнього BEC" },
+      { "voltage": "4V5", "max_current_a": 0.5, "notes": "живиться і від USB — для налаштування RX без батареї" },
+      { "voltage": "3V3", "max_current_a": 0.2, "notes": "для 3.3V сенсорів" }
     ]
   },
   "uarts": [
     { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false },
-    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false, "notes": "SBUS-пад інвертований апаратно (F7 має інвертори)" },
-    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
-    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
-    { "name": "UART5", "pads": ["T5", "R5"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false },
-    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": null, "inverted": false }
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false, "notes": "RX2 — Serial RX за замовчуванням; SBUS працює (F7 має апаратні інвертори)" },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": null, "inverted": false, "notes": "Керування VTX; живлення цифрового VTX — зовнішнє (9V на платі немає)" }
   ],
   "motor_outputs": 8,
   "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
-  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
+  "onboard_peripherals": ["barometer", "blackbox_sd", "osd_analog", "current_sensor", "dual_gyro"],
   "known_issues": [
+    { "issue": "Немає 9V BEC — цифровий VTX (DJI/Vista) не живиться з плати напряму", "workaround": "Зовнішній 9V BEC від VBAT", "source_url": "https://www.mateksys.com/downloads/F722-SE_Manual.pdf" },
     { "issue": "F7 має апаратні інвертори — SBUS працює на виділеному SBUS-паді", "workaround": "Використовуй SBUS-пад для інвертованих протоколів", "source_url": "https://betaflight.com/docs/wiki" }
   ],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://www.mateksys.com"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: мануал Matek F722-SE (PDF)",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://www.mateksys.com/downloads/F722-SE_Manual.pdf"
 }

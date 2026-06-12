@@ -1,5 +1,5 @@
 {
-  "$comment": "DRAFT — типова конфігурація JHEMCU GHF405AIO (FC + 4in1 ESC). НЕ звірено з мануалом. Звірити перед пайкою.",
+  "$comment": "MANUAL_CHECKED — звірено з мануалом JHEMCU GHF405AIO (2026-06-12): BEC 5V 2.5A + 10V 2A (УВАГА: 10V, не 9V!), вхід 2S-6S, 5 UART (1,2,3,4,6), ICM42688P, вбудований 40A 4in1 ESC. Target залежить від ревізії (JHEF405 / JHEF405PRO). Field-перевірка ще потрібна.",
   "id": "jhemcu-ghf405aio",
   "type": "flight_controller",
   "brand": "JHEMCU",
@@ -8,24 +8,30 @@
   "mcu": "STM32F405",
   "firmware_target": { "betaflight": "JHEF405", "inav": "JHEF405" },
   "voltage": {
-    "input_cells": "3S-6S",
+    "input_cells": "2S-6S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX (за ревізією)" }
+      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
+      { "voltage": "10V", "max_current_a": 2.0, "notes": "для VTX (на цій платі 10V, не 9V — для O3/аналогу підходить діапазон входу)" }
     ]
   },
   "uarts": [
     { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["receiver", "any"], "connector": "пади", "inverted": false },
     { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": "SH1.0", "inverted": false },
     { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false },
     { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
   ],
   "motor_outputs": 4,
   "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
   "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "4in1_esc"],
   "known_issues": [
-    { "issue": "AIO: мотори вже розведені на вбудований 4in1 ESC — не плутати з зовнішнім", "workaround": "Перевір протокол ESC у Configuration", "source_url": "https://betaflight.com/docs/wiki" }
+    { "issue": "AIO: мотори вже розведені на вбудований 4in1 ESC (40A BLHeli_S) — не плутати з зовнішнім", "workaround": "Перевір протокол ESC у Configuration", "source_url": "https://betaflight.com/docs/wiki" },
+    { "issue": "VTX-BEC тут 10V, а не 9V — звір допустимий вхід VTX", "workaround": "Більшість цифрових VTX приймають 7.4-26.4V; аналогові звіряй за мануалом", "source_url": "https://betaflight.com/docs/wiki" }
   ],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: мануал JHEMCU GHF405AIO",
+    "date": "2026-06-12"
+  },
   "source_url": "https://www.jhemcu.com"
 }

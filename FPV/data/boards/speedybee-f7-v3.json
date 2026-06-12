@@ -1,5 +1,5 @@
 {
-  "$comment": "DRAFT — типова конфігурація SpeedyBee F7 V3. НЕ звірено з мануалом. Звірити перед пайкою: https://wiki.speedybee.com",
+  "$comment": "MANUAL_CHECKED — BEC і target звірено з мануалом/оглядом SpeedyBee F7 V3 (2026-06-12): 9V 4A + 5V 2A, STM32F722, ESC telem на RX4 (half). Призначення інших UART — порада. Field-перевірка ще потрібна.",
   "id": "speedybee-f7-v3",
   "type": "flight_controller",
   "brand": "SpeedyBee",
@@ -10,8 +10,8 @@
   "voltage": {
     "input_cells": "3S-6S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" },
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 4.0, "notes": "для цифрового VTX/камери (потужний 9V 4A — фішка F7 V3)" },
       { "voltage": "4V5", "max_current_a": 1.0, "notes": "живиться від USB — для налаштування RX без батареї" }
     ]
   },
@@ -26,7 +26,13 @@
   "motor_outputs": 8,
   "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
   "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "bluetooth"],
-  "known_issues": [],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://wiki.speedybee.com"
+  "known_issues": [
+    { "issue": "F7 V3 — 4 повних UART + половинний RX4 під ESC-телеметрію; звір призначення з мануалом", "workaround": "Плануй периферію під повні UART", "source_url": "https://oscarliang.com/speedybee-f7-v3/" }
+  ],
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: мануал SpeedyBee + огляд Oscar Liang",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://oscarliang.com/speedybee-f7-v3/"
 }
