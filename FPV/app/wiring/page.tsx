@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { buildPlan, type Component } from '@/lib/engine';
 import { BOARDS, RECEIVERS, VTXS, GPSES } from '@/lib/data';
+import { effectiveStatus, boardKey, useVerifications } from '@/lib/verify';
 import { BoardPads } from './pad-map';
 
 const NONE = '—';
@@ -51,6 +52,7 @@ export default function WiringPage() {
   const [vtxId, setVtxId] = useState(VTXS[0]?.id ?? NONE);
   const [gpsId, setGpsId] = useState(NONE);
   const [showPads, setShowPads] = useState(false);
+  const { map: verifyMap } = useVerifications();
 
   const board = BOARDS.find((b) => b.id === boardId)!;
 
@@ -63,7 +65,8 @@ export default function WiringPage() {
   }, [rxId, vtxId, gpsId]);
 
   const plan = useMemo(() => buildPlan(board, selected), [board, selected]);
-  const status = statusLabel[board.verified.status] ?? statusLabel.draft;
+  const effBoardStatus = effectiveStatus(board.verified.status, verifyMap, boardKey(board.id));
+  const status = statusLabel[effBoardStatus] ?? statusLabel.draft;
 
   return (
     <main className="wrap">

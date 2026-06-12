@@ -247,6 +247,7 @@ footer.colophon {
 .tool.ground { border-left-color: var(--wire-ground); }
 .tool.copper { border-left-color: var(--copper); }
 .tool.ok { border-left-color: var(--ok); }
+.tool.warn { border-left-color: var(--warn); }
 .tool .tool-code {
   font-family: var(--mono);
   font-size: 11px;
@@ -663,6 +664,32 @@ footer.colophon {
 .pm-pad.i2c { color: var(--wire-i2c); border-color: var(--wire-i2c); width: auto; padding: 0 10px; }
 .pm-role { font-size: 12px; color: var(--silk-dim); }
 .padmap-note { margin-top: 12px; font-size: 12px; color: var(--silk-dim); }
+
+/* ===== Звірка даних ===== */
+.vf-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 18px; font-family: var(--mono); font-size: 13px; color: var(--silk-dim);
+}
+.vf-io { display: flex; gap: 8px; }
+.vf-io .ghost { padding: 8px 12px; min-height: 0; font-size: 13px; }
+.vf-section { margin-bottom: 22px; }
+.vf-section h2 { font-family: var(--mono); font-size: 16px; margin-bottom: 12px; }
+.vf-row {
+  background: var(--card); border: 1px solid var(--card-edge); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.vf-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.vf-name { font-family: var(--mono); font-size: 14px; color: var(--silk); }
+.vf-head .badge { margin-left: auto; }
+.vf-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vf-controls select, .vf-controls input {
+  background: var(--inset); border: 1px solid var(--card-edge); border-radius: 6px;
+  color: var(--silk); font-family: var(--mono); font-size: 13px; padding: 8px 10px;
+}
+.vf-controls select { flex: 1 1 220px; }
+.vf-controls input { flex: 1 1 140px; }
+.vf-controls .vf-save { min-height: 0; padding: 8px 14px; }
+.vf-controls .ghost { min-height: 0; padding: 8px 12px; font-size: 13px; }
 
 /* ===== Чек-листи ===== */
 .cl-bar {

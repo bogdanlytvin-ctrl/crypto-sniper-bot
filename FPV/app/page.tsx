@@ -50,6 +50,14 @@ const TOOLS = [
     cta: 'Відкрити чек-листи',
     accent: 'ok' as const,
   },
+  {
+    href: '/verify',
+    code: 'VRF',
+    title: 'Звірка даних',
+    desc: 'Підіймай статус плат і дерев draft → звірено. Експорт звірок для роздачі бригаді.',
+    cta: 'Відкрити звірку',
+    accent: 'warn' as const,
+  },
 ];
 
 export default function HomePage() {

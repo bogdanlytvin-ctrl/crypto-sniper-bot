@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BOARDS, FLOWS } from '@/lib/data';
 import { newRepair, saveRepair } from '@/lib/idb';
+import { effectiveStatus, flowKey, useVerifications } from '@/lib/verify';
 import {
   getNode,
   isCause,
@@ -61,6 +62,7 @@ const ALL_CAPS = CAPS.map((c) => c.key);
 
 export default function DiagnosePage() {
   const router = useRouter();
+  const { map: verifyMap } = useVerifications();
   const [boardId, setBoardId] = useState(BOARDS[0].id);
   const [caps, setCaps] = useState<string[]>(ALL_CAPS);
   const [flowId, setFlowId] = useState<string | null>(null);
@@ -132,7 +134,10 @@ export default function DiagnosePage() {
   }
 
   const node = flow && currentId ? getNode(flow, currentId) : null;
-  const status = flow ? flowStatus[flow.verified.status] ?? flowStatus.draft : null;
+  const effStatus = flow
+    ? effectiveStatus(flow.verified.status, verifyMap, flowKey(flow.id))
+    : null;
+  const status = effStatus ? flowStatus[effStatus] ?? flowStatus.draft : null;
   const broken = Boolean(flow && currentId && !node); // «бите» дерево
 
   return (
