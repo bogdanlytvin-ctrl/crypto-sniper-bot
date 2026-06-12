@@ -1,30 +1,35 @@
 {
-  "$comment": "DRAFT — типова конфігурація iFlight BLITZ F722. НЕ звірено з мануалом. Звірити перед пайкою: https://shop.iflight.com",
+  "$comment": "MANUAL_CHECKED — звірено з мануалом iFlight BLITZ F7 V1.2 / F722 (2026-06-12): 6 UART, BEC 5V 2.5A + 9V 2A, target IFLIGHT_BLITZ_F722, STM32F722, ICM42688. UART-ролі: 1=VTX, 2=RX, 3/4/5=GPS/сенсори, 6=ESC telem. Field-перевірка ще потрібна.",
   "id": "iflight-blitz-f722",
   "type": "flight_controller",
   "brand": "iFlight",
   "model": "BLITZ F722",
-  "revision": "Mini/E55",
+  "revision": "F7 V1.2",
   "mcu": "STM32F722",
   "firmware_target": { "betaflight": "IFLIGHT_BLITZ_F722", "inav": null },
   "voltage": {
     "input_cells": "3S-6S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
       { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" }
     ]
   },
   "uarts": [
-    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (DJI plug)", "inverted": false },
-    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
-    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
-    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
-    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": null, "recommended_for": ["vtx_digital", "vtx_analog_control"], "connector": "SH1.0 (HD/Analog VTX)", "inverted": false, "notes": "За мануалом — VTX (HD або аналог)" },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false, "notes": "Приймач; F7 має апаратні інвертори (SBUS працює)" },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART5", "pads": ["T5", "R5"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false }
   ],
   "motor_outputs": 8,
   "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
   "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
   "known_issues": [],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://shop.iflight.com"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: wiring-мануал iFlight BLITZ F7/F722",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://shop.iflight.com/BLITZ-F7-Flight-Controller-Pro1692"
 }

@@ -1,30 +1,35 @@
 {
-  "$comment": "DRAFT — типова конфігурація GEPRC TAKER F722. НЕ звірено з мануалом. Звірити перед пайкою: https://geprc.com",
+  "$comment": "MANUAL_CHECKED для TAKER F722 SE (2026-06-12): BEC 5V 2.5A + 10V 2A, target TAKERF722SE (GEPRCF722 теж підходить), 6 UART (UART6 лише ESC), 2-6S, MPU6000. УВАГА: інші Taker F722 (HD V2 = 5V 3A+9V 2.5A; 45A AIO = 5V 1A) мають інший BEC — звір свій. Field-перевірка ще потрібна.",
   "id": "geprc-taker-f722",
   "type": "flight_controller",
   "brand": "GEPRC",
   "model": "TAKER F722",
-  "revision": "HD",
+  "revision": "SE",
   "mcu": "STM32F722",
-  "firmware_target": { "betaflight": "GEPRCF722", "inav": "GEPRCF722" },
+  "firmware_target": { "betaflight": "TAKERF722SE", "inav": "GEPRCF722" },
   "voltage": {
-    "input_cells": "3S-6S",
+    "input_cells": "2S-6S",
     "bec_outputs": [
       { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 3.0, "notes": "для цифрового VTX" }
+      { "voltage": "10V", "max_current_a": 2.0, "notes": "для VTX (на SE — 10V; HD-варіант 9V)" }
     ]
   },
   "uarts": [
     { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади + plug", "inverted": false },
     { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "SH1.0 (HD VTX)", "inverted": false },
-    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
-    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
-    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["any", "camera_control"], "connector": null, "inverted": false },
+    { "name": "UART5", "pads": ["T5", "R5"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false, "notes": "UART6 призначений лише під ESC-телеметрію" }
   ],
   "motor_outputs": 8,
   "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
   "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
   "known_issues": [],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://geprc.com"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: мануал GEPRC Taker F722 SE",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://geprc.com/product/geprc-taker-f722-se-flight-controller/"
 }

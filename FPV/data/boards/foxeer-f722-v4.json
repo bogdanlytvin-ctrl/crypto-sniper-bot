@@ -1,32 +1,37 @@
 {
-  "$comment": "DRAFT — типова конфігурація Foxeer F722 V4. НЕ звірено з мануалом. Звірити перед пайкою: https://www.foxeer.com",
+  "$comment": "MANUAL_CHECKED для варіанта 30x30 Dual BEC (5V/10V), 2026-06-12. УВАГА: у Foxeer F722 V4 БАГАТО варіантів з різним BEC — mini 20x20 лише 5V/3A; 30x30 dual 5V 2A+10V 2A; 3-6S 5V 3A+9V 3A; ICM 5V 3A+12V 3A. Цей профіль = 30x30 dual 5V/10V. ЗВІР СВІЙ ВАРІАНТ! target FOXEERF722V4, STM32F722RET6. Field-перевірка ще потрібна.",
   "id": "foxeer-f722-v4",
   "type": "flight_controller",
   "brand": "Foxeer",
   "model": "F722",
-  "revision": "V4",
+  "revision": "V4 30x30 (dual BEC 5V/10V)",
   "mcu": "STM32F722",
   "firmware_target": { "betaflight": "FOXEERF722V4", "inav": null },
   "voltage": {
-    "input_cells": "2S-6S",
+    "input_cells": "3S-8S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 2.0, "notes": "для VTX" },
-      { "voltage": "4V5", "max_current_a": 1.0, "notes": "живиться від USB — для налаштування RX без батареї" }
+      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
+      { "voltage": "10V", "max_current_a": 2.0, "notes": "для VTX (на цьому варіанті 10V; інші варіанти — 9V/12V)" }
     ]
   },
   "uarts": [
     { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
     { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_digital"], "connector": "plug", "inverted": false },
-    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
-    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps"], "connector": null, "inverted": false },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
     { "name": "UART5", "pads": ["T5", "R5"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false },
     { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
   ],
   "motor_outputs": 8,
   "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
   "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor"],
-  "known_issues": [],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://www.foxeer.com"
+  "known_issues": [
+    { "issue": "Багато варіантів Foxeer F722 V4 з різним BEC (mini 5V-only / 30x30 5V+10V / 3-6S 5V+9V / ICM 5V+12V) і різною к-стю UART (mini 4, інші до 6)", "workaround": "ОБОВ'ЯЗКОВО звір напругу VTX-BEC і к-сть UART зі своєю конкретною платою", "source_url": "https://www.foxeer.com/foxeer-f722-v4-dual-bec-5v-10v-hv-8s-mini-flight-controller-g-455" }
+  ],
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: Foxeer (варіант 30x30 dual BEC)",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://www.foxeer.com/foxeer-f722-v4-dual-bec-5v-10v-hv-8s-mini-flight-controller-g-455"
 }

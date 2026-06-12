@@ -1,23 +1,25 @@
 {
-  "$comment": "DRAFT — типова конфігурація Diatone Mamba F405 MK4. НЕ звірено з мануалом. Звірити перед пайкою.",
+  "$comment": "MANUAL_CHECKED — звірено з мануалом Diatone Mamba MK4 F405 Mini (2026-06-12): 6 UART, BEC 3V3 0.5A / 5V 2.5A / 9V 2A (два MP9943), target MAMBAF405_2022B (ICM42688P) або MAMBA_F405_2022A (MPU6500), STM32F405 168MHz. Field-перевірка ще потрібна.",
   "id": "diatone-mamba-f405-mk4",
   "type": "flight_controller",
   "brand": "Diatone",
   "model": "Mamba F405",
-  "revision": "MK4",
+  "revision": "MK4 Mini 20x20",
   "mcu": "STM32F405",
   "firmware_target": { "betaflight": "MAMBAF405_2022B", "inav": null },
   "voltage": {
     "input_cells": "3S-6S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 2.0, "notes": "для RX, GPS, камери" },
-      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" }
+      { "voltage": "5V", "max_current_a": 2.5, "notes": "для RX, GPS, камери" },
+      { "voltage": "9V", "max_current_a": 2.0, "notes": "для цифрового VTX" },
+      { "voltage": "3V3", "max_current_a": 0.5, "notes": "для 3.3V сенсорів" }
     ]
   },
   "uarts": [
     { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
     { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_digital", "any"], "connector": "plug", "inverted": false },
     { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
     { "name": "UART5", "pads": ["T5", "R5"], "default_function": "ESC telemetry", "recommended_for": ["esc_telemetry"], "connector": "ESC plug", "inverted": false },
     { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false }
   ],
@@ -27,6 +29,10 @@
   "known_issues": [
     { "issue": "F405 без апаратних інверторів — SBUS напряму не працює", "workaround": "ELRS/CRSF", "source_url": "https://betaflight.com/docs/wiki" }
   ],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://www.diatone.us"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: мануал Diatone Mamba MK4 F405 Mini",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://www.diatone.us/products/mb-mk4-f405-mini-fc"
 }
