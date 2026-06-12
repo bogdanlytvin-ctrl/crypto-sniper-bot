@@ -1,29 +1,37 @@
 {
-  "$comment": "DRAFT — НЕ ЗВІРЕНО і свідомо лишається draft. Відкриті джерела по 'JHEMCU GF16' суперечливі: частина вказує F405, частина F411, точних UART/BEC немає. Не вгадуємо пінаут (= ризик спаленої плати). Звір з фізичною платою/мануалом перед пайкою.",
+  "$comment": "MANUAL_CHECKED — звірено (2026-06-12) з мануалом JHEMCU + узгодженими лістингами (FPVELITE/SpeedyFPV/Amazon/jhemcu.com). ВИПРАВЛЕНО грубу помилку чернетки: GF16 — це F405, НЕ F411. STM32F405, MPU6000 (варіанти BMI270/ICM), 5 UART (1,2,3,4,6), BEC лише 5V/3A (9V НЕМАЄ), вхід 2-4S, 16x16мм, вбудований 13A 4in1 ESC. Target звір у конфігураторі. Field-перевірка ще потрібна.",
   "id": "jhemcu-gf16-aio",
   "type": "flight_controller",
   "brand": "JHEMCU",
   "model": "GF16",
-  "revision": "AIO F411",
-  "mcu": "STM32F411",
-  "firmware_target": { "betaflight": "JHEF411", "inav": null },
+  "revision": "F405 16x16 AIO",
+  "mcu": "STM32F405",
+  "firmware_target": { "betaflight": "JHEF405", "inav": null },
   "voltage": {
-    "input_cells": "1S-4S",
+    "input_cells": "2S-4S",
     "bec_outputs": [
-      { "voltage": "5V", "max_current_a": 1.5, "notes": "для RX, камери, малого VTX" }
+      { "voltage": "5V", "max_current_a": 3.0, "notes": "єдиний BEC — для RX/камери/малого VTX. 9V НЕМАЄ: цифровий VTX лише від зовнішнього BEC" }
     ]
   },
   "uarts": [
-    { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false },
-    { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_analog_control", "any"], "connector": null, "inverted": false, "notes": "SmartAudio для аналогового VTX" }
+    { "name": "UART1", "pads": ["T1", "R1"], "default_function": "Receiver", "recommended_for": ["receiver"], "connector": "пади", "inverted": false, "notes": "RC input; SBUS на RX1" },
+    { "name": "UART2", "pads": ["T2", "R2"], "default_function": null, "recommended_for": ["vtx_analog_control", "vtx_digital", "any"], "connector": null, "inverted": false, "notes": "SmartAudio або керування VTX" },
+    { "name": "UART3", "pads": ["T3", "R3"], "default_function": null, "recommended_for": ["gps", "any"], "connector": null, "inverted": false },
+    { "name": "UART4", "pads": ["T4", "R4"], "default_function": null, "recommended_for": ["any"], "connector": null, "inverted": false },
+    { "name": "UART6", "pads": ["T6", "R6"], "default_function": null, "recommended_for": ["esc_telemetry", "any"], "connector": null, "inverted": false }
   ],
   "motor_outputs": 4,
-  "i2c": [],
-  "onboard_peripherals": ["blackbox_flash", "osd_analog", "current_sensor", "4in1_esc"],
+  "i2c": [{ "name": "I2C1", "pads": ["SDA", "SCL"], "recommended_for": ["compass"] }],
+  "onboard_peripherals": ["barometer", "blackbox_flash", "osd_analog", "current_sensor", "4in1_esc"],
   "known_issues": [
-    { "issue": "F411 — лише 2-3 UART і менше пам'яті; немає вільного UART під GPS+VTX+RX одночасно", "workaround": "Плануй периферію під обмежені порти; GPS часто доводиться жертвувати", "source_url": "https://betaflight.com/docs/wiki" },
-    { "issue": "F411 без апаратних інверторів — SBUS напряму не працює", "workaround": "ELRS/CRSF", "source_url": "https://betaflight.com/docs/wiki" }
+    { "issue": "Немає 9V BEC — цифровий VTX (DJI/Vista) не живиться з плати", "workaround": "Зовнішній 9V BEC від VBAT, або аналоговий VTX від VBAT", "source_url": "https://betaflight.com/docs/wiki" },
+    { "issue": "F405 без апаратних інверторів — SBUS напряму на звичайний RX не працює (RX1 під SBUS виведено окремо)", "workaround": "ELRS/CRSF, або SBUS на RX1", "source_url": "https://betaflight.com/docs/wiki" },
+    { "issue": "Вбудований 4in1 ESC 13A, 2-4S — для важких бортів замало", "workaround": "GF16 — під мікро/легкі збірки", "source_url": "https://www.jhemcu.com/e_productshow/?76-JHEMCU-GF16-BMI-stack-F405-Flight-control-13A-ESC-76.html=" }
   ],
-  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-11" },
-  "source_url": "https://www.jhemcu.com"
+  "verified": {
+    "status": "manual_checked",
+    "checked_by": "web-звірка: JHEMCU + узгоджені лістинги (F405 підтверджено)",
+    "date": "2026-06-12"
+  },
+  "source_url": "https://www.jhemcu.com/e_productshow/?76-JHEMCU-GF16-BMI-stack-F405-Flight-control-13A-ESC-76.html="
 }
