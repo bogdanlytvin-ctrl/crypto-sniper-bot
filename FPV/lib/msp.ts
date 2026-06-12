@@ -20,11 +20,14 @@ export function webSerialSupported(): boolean {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const MAX_BUF = 4096; // стеля буфера — захист від шуму на USB-лінії
+
 export class MspClient {
   private port: any = null;
   private reader: any = null;
   private writer: any = null;
   private buf: number[] = [];
+  private pending: Promise<Uint8Array | null> | null = null; // активний read, переживає таймаут
 
   async connect(): Promise<void> {
     const serial = (navigator as any).serial;
@@ -66,6 +69,7 @@ export class MspClient {
     this.port = null;
     this.reader = null;
     this.writer = null;
+    this.pending = null;
   }
 
   private buildRequest(cmd: number, payload: number[] = []): Uint8Array {
@@ -75,39 +79,66 @@ export class MspClient {
     return new Uint8Array([0x24, 0x4d, 0x3c, size, cmd, ...payload, crc & 0xff]);
   }
 
-  // Витягуємо повний MSP-кадр для заданої команди з накопиченого буфера.
+  // Витягуємо кадр для заданої команди. Чужі/биті кадри СПОЖИВАЄМО з буфера
+  // (інакше при фоновій телеметрії FC буфер ріс би безмежно), ресинхронізуємось
+  // по байту '$', а сам буфер обмежений MAX_BUF.
   private tryExtract(cmd: number): Uint8Array | null {
-    const b = this.buf;
-    for (let i = 0; i + 5 <= b.length; i++) {
-      if (b[i] !== 0x24 || b[i + 1] !== 0x4d) continue; // '$M'
-      const dir = b[i + 2]; // '>' = 0x3e відповідь, '!' = 0x21 помилка
-      const size = b[i + 3];
-      const rcmd = b[i + 4];
-      const end = i + 5 + size; // індекс crc
-      if (end >= b.length) return null; // кадр ще не дочитаний
-      const payload = b.slice(i + 5, i + 5 + size);
+    while (true) {
+      // 1) відкинути сміття до першого '$'
+      let i = 0;
+      while (i < this.buf.length && this.buf[i] !== 0x24) i++;
+      if (i > 0) this.buf = this.buf.slice(i);
+      if (this.buf.length < 6) break; // мінімум: $ M dir size cmd crc
+      if (this.buf[1] !== 0x4d) {
+        this.buf = this.buf.slice(1); // '$' без 'M' — зсунутись і шукати далі
+        continue;
+      }
+      const dir = this.buf[2]; // 0x3e '>' відповідь, 0x21 '!' помилка
+      const size = this.buf[3];
+      const rcmd = this.buf[4];
+      const end = 5 + size; // індекс crc
+      if (this.buf.length <= end) break; // кадр ще не дочитаний — чекаємо
+
+      const payload = this.buf.slice(5, 5 + size);
       let crc = size ^ rcmd;
       for (const x of payload) crc ^= x;
-      const ok = (crc & 0xff) === b[end];
-      if (rcmd === cmd && dir === 0x3e && ok) {
-        this.buf = b.slice(end + 1);
-        return new Uint8Array(payload);
+      if ((crc & 0xff) !== this.buf[end]) {
+        this.buf = this.buf.slice(1); // бита crc — ресинк по байту
+        continue;
       }
-      // помилковий/чужий кадр — відкидаємо його початок і шукаємо далі
-      if (dir === 0x21 && rcmd === cmd) {
-        this.buf = b.slice(end + 1);
+      // валідний кадр — споживаємо повністю
+      this.buf = this.buf.slice(end + 1);
+      if (rcmd === cmd && dir === 0x3e) return new Uint8Array(payload);
+      if (rcmd === cmd && dir === 0x21) {
         throw new Error(`FC відповів помилкою на команду ${cmd}`);
       }
+      // інакше — валідний кадр іншої команди: спожитий, шукаємо далі
     }
+    if (this.buf.length > MAX_BUF) this.buf = this.buf.slice(this.buf.length - MAX_BUF);
     return null;
   }
 
-  private async readWithTimeout(deadline: number): Promise<Uint8Array | null> {
+  // Читання chunk-а з таймаутом. КЛЮЧОВЕ: при таймауті read НЕ скасовується, а
+  // зберігається в this.pending і перевикористовується наступним викликом —
+  // інакше орфанний read «з'їдав» би дані для наступної команди.
+  private async readChunk(deadline: number): Promise<Uint8Array | null> {
     const remaining = deadline - Date.now();
     if (remaining <= 0) return null;
-    const timeout = new Promise<null>((res) => setTimeout(() => res(null), remaining));
-    const read = this.reader.read().then((r: any) => (r.done ? null : r.value));
-    return Promise.race([read, timeout]);
+    if (!this.pending) {
+      this.pending = this.reader.read().then(
+        (r: any) => {
+          this.pending = null;
+          return r.done ? null : (r.value as Uint8Array);
+        },
+        () => {
+          this.pending = null;
+          return null;
+        },
+      );
+    }
+    const timeout = new Promise<'timeout'>((res) => setTimeout(() => res('timeout'), remaining));
+    const result = await Promise.race([this.pending, timeout]);
+    return result === 'timeout' ? null : (result as Uint8Array | null);
   }
 
   async request(cmd: number, timeoutMs = 1500): Promise<Uint8Array> {
@@ -117,13 +148,11 @@ export class MspClient {
     const pre = this.tryExtract(cmd);
     if (pre) return pre;
     while (Date.now() < deadline) {
-      const chunk = await this.readWithTimeout(deadline);
+      const chunk = await this.readChunk(deadline);
       if (chunk && chunk.length) {
         for (let i = 0; i < chunk.length; i++) this.buf.push(chunk[i]);
         const frame = this.tryExtract(cmd);
         if (frame) return frame;
-      } else if (chunk === null) {
-        break;
       }
     }
     throw new Error(`Таймаут MSP (команда ${cmd}) — плата не відповіла`);

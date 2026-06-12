@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BOARDS, FLOWS } from '@/lib/data';
@@ -69,15 +69,19 @@ export default function DiagnosePage() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [history, setHistory] = useState<PathStep[]>([]);
 
-  const board = BOARDS.find((b) => b.id === boardId) ?? BOARDS[0];
-  const flow = FLOWS.find((f) => f.id === flowId) ?? null;
+  const board = useMemo(() => BOARDS.find((b) => b.id === boardId) ?? BOARDS[0], [boardId]);
+  const flow = useMemo(() => FLOWS.find((f) => f.id === flowId) ?? null, [flowId]);
 
   // Показуємо лише симптоми, релевантні до того, що на борту (applies_to).
-  const visibleFlows = FLOWS.filter((f) => {
-    const need = f.applies_to?.has;
-    if (!need || need.length === 0) return true;
-    return need.some((h) => caps.includes(h));
-  });
+  const visibleFlows = useMemo(
+    () =>
+      FLOWS.filter((f) => {
+        const need = f.applies_to?.has;
+        if (!need || need.length === 0) return true;
+        return need.some((h) => caps.includes(h));
+      }),
+    [caps],
+  );
 
   function toggleCap(key: string) {
     setCaps((c) => (c.includes(key) ? c.filter((k) => k !== key) : [...c, key]));

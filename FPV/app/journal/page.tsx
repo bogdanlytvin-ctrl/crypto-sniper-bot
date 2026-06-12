@@ -7,10 +7,16 @@ import {
   deleteRepair,
   listRepairs,
   newRepair,
+  putManyRepairs,
   saveRepair,
   type RepairRecord,
   type RepairStatus,
 } from '@/lib/idb';
+
+const STATUSES: readonly RepairStatus[] = ['open', 'fixed', 'scrapped'];
+function asStr(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
 
 const STATUS: Record<RepairStatus, { label: string; cls: string }> = {
   open: { label: 'у роботі', cls: 'open' },
@@ -37,26 +43,27 @@ export default function JournalPage() {
   const [showStats, setShowStats] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  async function reload() {
+  async function reload(): Promise<RepairRecord[]> {
     try {
-      setRepairs(await listRepairs());
+      const list = await listRepairs();
+      setRepairs(list);
+      return list;
     } catch {
       setRepairs([]);
+      return [];
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    reload().then(() => {
-      // Підхоплюємо запис, створений із діагностики, одразу в редагування.
+    reload().then((list) => {
+      // Підхоплюємо запис, створений із діагностики, одразу в редагування (без 2-го читання БД).
       const openId = localStorage.getItem('ftos:open-edit');
       if (openId) {
         localStorage.removeItem('ftos:open-edit');
-        listRepairs().then((list) => {
-          const rec = list.find((r) => r.id === openId);
-          if (rec) setEditing(rec);
-        });
+        const rec = list.find((r) => r.id === openId);
+        if (rec) setEditing(rec);
       }
     });
   }, []);
@@ -155,17 +162,29 @@ export default function JournalPage() {
       const parsed = JSON.parse(await file.text());
       const arr: unknown = Array.isArray(parsed) ? parsed : parsed?.repairs;
       if (!Array.isArray(arr)) throw new Error('format');
-      let n = 0;
+      const valid: RepairRecord[] = [];
       for (const raw of arr) {
         if (!raw || typeof raw !== 'object') continue;
         const r = raw as Partial<RepairRecord>;
-        const rec = newRepair(r); // зберігає id/createdAt з файлу, доповнює дефолти
-        if (!(['open', 'fixed', 'scrapped'] as const).includes(rec.status)) rec.status = 'open';
-        await saveRepair(rec);
-        n++;
+        // НОВИЙ id — щоб імпорт не перезаписав наявні записи за збігом id.
+        const rec = newRepair({});
+        rec.droneTag = asStr(r.droneTag);
+        rec.boardId = asStr(r.boardId);
+        rec.boardLabel = asStr(r.boardLabel);
+        rec.symptomId = r.symptomId ? asStr(r.symptomId) : undefined;
+        rec.symptomLabel = r.symptomLabel ? asStr(r.symptomLabel) : undefined;
+        rec.causeLabel = r.causeLabel ? asStr(r.causeLabel) : undefined;
+        rec.fixAction = r.fixAction ? asStr(r.fixAction) : undefined;
+        rec.parts = asStr(r.parts);
+        rec.notes = asStr(r.notes);
+        rec.minutesSpent = typeof r.minutesSpent === 'number' ? r.minutesSpent : undefined;
+        rec.status = STATUSES.includes(r.status as RepairStatus) ? (r.status as RepairStatus) : 'open';
+        if (typeof r.createdAt === 'number') rec.createdAt = r.createdAt;
+        valid.push(rec);
       }
+      if (valid.length) await putManyRepairs(valid);
       await reload();
-      alert(`Імпортовано записів: ${n}`);
+      alert(`Імпортовано записів: ${valid.length}`);
     } catch {
       alert('Не вдалося імпортувати: невірний файл журналу.');
     }
@@ -320,7 +339,7 @@ export default function JournalPage() {
           <div className="jr-io">
             {repairs.length > 0 && (
               <button className="ghost" onClick={() => setShowStats((s) => !s)}>
-                📊 аналітика
+                ▦ аналітика
               </button>
             )}
             <button className="ghost" onClick={exportJournal}>

@@ -69,9 +69,9 @@ function Row({
       </div>
       <div className="vf-controls">
         <select value={status} onChange={(e) => setStatus(e.target.value as VerifyStatus)}>
-          <option value="draft">draft — не звірено</option>
-          <option value="manual_checked">manual_checked — звірено з мануалом</option>
-          <option value="field_tested">field_tested — перевірено в полі</option>
+          <option value="draft">не звірено</option>
+          <option value="manual_checked">звірено з мануалом</option>
+          <option value="field_tested">перевірено в полі (на залізі)</option>
         </select>
         <input
           value={checkedBy}

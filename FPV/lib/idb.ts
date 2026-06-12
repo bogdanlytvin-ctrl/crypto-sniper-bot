@@ -32,8 +32,11 @@ function genId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB недоступний (немає браузерного середовища)'));
       return;
@@ -51,22 +54,36 @@ function openDB(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+  // при помилці дозволяємо повторне відкриття наступного разу
+  dbPromise.catch(() => {
+    dbPromise = null;
+  });
+  return dbPromise;
 }
 
+// З'єднання тримаємо відкритим (кешований singleton) — не закриваємо після кожної tx.
 function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   return openDB().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
         const transaction = db.transaction(STORE, mode);
         const request = fn(transaction.objectStore(STORE));
-        transaction.oncomplete = () => {
-          db.close();
-          resolve(request.result);
-        };
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error);
-        };
+        transaction.oncomplete = () => resolve(request.result);
+        transaction.onerror = () => reject(transaction.error);
+      }),
+  );
+}
+
+// Батч-збереження в ОДНІЙ транзакції (для імпорту) замість N окремих.
+export function putManyRepairs(recs: RepairRecord[]): Promise<void> {
+  return openDB().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORE, 'readwrite');
+        const store = transaction.objectStore(STORE);
+        for (const r of recs) store.put(r);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
       }),
   );
 }

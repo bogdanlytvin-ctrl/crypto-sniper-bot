@@ -16,7 +16,7 @@ const TOOLS = [
     title: 'Карта підключення',
     desc: 'FC + RX + VTX + GPS → UART-и, пади, живлення, налаштування Betaflight.',
     cta: 'Зібрати карту',
-    accent: 'power' as const,
+    accent: 'copper' as const,
   },
   {
     href: '/journal',
@@ -24,7 +24,7 @@ const TOOLS = [
     title: 'Журнал ремонту',
     desc: 'Локальний облік: борт → симптом → причина → запчастини. Офлайн, без хмари.',
     cta: 'Відкрити журнал',
-    accent: 'i2c' as const,
+    accent: 'muted' as const,
   },
   {
     href: '/firmware',
@@ -32,7 +32,7 @@ const TOOLS = [
     title: 'Прошивки',
     desc: 'Правильний firmware target для плати + чесний чек-лист прошивки і CLI-пресети.',
     cta: 'Підібрати прошивку',
-    accent: 'ground' as const,
+    accent: 'muted' as const,
   },
   {
     href: '/connect',
@@ -40,7 +40,7 @@ const TOOLS = [
     title: 'Опитати плату',
     desc: 'Підключи FC по USB — плата сама скаже хто вона, прошивку й версію. Desktop Chrome.',
     cta: 'Підключити плату',
-    accent: 'copper' as const,
+    accent: 'muted' as const,
   },
   {
     href: '/checklist',
@@ -48,7 +48,7 @@ const TOOLS = [
     title: 'Чек-листи',
     desc: 'Передполітний, приймання після ремонту, профілактика — за реальними причинами відмов.',
     cta: 'Відкрити чек-листи',
-    accent: 'ok' as const,
+    accent: 'muted' as const,
   },
   {
     href: '/verify',
@@ -56,7 +56,15 @@ const TOOLS = [
     title: 'Звірка даних',
     desc: 'Підіймай статус плат і дерев draft → звірено. Експорт звірок для роздачі бригаді.',
     cta: 'Відкрити звірку',
-    accent: 'warn' as const,
+    accent: 'muted' as const,
+  },
+  {
+    href: '/reference',
+    code: 'REF',
+    title: 'Довідник',
+    desc: 'Частоти 5.8 ГГц, потужність VTX, LiPo, KV моторів, пропи — швидкі таблиці з джерелами.',
+    cta: 'Відкрити довідник',
+    accent: 'muted' as const,
   },
 ];
 

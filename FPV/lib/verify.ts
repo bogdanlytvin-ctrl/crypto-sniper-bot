@@ -19,8 +19,11 @@ const DB_NAME = 'ftos-verify';
 const STORE = 'verifications';
 const VERSION = 1;
 
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB недоступний'));
       return;
@@ -35,22 +38,21 @@ function openDB(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+  dbPromise.catch(() => {
+    dbPromise = null;
+  });
+  return dbPromise;
 }
 
+// Кешований singleton — не закриваємо після кожної операції.
 function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   return openDB().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
         const t = db.transaction(STORE, mode);
         const r = fn(t.objectStore(STORE));
-        t.oncomplete = () => {
-          db.close();
-          resolve(r.result);
-        };
-        t.onerror = () => {
-          db.close();
-          reject(t.error);
-        };
+        t.oncomplete = () => resolve(r.result);
+        t.onerror = () => reject(t.error);
       }),
   );
 }
@@ -98,7 +100,7 @@ export async function importVerifications(text: string): Promise<number> {
   const parsed = JSON.parse(text);
   const arr: unknown = Array.isArray(parsed) ? parsed : parsed?.items;
   if (!Array.isArray(arr)) throw new Error('format');
-  let n = 0;
+  const valid: VerificationRecord[] = [];
   for (const raw of arr) {
     if (!raw || typeof raw !== 'object') continue;
     const r = raw as Partial<VerificationRecord>;
@@ -106,16 +108,27 @@ export async function importVerifications(text: string): Promise<number> {
     if (!(['draft', 'manual_checked', 'field_tested'] as const).includes(r.status as VerifyStatus)) {
       continue;
     }
-    await saveVerification({
+    valid.push({
       key: r.key,
       status: r.status as VerifyStatus,
       checkedBy: typeof r.checkedBy === 'string' ? r.checkedBy : '',
       note: typeof r.note === 'string' ? r.note : '',
       date: typeof r.date === 'number' ? r.date : Date.now(),
     });
-    n++;
   }
-  return n;
+  if (valid.length === 0) return 0;
+  // одна транзакція на весь батч
+  await openDB().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const t = db.transaction(STORE, 'readwrite');
+        const s = t.objectStore(STORE);
+        for (const rec of valid) s.put(rec);
+        t.oncomplete = () => resolve();
+        t.onerror = () => reject(t.error);
+      }),
+  );
+  return valid.length;
 }
 
 // Хук для клієнтських сторінок: мапа оверрайдів + перезавантаження.

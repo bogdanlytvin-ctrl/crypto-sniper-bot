@@ -86,7 +86,7 @@ export default function ConnectPage() {
         <section className="cn">
           {status !== 'connected' && (
             <button className="primary" onClick={connect} disabled={status === 'connecting'}>
-              {status === 'connecting' ? 'Підключення…' : '🔌 Підключити плату по USB'}
+              {status === 'connecting' ? 'Підключення…' : '▸ Підключити плату по USB'}
             </button>
           )}
           {status === 'connected' && (
