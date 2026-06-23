@@ -5,48 +5,39 @@ const DEFAULT_DATA = {
   // site content
   name: "Богдан",
   tagline: {
-    ua: "Telegram-боти, сайти, лендинги",
-    en: "Telegram bots, websites, landings",
-    ru: "Telegram-боты, сайты, лендинги",
+    ua: "Telegram-боти · сайти · автоматизації",
+    en: "Telegram bots · websites · automations",
+    ru: "Telegram-боты · сайты · автоматизации",
   },
   bio: {
-    ua: "Ентузіаст-самоучка. Будую продукти, які економлять час і приносять гроші.",
-    en: "Self-taught enthusiast. I build products that save time and make money.",
-    ru: "Энтузиаст-самоучка. Строю продукты, которые экономят время и приносят деньги.",
+    ua: "Самоучка. Починаю шлях у розробці — вивчаю Python і JavaScript, роблю Telegram-боти та сайти для знайомих і перших клієнтів на фрілансі. Беруся за реальні задачі і роблю їх чесно.",
+    en: "Self-taught. Starting my dev journey — learning Python and JavaScript, building Telegram bots and websites for friends and first freelance clients. I take on real tasks and do them honestly.",
+    ru: "Самоучка. Начинаю путь в разработке — изучаю Python и JavaScript, делаю Telegram-боты и сайты для знакомых и первых клиентов на фрилансе. Берусь за реальные задачи и делаю их честно.",
   },
   heroTitle: {
-    ua: "Я будую цифрові\nінструменти, що\nпрацюють за вас",
-    en: "I build digital\ntools that work\nfor you",
-    ru: "Я создаю цифровые\nинструменты, что\nработают за вас",
+    ua: "Роблю боти\nта сайти —\nчесно і в строк",
+    en: "I build bots\nand websites —\nhonestly, on time",
+    ru: "Делаю ботов\nи сайты —\nчестно и в срок",
   },
   heroSub: {
-    ua: "Боти, лендинги, автоматизації. Від ідеї до запуску — зазвичай 3–10 днів.",
-    en: "Bots, landings, automations. From idea to launch — usually 3–10 days.",
-    ru: "Боты, лендинги, автоматизации. От идеи до запуска — обычно 3–10 дней.",
+    ua: "Самоучка на старті. Беруся за Telegram-ботів, лендинги та сайти-візитки. Ціни адекватні, результат реальний.",
+    en: "Self-taught, just getting started. I build Telegram bots, landings and business-card sites. Fair prices, real results.",
+    ru: "Самоучка в начале пути. Делаю Telegram-ботов, лендинги и сайты-визитки. Цены адекватные, результат реальный.",
   },
   // accent color
   accent: "#E89B3C", // amber/бурштин
 
   // services
   services: [
-    { id: "s1", icon: "◆", title: { ua: "Telegram-боти", en: "Telegram bots", ru: "Telegram-боты" }, desc: { ua: "Магазини, записи, квізи, нотифікації, CRM-інтеграції", en: "Shops, booking, quizzes, notifications, CRM", ru: "Магазины, записи, квизы, уведомления, CRM" }, price: "від $150" },
-    { id: "s2", icon: "▲", title: { ua: "Лендинги", en: "Landing pages", ru: "Лендинги" }, desc: { ua: "Адаптивні, швидкі, з аналітикою й A/B-тестами", en: "Responsive, fast, with analytics and A/B tests", ru: "Адаптивные, быстрые, с аналитикой и A/B-тестами" }, price: "від $200" },
-    { id: "s3", icon: "●", title: { ua: "Сайти-візитки", en: "Business-card sites", ru: "Сайты-визитки" }, desc: { ua: "Особистий бренд або бізнес — за тиждень під ключ", en: "Personal or business site — delivered in a week", ru: "Личный бренд или бизнес — под ключ за неделю" }, price: "від $180" },
-    { id: "s4", icon: "■", title: { ua: "Веб-додатки", en: "Web apps", ru: "Веб-приложения" }, desc: { ua: "React-додатки з бекендом, авторизацією, БД", en: "React apps with backend, auth, DB", ru: "React-приложения с бэкендом, авторизацией, БД" }, price: "від $500" },
-    { id: "s5", icon: "◈", title: { ua: "Автоматизації", en: "Automations", ru: "Автоматизации" }, desc: { ua: "n8n, Make, API-інтеграції. Економлю клієнтам години роботи", en: "n8n, Make, API integrations. I save clients hours of work", ru: "n8n, Make, API-интеграции. Экономлю часы работы" }, price: "від $100" },
-    { id: "s6", icon: "◉", title: { ua: "UI/UX дизайн", en: "UI/UX design", ru: "UI/UX дизайн" }, desc: { ua: "Макети у Figma з прототипами й дизайн-системою", en: "Figma mockups with prototypes and design system", ru: "Макеты в Figma с прототипами и дизайн-системой" }, price: "від $120" },
-    { id: "s7", icon: "✳", title: { ua: "Консультації", en: "Consulting", ru: "Консультации" }, desc: { ua: "Аудит, вибір стеку, допомога з архітектурою — 1 година", en: "Audit, stack selection, architecture help — 1 hour", ru: "Аудит, выбор стека, помощь с архитектурой — 1 час" }, price: "$30/год" },
+    { id: "s1", icon: "◆", title: { ua: "Telegram-боти", en: "Telegram bots", ru: "Telegram-боты" }, desc: { ua: "Прості боти для бізнесу: запис, нагадування, FAQ, прийом заявок", en: "Simple bots: booking, reminders, FAQ, lead collection", ru: "Простые боты: запись, напоминания, FAQ, приём заявок" }, price: "від $50" },
+    { id: "s2", icon: "▲", title: { ua: "Лендинги", en: "Landing pages", ru: "Лендинги" }, desc: { ua: "Односторінковий сайт для продукту або послуги з формою заявки", en: "One-page site for product or service with a lead form", ru: "Одностраничный сайт для продукта или услуги с формой заявки" }, price: "від $80" },
+    { id: "s3", icon: "●", title: { ua: "Сайти-візитки", en: "Business-card sites", ru: "Сайты-визитки" }, desc: { ua: "Особиста сторінка або сторінка бізнесу — портфоліо, контакти, послуги", en: "Personal or business page — portfolio, contacts, services", ru: "Личная страница или бизнеса — портфолио, контакты, услуги" }, price: "від $100" },
+    { id: "s4", icon: "◈", title: { ua: "Автоматизації", en: "Automations", ru: "Автоматизации" }, desc: { ua: "Прості інтеграції через n8n або API: форма → Telegram, таблиця → бот", en: "Simple integrations via n8n or API: form → Telegram, sheet → bot", ru: "Простые интеграции через n8n или API: форма → Telegram, таблица → бот" }, price: "від $40" },
   ],
 
   // portfolio projects
   projects: [
-    { id: "p1", title: "OrderBot", cat: "telegram", year: "2025", tag: { ua: "Бот для кав'ярні", en: "Coffee shop bot", ru: "Бот для кофейни" }, desc: { ua: "Прийом замовлень, оплата, інтеграція з POS. 400+ замовлень/міс.", en: "Orders, payments, POS integration. 400+ orders/mo.", ru: "Заказы, оплата, интеграция с POS. 400+ заказов/мес." }, stack: "Python · aiogram · Stripe", metric: "+38% заказов" },
-    { id: "p2", title: "Flux Landing", cat: "landing", year: "2025", tag: { ua: "SaaS-лендинг", en: "SaaS landing", ru: "SaaS-лендинг" }, desc: { ua: "Конверсія 6.2% — у 3 рази вище попереднього лендингу.", en: "6.2% conversion — 3× the previous landing.", ru: "Конверсия 6.2% — в 3 раза выше прошлой." }, stack: "Next.js · Framer Motion", metric: "×3 CR" },
-    { id: "p3", title: "MentorCard", cat: "card", year: "2026", tag: { ua: "Візитка для коуча", en: "Coach business card", ru: "Визитка коуча" }, desc: { ua: "Односторінковий сайт з автоматичним бронюванням дзвінків.", en: "One-pager with automated call booking.", ru: "Одностраничник с автобронированием звонков." }, stack: "HTML · Calendly · GA4", metric: "60 заявок/міс" },
-    { id: "p4", title: "StockSync", cat: "automation", year: "2025", tag: { ua: "Синк між 4 маркетплейсами", en: "4-marketplace sync", ru: "Синхронизация 4 маркетплейсов" }, desc: { ua: "Автоматичне оновлення залишків між Rozetka, Prom, Allo, сайтом.", en: "Auto stock sync between marketplaces and the site.", ru: "Автообновление остатков между маркетплейсами." }, stack: "n8n · PostgreSQL · API", metric: "-12 год/тиждень" },
-    { id: "p5", title: "QuizMaster", cat: "telegram", year: "2026", tag: { ua: "Освітній бот", en: "Educational bot", ru: "Образовательный бот" }, desc: { ua: "Бот-тренажер з курсами, прогресом, монетизацією.", en: "Training bot with courses, progress, monetization.", ru: "Бот-тренажёр с курсами, прогрессом, монетизацией." }, stack: "Node.js · Telegraf · MongoDB", metric: "2.1k користувачів" },
-    { id: "p6", title: "LocalGym", cat: "web", year: "2025", tag: { ua: "Веб-додаток для зали", en: "Gym web app", ru: "Веб-приложение для зала" }, desc: { ua: "Розклад, абонементи, особистий кабінет тренерів.", en: "Schedule, memberships, trainer dashboard.", ru: "Расписание, абонементы, ЛК тренеров." }, stack: "React · Supabase · Stripe", metric: "180 активних" },
-    { id: "p7", title: "Soma Store", cat: "landing", year: "2026", tag: { ua: "Лендинг косметики", en: "Cosmetics landing", ru: "Лендинг косметики" }, desc: { ua: "Швидкий лендинг з кошиком та UTM-аналітикою.", en: "Fast landing with cart and UTM analytics.", ru: "Быстрый лендинг с корзиной и UTM-аналитикой." }, stack: "Astro · Snipcart", metric: "2.1s LCP" },
+    { id: "p1", title: "Сайт-візитка (цей сайт)", cat: "card", year: "2026", tag: { ua: "Особистий портфоліо-сайт", en: "Personal portfolio site", ru: "Личный сайт-портфолио" }, desc: { ua: "Повноцінний сайт-портфоліо з адмінкою, темами, мультимовністю та формою заявок. Зроблений для себе як перший серйозний проект.", en: "Full portfolio site with admin panel, themes, multilanguage and lead form. Built for myself as first serious project.", ru: "Полноценный сайт-портфолио с админкой, темами, мультиязычностью и формой заявок. Сделан для себя как первый серьёзный проект." }, stack: "HTML · JavaScript · React · Supabase · Vercel", metric: "Онлайн" },
   ],
 
   // categories (filters)
@@ -68,17 +59,13 @@ const DEFAULT_DATA = {
   ],
 
   // testimonials
-  testimonials: [
-    { id: "t1", name: "Анна К.", role: { ua: "Власниця кав'ярні", en: "Coffee shop owner", ru: "Владелица кофейни" }, text: { ua: "Бот окупився за 3 тижні. Богдан зробив все швидше, ніж обіцяв.", en: "Bot paid off in 3 weeks. Bohdan delivered faster than promised.", ru: "Бот окупился за 3 недели. Богдан сделал быстрее, чем обещал." } },
-    { id: "t2", name: "Dmytro V.", role: { ua: "Засновник SaaS", en: "SaaS founder", ru: "Основатель SaaS" }, text: { ua: "Ріст конверсії х3 після редизайну лендингу. Без магії — просто розумна робота.", en: "3× conversion after landing redesign. No magic — just smart work.", ru: "Х3 по конверсии после редизайна. Без магии — просто умная работа." } },
-    { id: "t3", name: "Оля М.", role: { ua: "Коуч", en: "Coach", ru: "Коуч" }, text: { ua: "Сайт + воронка дали мені 60 заявок у перший місяць. Я в шоці.", en: "Site + funnel brought me 60 leads in the first month. Mind blown.", ru: "Сайт + воронка дали 60 заявок в первый месяц. В шоке." } },
-  ],
+  testimonials: [],
 
   // plans
   plans: [
-    { id: "pl1", name: { ua: "Старт", en: "Start", ru: "Старт" }, price: "$150", per: { ua: "разово", en: "one-time", ru: "разово" }, features: { ua: ["1 лендинг або бот", "до 5 днів", "1 раунд правок", "Базовий хостинг"], en: ["1 landing or bot", "up to 5 days", "1 revision round", "Basic hosting"], ru: ["1 лендинг или бот", "до 5 дней", "1 раунд правок", "Базовый хостинг"] }, featured: false },
-    { id: "pl2", name: { ua: "Про", en: "Pro", ru: "Про" }, price: "$450", per: { ua: "разово", en: "one-time", ru: "разово" }, features: { ua: ["Сайт + бот + аналітика", "до 14 днів", "3 раунди правок", "Інтеграції з CRM", "30 днів супроводу"], en: ["Site + bot + analytics", "up to 14 days", "3 revision rounds", "CRM integrations", "30 days support"], ru: ["Сайт + бот + аналитика", "до 14 дней", "3 раунда правок", "Интеграции с CRM", "30 дней поддержки"] }, featured: true },
-    { id: "pl3", name: { ua: "Продукт", en: "Product", ru: "Продукт" }, price: "$1200+", per: { ua: "проект", en: "project", ru: "проект" }, features: { ua: ["Веб-додаток під ключ", "БД, авторизація, платежі", "Необмежено правок у межах ТЗ", "90 днів супроводу"], en: ["Full web app", "DB, auth, payments", "Unlimited spec-scope revisions", "90 days support"], ru: ["Веб-приложение под ключ", "БД, авторизация, платежи", "Без лимита правок в ТЗ", "90 дней поддержки"] }, featured: false },
+    { id: "pl1", name: { ua: "Мінімум", en: "Minimum", ru: "Минимум" }, price: "$50", per: { ua: "разово", en: "one-time", ru: "разово" }, features: { ua: ["Простий Telegram-бот або лендинг", "до 7 днів", "Правки після здачі", "Без прихованих доплат"], en: ["Simple Telegram bot or landing", "up to 7 days", "Fixes after delivery", "No hidden fees"], ru: ["Простой Telegram-бот или лендинг", "до 7 дней", "Правки после сдачи", "Без скрытых доплат"] }, featured: false },
+    { id: "pl2", name: { ua: "Стандарт", en: "Standard", ru: "Стандарт" }, price: "$100–150", per: { ua: "разово", en: "one-time", ru: "разово" }, features: { ua: ["Сайт-візитка або бот зі сценаріями", "до 10 днів", "Адаптив + форма заявки", "Деплой і налаштування"], en: ["Business-card site or bot with flows", "up to 10 days", "Responsive + lead form", "Deploy and setup"], ru: ["Сайт-визитка или бот со сценариями", "до 10 дней", "Адаптив + форма заявки", "Деплой и настройка"] }, featured: true },
+    { id: "pl3", name: { ua: "Індивідуально", en: "Custom", ru: "Индивидуально" }, price: "Домовимось", per: { ua: "проект", en: "project", ru: "проект" }, features: { ua: ["Нестандартне завдання", "Обговорюємо деталі", "Ціна після уточнення ТЗ", "Пишіть — відповім того ж дня"], en: ["Custom task", "Discuss the details", "Price after spec clarification", "Write me — reply same day"], ru: ["Нестандартная задача", "Обсуждаем детали", "Цена после уточнения ТЗ", "Пишите — отвечу в тот же день"] }, featured: false },
   ],
 
   // price calculator
@@ -113,8 +100,8 @@ const DEFAULT_DATA = {
     { id: "f1", q: { ua: "Скільки триває розробка?", en: "How long does it take?", ru: "Сколько длится разработка?" }, a: { ua: "Бот або лендинг — 3–7 днів. Веб-додаток — 2–4 тижні. Все залежить від обсягу.", en: "Bot or landing — 3–7 days. Web app — 2–4 weeks. Depends on scope.", ru: "Бот или лендинг — 3–7 дней. Веб-приложение — 2–4 недели." } },
     { id: "f2", q: { ua: "Як відбувається оплата?", en: "How does payment work?", ru: "Как происходит оплата?" }, a: { ua: "50% передоплата, 50% після запуску. Картка, IBAN, USDT.", en: "50% upfront, 50% on delivery. Card, IBAN, USDT.", ru: "50% предоплата, 50% после запуска. Карта, IBAN, USDT." } },
     { id: "f3", q: { ua: "Що з підтримкою після запуску?", en: "What about post-launch support?", ru: "Что с поддержкой после запуска?" }, a: { ua: "30 днів безкоштовних правок у межах ТЗ. Далі — погодинно або підписка.", en: "30 days of free fixes within spec. After — hourly or subscription.", ru: "30 дней бесплатных правок в ТЗ. Далее — почасово или подписка." } },
-    { id: "f4", q: { ua: "Працюєш один чи з командою?", en: "Solo or with a team?", ru: "Один или с командой?" }, a: { ua: "Зазвичай сам. Для складних проектів підключаю перевірених підрядників.", en: "Usually solo. For complex projects I bring in trusted contractors.", ru: "Обычно один. На сложных проектах привлекаю подрядчиков." } },
-    { id: "f5", q: { ua: "Чи є гарантія?", en: "Is there a warranty?", ru: "Есть ли гарантия?" }, a: { ua: "Так — 30 днів на всі баги, які виникли не з вини клієнта.", en: "Yes — 30 days on any bugs not caused by client changes.", ru: "Да — 30 дней на все баги не по вине клиента." } },
+    { id: "f4", q: { ua: "Ти досвідчений розробник?", en: "Are you an experienced developer?", ru: "Ты опытный разработчик?" }, a: { ua: "Чесно — на старті шляху. Самоучка, вивчаю Python і JavaScript, роблю перші реальні проекти. Саме тому ціни адекватні, а підхід — відповідальний.", en: "Honestly — just getting started. Self-taught, learning Python and JavaScript, doing first real projects. That's why prices are fair and approach is responsible.", ru: "Честно — в начале пути. Самоучка, изучаю Python и JavaScript, делаю первые реальные проекты. Именно поэтому цены адекватные, а подход — ответственный." } },
+    { id: "f5", q: { ua: "Чи є гарантія?", en: "Is there a warranty?", ru: "Есть ли гарантия?" }, a: { ua: "Так — виправлю всі баги після здачі. Не зникаю після оплати.", en: "Yes — I fix all bugs after delivery. I don't disappear after payment.", ru: "Да — исправлю все баги после сдачи. Не исчезаю после оплаты." } },
   ],
 
   // blog
@@ -168,10 +155,10 @@ const DEFAULT_DATA = {
 
   // stats (about)
   stats: [
-    { n: "40+", label: { ua: "проєктів здано", en: "projects shipped", ru: "проектов сдано" } },
-    { n: "4+",  label: { ua: "роки в розробці", en: "years coding", ru: "года в разработке" } },
-    { n: "30+", label: { ua: "клієнтів", en: "clients", ru: "клиентов" } },
-    { n: "28+", label: { ua: "технологій у стеку", en: "technologies", ru: "технологий" } },
+    { n: "2024", label: { ua: "рік старту в IT", en: "year I started", ru: "год старта в IT" } },
+    { n: "1+",   label: { ua: "рік самонавчання", en: "year self-learning", ru: "год самообучения" } },
+    { n: "10+",  label: { ua: "технологій у стеку", en: "technologies", ru: "технологий в стеке" } },
+    { n: "0→1",  label: { ua: "перші проекти в роботі", en: "first real projects", ru: "первые проекты в работе" } },
   ],
 
   // tech stack
@@ -200,9 +187,9 @@ const DEFAULT_DATA = {
 
   // contacts
   contacts: {
-    email: "bohdan@portfolio.dev",
-    telegram: "@bohdan_builds",
-    whatsapp: "+380 00 000 00 00",
+    email: "b.litvin2023@gmail.com",
+    telegram: "@LytvinB",
+    whatsapp: "",
     location: { ua: "Україна, віддалено", en: "Ukraine, remote", ru: "Украина, удалённо" },
   },
 
