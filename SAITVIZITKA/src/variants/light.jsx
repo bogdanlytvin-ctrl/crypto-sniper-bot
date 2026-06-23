@@ -177,17 +177,20 @@ function LightSite() {
               const [bg, fg] = palette[i % palette.length];
               return (
                 <div key={p.id} onClick={() => setOpenProject(p)} className="proj-card">
-                  <div className="proj-thumb" style={{ borderRadius: 8, height: 320, position: "relative" }}>
-                    <div className="swatch" style={{ position: "absolute", inset: 0, background: bg, color: fg, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 28, borderRadius: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: '"JetBrains Mono", monospace', fontSize: 11, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                        <span>{p.cat}</span>
-                        <span>{p.year}</span>
-                      </div>
-                      <div>
-                        <div className="serif" style={{ fontSize: 72, lineHeight: 0.9, letterSpacing: "-0.03em" }}>{p.title}</div>
-                        <div style={{ marginTop: 16, fontFamily: '"JetBrains Mono", monospace', fontSize: 12, opacity: 0.7 }}>{p.stack}</div>
-                      </div>
-                    </div>
+                  <div className="proj-thumb" style={{ borderRadius: 8, height: 320, position: "relative", overflow: "hidden" }}>
+                    {p.image
+                      ? <div style={{ position: "absolute", inset: 0, background: `url(${p.image}) center/cover no-repeat`, borderRadius: 8 }} />
+                      : <div className="swatch" style={{ position: "absolute", inset: 0, background: bg, color: fg, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 28, borderRadius: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: '"JetBrains Mono", monospace', fontSize: 11, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                            <span>{p.cat}</span>
+                            <span>{p.year}</span>
+                          </div>
+                          <div>
+                            <div className="serif" style={{ fontSize: 72, lineHeight: 0.9, letterSpacing: "-0.03em" }}>{p.title}</div>
+                            <div style={{ marginTop: 16, fontFamily: '"JetBrains Mono", monospace', fontSize: 12, opacity: 0.7 }}>{p.stack}</div>
+                          </div>
+                        </div>
+                    }
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 16, gap: 24 }}>
                     <div>
