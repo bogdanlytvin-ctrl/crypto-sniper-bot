@@ -329,13 +329,16 @@ function DarkSite() {
                   <div className="h-display" style={{ fontSize: 46 }}>1+<span style={{ fontSize: 22, color: T.text2 }}>{tr("рік", "yr", "год")}</span></div>
                   <div style={{ color: T.text2, fontSize: 14, marginTop: 4 }}>{tr("самонавчання", "self-learning", "самообучения")}</div>
                 </div>
-                <div className="bento lift glow" style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "grid", placeItems: "center", background: "rgba(255,255,255,0.05)", fontSize: 22 }}>🚀</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{tr("Відкритий до замовлень", "Open for projects", "Открыт к заказам")}</div>
-                    <div className="mono" style={{ fontSize: 11, color: accent, marginTop: 2 }}>available ✓</div>
+                <a href="https://learn.microsoft.com/en-us/users/38035639/" target="_blank" rel="noopener noreferrer" className="bento lift glow" style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "grid", placeItems: "center", background: "rgba(255,255,255,0.05)" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24"><rect x="1" y="1" width="10.5" height="10.5" fill="#f25022" /><rect x="12.5" y="1" width="10.5" height="10.5" fill="#7fba00" /><rect x="1" y="12.5" width="10.5" height="10.5" fill="#00a4ef" /><rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#ffb900" /></svg>
                   </div>
-                </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>Microsoft Learn</div>
+                    <div className="mono" style={{ fontSize: 11, color: accent, marginTop: 2 }}>Agentic AI ✓</div>
+                  </div>
+                  <span style={{ color: T.text3 }}>↗</span>
+                </a>
               </div>
             </div>
 
