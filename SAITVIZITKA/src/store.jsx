@@ -98,6 +98,7 @@ const DEFAULT_DATA = {
       tag: { ua: "Офлайн PWA для FPV-техніків", en: "Offline PWA for FPV technicians", ru: "Офлайн PWA для FPV-техников" },
       desc: { ua: "Офлайн-довідник техніка FPV-бригади. Вводиш симптом — отримуєш ймовірну причину і крок фіксу. Працює в полі без інтернету, mobile-first.", en: "Offline field guide for FPV brigade technicians. Enter a symptom — get the likely cause and fix steps. Works in the field without internet, mobile-first.", ru: "Офлайн-справочник техника FPV-бригады. Вводишь симптом — получаешь вероятную причину и шаг фикса. Работает в поле без интернета, mobile-first." },
       stack: "Next.js · TypeScript · PWA · Vercel",
+      url: "https://ftos-rho.vercel.app",
       metric: "Онлайн",
     },
     {
