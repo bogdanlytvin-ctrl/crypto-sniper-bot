@@ -24,12 +24,16 @@ export default async function handler(req, res) {
     if (!body || !safeEqual(body.password, PASS)) return res.status(401).json({ ok: false });
 
     let telegram = null;
-    const pool = getPool();
     try {
-      const r = await pool.query(`SELECT data FROM site_content WHERE id = 'main' LIMIT 1`);
-      telegram = r.rows[0]?.data?.telegram || null;
-    } finally {
-      await pool.end();
+      const pool = getPool();
+      try {
+        const r = await pool.query(`SELECT data FROM site_content WHERE id = 'main' LIMIT 1`);
+        telegram = r.rows[0]?.data?.telegram || null;
+      } finally {
+        await pool.end();
+      }
+    } catch (dbErr) {
+      // DB unavailable — auth still succeeds, telegram config just won't be pre-filled
     }
     return res.status(200).json({ ok: true, telegram });
   } catch (e) {
