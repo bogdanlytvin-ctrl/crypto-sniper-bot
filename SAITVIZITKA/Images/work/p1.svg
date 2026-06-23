@@ -44,7 +44,7 @@
   <text x="92" y="712" font-family="JetBrains Mono,Consolas,monospace" font-size="28" fill="#7A8099" letter-spacing="0.5">Система замовлень для пекарні</text>
 
   <!-- stack -->
-  <text x="92" y="762" font-family="JetBrains Mono,Consolas,monospace" font-size="26" fill="#545870">Next.js · TypeScript · Tailwind · Vercel</text>
+  <text x="92" y="762" font-family="JetBrains Mono,Consolas,monospace" font-size="26" fill="#8A94A6">Next.js · TypeScript · Tailwind · Vercel</text>
 
   <!-- metric chip -->
   <rect x="88" y="808" width="380" height="64" rx="18" fill="#E89B3C" opacity="0.12"/>
