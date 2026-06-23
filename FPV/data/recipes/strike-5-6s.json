@@ -1,0 +1,25 @@
+{
+  "$comment": "DRAFT — типова мета-збірка 5\" 6S. Звірено з Oscar Liang / UAVMODEL (2026). Специфіку звір під свій конструктив.",
+  "id": "strike-5-6s",
+  "role": "Ударний / фристайл 5\" (6S)",
+  "summary": "Найпоширеніша платформа: маневрений 5-дюймовий борт на 6S.",
+  "frame": "5 дюймів",
+  "cells": "6S",
+  "firmware": "Betaflight",
+  "fc_hint": "F7 / F405, 30x30",
+  "bom": [
+    { "part": "Мотори", "spec": "2207, ~1750–1900 KV (6S мета)" },
+    { "part": "ESC", "spec": "4in1 40–45A, 6S, DShot600" },
+    { "part": "Пропи", "spec": "5\" три-лопатеві" },
+    { "part": "VTX", "spec": "цифра (O3 / Walksnail / HDZero) або аналог" },
+    { "part": "Приймач", "spec": "ELRS 2.4 ГГц (CRSF)" },
+    { "part": "Акум", "spec": "6S 1050–1300 mAh" }
+  ],
+  "config_notes": [
+    "Motor protocol DShot600; bidirectional DShot для RPM-фільтра (BLHeli_32 / AM32 / Bluejay).",
+    "Failsafe = Drop (ударний борт не повертається й не «гуляє»).",
+    "Напрямок і порядок моторів перевір без пропелерів."
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://oscarliang.com/table-prop-motor-lipo-weight/"
+}

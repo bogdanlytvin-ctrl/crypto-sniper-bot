@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — звірити з документацією RadioMaster. RP1 — нано ELRS 2.4G, CRSF по UART (full duplex), живлення 5V. Field-перевірка потрібна.",
+  "id": "radiomaster-rp1-elrs",
+  "type": "receiver",
+  "brand": "RadioMaster",
+  "model": "RP1 (ELRS 2.4G)",
+  "protocol": "CRSF",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["5V"],
+    "current_draw_ma": 60,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "5V", "connects_to": "5V BEC" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Serial RX; Configuration → Receiver → Serial (CRSF). binding phrase має збігатися з пультом.",
+  "known_issues": [
+    {
+      "issue": "TX/RX навхрест — найчастіша помилка (TX компонента → RX плати)",
+      "workaround": "Завжди навхрест: TX→RX, RX→TX"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://www.radiomasterrc.com"
+}

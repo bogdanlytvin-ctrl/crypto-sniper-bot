@@ -16,6 +16,7 @@ import iflightBlitzF405 from '@/data/boards/iflight-blitz-f405.json';
 import iflightBlitzF722 from '@/data/boards/iflight-blitz-f722.json';
 import diatoneMambaF405Mk4 from '@/data/boards/diatone-mamba-f405-mk4.json';
 import foxeerF722V4 from '@/data/boards/foxeer-f722-v4.json';
+import matekF405Wing from '@/data/boards/matek-f405-wing.json';
 
 import noVideo from '@/data/flows/no-video.json';
 import noRxLink from '@/data/flows/no-rx-link.json';
@@ -30,12 +31,31 @@ import noTelemetry from '@/data/flows/no-telemetry.json';
 import voltageSag from '@/data/flows/voltage-sag.json';
 import escDesync from '@/data/flows/esc-desync.json';
 import rebootInflight from '@/data/flows/reboot-inflight.json';
+import linkJamming from '@/data/flows/link-loss-jamming.json';
+import fiberNoSignal from '@/data/flows/fiber-no-signal.json';
+import dropRelease from '@/data/flows/drop-release.json';
+import gpsRescue from '@/data/flows/gps-rescue.json';
+import smokeShort from '@/data/flows/smoke-short.json';
+import gyroCalibration from '@/data/flows/gyro-calibration.json';
+import osdFont from '@/data/flows/osd-font.json';
+import saveFailed from '@/data/flows/save-failed.json';
+import channelMap from '@/data/flows/channel-map.json';
+import flipTakeoff from '@/data/flows/flip-takeoff.json';
 
 import rp3 from '@/data/components/radiomaster-rp3-elrs.json';
 import ep2 from '@/data/components/happymodel-ep2-elrs.json';
+import rp1 from '@/data/components/radiomaster-rp1-elrs.json';
+import betafpvElrs from '@/data/components/betafpv-elrs-lite.json';
 import o3 from '@/data/components/dji-o3-air-unit.json';
+import walksnail from '@/data/components/walksnail-avatar-hd.json';
+import hdzero from '@/data/components/hdzero-freestyle-v2.json';
 import tankSolo from '@/data/components/rush-tank-solo.json';
 import m10q from '@/data/components/matek-m10q-5883.json';
+import escBlheliS from '@/data/components/generic-blheli-s-4in1.json';
+import escBlheli32 from '@/data/components/generic-blheli32-4in1.json';
+import escAm32 from '@/data/components/generic-am32-4in1.json';
+import releaseServo from '@/data/components/generic-servo-release.json';
+import releaseMagnet from '@/data/components/generic-electromagnet-release.json';
 
 export const BOARDS = [
   speedybeeF405V4,
@@ -53,13 +73,31 @@ export const BOARDS = [
   iflightBlitzF722,
   diatoneMambaF405Mk4,
   foxeerF722V4,
-] as unknown as Board[];
+  matekF405Wing,
+] as Board[];
 
-export const COMPONENTS = [rp3, ep2, o3, tankSolo, m10q] as unknown as Component[];
+export const COMPONENTS = [
+  rp3,
+  ep2,
+  rp1,
+  betafpvElrs,
+  o3,
+  walksnail,
+  hdzero,
+  tankSolo,
+  m10q,
+  escBlheliS,
+  escBlheli32,
+  escAm32,
+  releaseServo,
+  releaseMagnet,
+] as Component[];
 
 export const RECEIVERS = COMPONENTS.filter((c) => c.type === 'receiver');
 export const VTXS = COMPONENTS.filter((c) => c.type === 'vtx_digital' || c.type === 'vtx_analog');
 export const GPSES = COMPONENTS.filter((c) => c.type === 'gps');
+export const ESCS = COMPONENTS.filter((c) => c.type === 'esc');
+export const RELEASES = COMPONENTS.filter((c) => c.type === 'release');
 
 export const FLOWS = [
   noVideo,
@@ -75,7 +113,17 @@ export const FLOWS = [
   voltageSag,
   escDesync,
   rebootInflight,
-] as unknown as DiagnosticFlow[];
+  linkJamming,
+  fiberNoSignal,
+  dropRelease,
+  gpsRescue,
+  smokeShort,
+  gyroCalibration,
+  osdFont,
+  saveFailed,
+  channelMap,
+  flipTakeoff,
+] as DiagnosticFlow[];
 
 // Дев-перевірка цілісності дерев: биті next/відсутні source ловимо до деплою,
 // а не білим екраном у полі.

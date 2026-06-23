@@ -1,0 +1,92 @@
+{
+  "$comment": "DRAFT-дерево. Битий/порожній OSD (кракозябри). Аналог = шрифт у MAX7456 на FC (Font Manager); цифрове = шрифт в окулярах. Звірено з Betaflight OSD tab + UAVMODEL. НЕ звірено живим ремонтом.",
+  "id": "osd-font",
+  "symptom": "Битий / порожній OSD (кракозябри)",
+  "summary": "Замість цифр — квадратики/сміття або OSD немає. Спершу — аналог чи цифра: шрифт живе в різних місцях.",
+  "applies_to": {},
+  "entry": "type",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-20" },
+  "source_url": "https://betaflight.com/docs/wiki/app/osd-tab",
+  "nodes": {
+    "type": {
+      "type": "check",
+      "id": "type",
+      "instruction": "Яке відео і як саме виглядає OSD?",
+      "method": "visual",
+      "note": "Аналог: шрифт зберігається у чипі MAX7456 на FC. Цифра (DJI/Walksnail/HDZero): шрифт в окулярах, не на платі.",
+      "outcomes": [
+        { "label": "Аналог — кракозябри/квадратики замість символів", "next": "font_state" },
+        { "label": "Аналог — OSD взагалі немає", "next": "c_osd_off" },
+        { "label": "Цифра (DJI/HD) — немає OSD", "next": "c_digital_osd" }
+      ]
+    },
+    "font_state": {
+      "type": "check",
+      "id": "font_state",
+      "instruction": "Чи заливав шрифт через Font Manager? (особливо ПІСЛЯ перепрошивки)",
+      "method": "configurator",
+      "note": "Перепрошивка стирає/змінює шрифт OSD — його треба залити заново. Під час заливки (~15 с) НЕ відключай USB.",
+      "outcomes": [
+        { "label": "Не заливав / після оновлення прошивки", "next": "c_upload_font" },
+        { "label": "Заливав, все одно битий/нечіткий", "next": "c_font_hw" }
+      ]
+    },
+
+    "c_upload_font": {
+      "type": "cause",
+      "id": "c_upload_font",
+      "cause": "Шрифт OSD не залито (або стерто прошивкою)",
+      "fix_steps": [
+        "OSD-вкладка → Font Manager → обери шрифт → Upload Font.",
+        "Не відключай USB під час заливки (~15 с).",
+        "Після заливки перезавантаж FC, щоб шрифт ініціалізувався."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/app/osd-tab",
+      "est_minutes": 5
+    },
+    "c_font_hw": {
+      "type": "cause",
+      "id": "c_font_hw",
+      "cause": "Збій пам'яті шрифту / несправний MAX7456",
+      "fix_steps": [
+        "Перезалий шрифт ще раз (інколи допомагає заливка двічі поспіль з підключеною батареєю).",
+        "Якщо лишається битим — можливий некоректний firmware MAX7456 або несправний чип.",
+        "За підтвердженого збою чипа — ремонт/заміна плати з робочим OSD."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/app/osd-tab",
+      "est_minutes": 20
+    },
+    "c_osd_off": {
+      "type": "cause",
+      "id": "c_osd_off",
+      "cause": "OSD вимкнено або MAX7456 не визначається",
+      "fix_steps": [
+        "Configuration → увімкни OSD; в OSD-вкладці додай потрібні елементи.",
+        "Перевір, що плата має аналоговий OSD (MAX7456) і він визначається.",
+        "Перевір відеотракт камера→FC→VTX (OSD накладається на платі)."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/app/osd-tab",
+      "est_minutes": 10
+    },
+    "c_digital_osd": {
+      "type": "cause",
+      "id": "c_digital_osd",
+      "cause": "Цифрове OSD (MSP DisplayPort) не налаштовано",
+      "fix_steps": [
+        "Шрифт цифрового OSD — в ОКУЛЯРАХ, не на FC; онови/обери шрифт в окулярах.",
+        "Betaflight: Ports → UART VTX → Peripherals: VTX (MSP + DisplayPort); OSD → HD (canvas).",
+        "Деталі відеотракту — дерево «немає відео»."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/setup-osd-dji-fpv/",
+      "est_minutes": 10
+    }
+  }
+}

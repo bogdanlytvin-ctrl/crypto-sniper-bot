@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — звірено з оглядом Oscar Liang + мануалом Caddx (2026-06-18): Avatar HD VTX (Micro/V2) вхід 6–25.2В (2–6S), 4 дроти (VCC/GND/TX/RX), MSP DisplayPort. Mini 1S/Nano мають інший вхід (3.1–5В / 3.1–13В) — це окремі варіанти. Field-перевірка потрібна.",
+  "id": "walksnail-avatar-hd",
+  "type": "vtx_digital",
+  "brand": "Walksnail",
+  "model": "Avatar HD (Micro/V2)",
+  "protocol": "MSP DisplayPort",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["9V", "7.4-26.4V"],
+    "current_draw_ma": 1200,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "VCC (6–25.2V)", "connects_to": "9V BEC або VBAT (2–6S)" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Peripherals: VTX (MSP + DisplayPort); OSD → HD. Пресет «Avatar HD VTXs» у вкладці Presets.",
+  "known_issues": [
+    {
+      "issue": "Варіанти з різним входом: Micro/V2 6–25.2В, Mini 1S 3.1–5В, Nano 3.1–13В — не переплутати живлення",
+      "workaround": "Звір конкретний варіант; для 1S/Nano НЕ подавати 9V"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://oscarliang.com/setup-avatar-fpv-system/"
+}

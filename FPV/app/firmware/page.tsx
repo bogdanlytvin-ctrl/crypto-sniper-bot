@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { BOARDS } from '@/lib/data';
+import { safeHref } from '@/lib/diagnostics';
+import { useStickyBoardId } from '@/lib/prefs';
+import { useAllBoards } from '@/lib/custom-boards';
 
 const FLASH_STEPS = [
   'Зроби backup: у CLI виконай `diff all` і збережи весь вивід — це твоя страховка.',
@@ -21,9 +24,10 @@ const CLI_PRESETS: { title: string; cmd: string; note: string }[] = [
 ];
 
 export default function FirmwarePage() {
-  const [boardId, setBoardId] = useState(BOARDS[0].id);
+  const [boardId, setBoardId] = useStickyBoardId();
   const [copied, setCopied] = useState<string | null>(null);
-  const board = BOARDS.find((b) => b.id === boardId) ?? BOARDS[0];
+  const allBoards = useAllBoards();
+  const board = allBoards.find((b) => b.id === boardId) ?? allBoards[0];
 
   function copy(text: string) {
     navigator.clipboard?.writeText(text).then(
@@ -59,9 +63,10 @@ export default function FirmwarePage() {
       <div className="field dx-board">
         <label htmlFor="fwboard">Польотний контролер</label>
         <select id="fwboard" value={boardId} onChange={(e) => setBoardId(e.target.value)}>
-          {BOARDS.map((b) => (
+          {allBoards.map((b) => (
             <option key={b.id} value={b.id}>
               {b.brand} {b.model} {b.revision}
+              {b.custom ? ' ★ власна' : ''}
             </option>
           ))}
         </select>
@@ -97,7 +102,7 @@ export default function FirmwarePage() {
         <div className="fw-mcu">
           MCU: <b>{board.mcu}</b> · живлення: {board.voltage?.input_cells ?? '—'}
           {' · '}
-          <a href={board.source_url} target="_blank" rel="noopener noreferrer">
+          <a href={safeHref(board.source_url)} target="_blank" rel="noopener noreferrer">
             мануал виробника
           </a>
         </div>

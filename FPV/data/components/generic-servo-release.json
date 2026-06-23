@@ -1,0 +1,27 @@
+{
+  "$comment": "DRAFT — серво-реліз скиду. Підключення/керування звір зі своїм механізмом. БЕЗПЕКА: не має спрацьовувати на вмиканні/у failsafe.",
+  "id": "generic-servo-release",
+  "type": "release",
+  "brand": "Generic",
+  "model": "Серво-реліз",
+  "protocol": "PWM (серво)",
+  "requirements": {
+    "connection": "servo",
+    "voltage": ["5V"],
+    "current_draw_ma": 200
+  },
+  "wiring": [
+    { "component_pin": "Сигнал", "connects_to": "FC серво/PWM-вихід (resource SERVO на вільний пад)" },
+    { "component_pin": "+ (5V)", "connects_to": "5V BEC (потужне серво — окремий BEC)" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: керування AUX-каналом через Servos tab (SERVO_TILT) або CHANNEL_FORWARDING. Вистав безпечне (закрите) значення у disarmed і у failsafe; перевір кінцеві точки.",
+  "known_issues": [
+    {
+      "issue": "Самовільне спрацювання на вмиканні / у failsafe / при плаваючому каналі",
+      "workaround": "Безпечне значення каналу у disarmed і failsafe; тест лише без бойового вантажу"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1"
+}

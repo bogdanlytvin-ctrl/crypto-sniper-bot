@@ -1,0 +1,31 @@
+{
+  "$comment": "DRAFT — типовий BLHeli_32 4in1. Має повну телеметрію (V/струм/темп/RPM) по 1 дроту TLM на виділений ESC-telem UART + bidir DShot. Ліцензію BLHeli_32 закрито 2024. Струм/банки звір на своєму ESC.",
+  "id": "generic-blheli32-4in1",
+  "type": "esc",
+  "brand": "Generic",
+  "model": "BLHeli_32 4in1",
+  "protocol": "DShot300/600 + bidir",
+  "firmware": "BLHeli_32",
+  "current_rating_a": 50,
+  "requirements": {
+    "connection": "stack_cable",
+    "voltage": ["3-6S"],
+    "has_telemetry": true
+  },
+  "wiring": [
+    { "component_pin": "M1–M4 (сигнал)", "connects_to": "FC виходи моторів M1–M4" },
+    { "component_pin": "VBAT (батарея/XT60)", "connects_to": "FC VBAT (ESC живить FC)" },
+    { "component_pin": "Curr", "connects_to": "FC датчик струму (Curr-пад)" },
+    { "component_pin": "TLM", "connects_to": "FC RX виділеного ESC-telem UART" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Motor protocol DShot600 + ESC/Motor features → ESC Sensor (телеметрія) на ESC-telem UART; для RPM-фільтра увімкни bidirectional DShot.",
+  "known_issues": [
+    {
+      "issue": "Телеметрія потребує підключеного TLM-дроту до ESC-telem UART плати",
+      "workaround": "Звір, що TLM-пад ESC заведено на RX виділеного UART (часто RX вже у стек-кабелі)"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://ardupilot.org/copter/docs/common-blheli32-passthru.html"
+}

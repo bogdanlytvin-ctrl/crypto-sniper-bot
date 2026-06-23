@@ -117,18 +117,26 @@ export async function importVerifications(text: string): Promise<number> {
     });
   }
   if (valid.length === 0) return 0;
+  // Не затираємо свіжіші локальні звірки: чужий/застарілий файл не повинен
+  // знижувати статус, який технік уже підняв на залізі. Пишемо лише новіші.
+  const existing = await loadVerifications();
+  const toWrite = valid.filter((rec) => {
+    const cur = existing.get(rec.key);
+    return !cur || rec.date >= cur.date;
+  });
+  if (toWrite.length === 0) return 0;
   // одна транзакція на весь батч
   await openDB().then(
     (db) =>
       new Promise<void>((resolve, reject) => {
         const t = db.transaction(STORE, 'readwrite');
         const s = t.objectStore(STORE);
-        for (const rec of valid) s.put(rec);
+        for (const rec of toWrite) s.put(rec);
         t.oncomplete = () => resolve();
         t.onerror = () => reject(t.error);
       }),
   );
-  return valid.length;
+  return toWrite.length;
 }
 
 // Хук для клієнтських сторінок: мапа оверрайдів + перезавантаження.

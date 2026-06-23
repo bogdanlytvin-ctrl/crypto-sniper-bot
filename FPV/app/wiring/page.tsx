@@ -1,9 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { buildPlan, type Component } from '@/lib/engine';
-import { BOARDS, RECEIVERS, VTXS, GPSES } from '@/lib/data';
+import { safeHref } from '@/lib/diagnostics';
+import { useStickyBoardId } from '@/lib/prefs';
+import { useAllBoards } from '@/lib/custom-boards';
+import { StatusLegend } from '../status-legend';
+import { BOARDS, RECEIVERS, VTXS, GPSES, ESCS, RELEASES } from '@/lib/data';
 import { effectiveStatus, boardKey, useVerifications } from '@/lib/verify';
 import { BoardPads } from './pad-map';
 
@@ -47,22 +51,33 @@ const statusLabel: Record<string, { text: string; cls: string }> = {
 };
 
 export default function WiringPage() {
-  const [boardId, setBoardId] = useState(BOARDS[0].id);
+  const [boardId, setBoardId] = useStickyBoardId();
   const [rxId, setRxId] = useState(RECEIVERS[0]?.id ?? NONE);
   const [vtxId, setVtxId] = useState(VTXS[0]?.id ?? NONE);
   const [gpsId, setGpsId] = useState(NONE);
+  const [escId, setEscId] = useState(NONE);
+  const [releaseId, setReleaseId] = useState(NONE);
   const [showPads, setShowPads] = useState(false);
+  const [printDate, setPrintDate] = useState('');
   const { map: verifyMap } = useVerifications();
 
-  const board = BOARDS.find((b) => b.id === boardId)!;
+  // Дата для друкованого аркуша — лише на клієнті (без hydration-розбіжності).
+  useEffect(() => setPrintDate(new Date().toLocaleDateString('uk-UA')), []);
+
+  const allBoards = useAllBoards();
+  const board = allBoards.find((b) => b.id === boardId) ?? allBoards[0];
 
   const selected = useMemo(() => {
     const pick = (id: string, list: Component[]) =>
       id === NONE ? null : (list.find((c) => c.id === id) ?? null);
-    return [pick(rxId, RECEIVERS), pick(vtxId, VTXS), pick(gpsId, GPSES)].filter(
-      Boolean,
-    ) as Component[];
-  }, [rxId, vtxId, gpsId]);
+    return [
+      pick(rxId, RECEIVERS),
+      pick(vtxId, VTXS),
+      pick(gpsId, GPSES),
+      pick(escId, ESCS),
+      pick(releaseId, RELEASES),
+    ].filter(Boolean) as Component[];
+  }, [rxId, vtxId, gpsId, escId, releaseId]);
 
   const plan = useMemo(() => buildPlan(board, selected), [board, selected]);
   const effBoardStatus = effectiveStatus(board.verified.status, verifyMap, boardKey(board.id));
@@ -87,15 +102,17 @@ export default function WiringPage() {
         </p>
       </header>
 
+      <StatusLegend />
+
       <div className="grid">
         <section className="panel" aria-label="Вибір компонентів">
           <Selector
             label="Польотний контролер"
             value={boardId}
             onChange={setBoardId}
-            options={BOARDS.map((b) => ({
+            options={allBoards.map((b) => ({
               id: b.id,
-              name: `${b.brand} ${b.model} ${b.revision}`,
+              name: `${b.brand} ${b.model} ${b.revision}${b.custom ? ' ★ власна' : ''}`,
             }))}
           />
           <Selector
@@ -123,12 +140,44 @@ export default function WiringPage() {
             hint="Модулі з компасом додатково займають шину I2C."
             options={GPSES.map((c) => ({ id: c.id, name: `${c.brand} ${c.model}` }))}
           />
+          <Selector
+            label="ESC (регулятор)"
+            value={escId}
+            onChange={setEscId}
+            allowNone
+            hint="Стек-кабель: мотори + VBAT (живить FC) + струм + телеметрія. BLHeli_S — без телеметрії."
+            options={ESCS.map((c) => ({ id: c.id, name: `${c.brand} ${c.model}` }))}
+          />
+          <Selector
+            label="Скид / реліз"
+            value={releaseId}
+            onChange={setReleaseId}
+            allowNone
+            hint="Серво/магніт на PWM-вихід + 5V. Безпека: не має спрацьовувати на вмиканні/failsafe."
+            options={RELEASES.map((c) => ({ id: c.id, name: `${c.brand} ${c.model}` }))}
+          />
           <button className="ghost pads-toggle" onClick={() => setShowPads((s) => !s)}>
             {showPads ? 'сховати схему падів' : '▦ схема падів плати'}
+          </button>
+          <button
+            className="ghost pads-toggle wf-print"
+            onClick={() => window.print()}
+            disabled={selected.length === 0}
+            title="Надрукувати або зберегти карту пайки як PDF"
+          >
+            🖶 Друк / PDF
           </button>
         </section>
 
         <section className="plan" aria-label="План підключення" aria-live="polite">
+          <div className="print-only print-head">
+            <strong>FTOS · карта пайки</strong>
+            <span>
+              {board.brand} {board.model} {board.revision} · {board.mcu}
+              {printDate ? ` · ${printDate}` : ''}
+            </span>
+          </div>
+
           <div className="plan-head">
             <h2>
               {board.brand} {board.model} {board.revision} · {board.mcu}
@@ -155,12 +204,20 @@ export default function WiringPage() {
                   {a.component.brand} {a.component.model}
                 </h3>
                 <span className="proto">{a.component.protocol}</span>
-                <span className={`port ${a.uart ? '' : 'conflict'}`}>
-                  {a.uart ? a.uart.name : 'НЕМАЄ ВІЛЬНОГО UART'}
-                </span>
+                {a.component.type === 'esc' ? (
+                  <span className="port">
+                    {a.uart ? `ESC-telem: ${a.uart.name}` : 'стек-кабель · без телеметрії'}
+                  </span>
+                ) : a.component.type === 'release' ? (
+                  <span className="port">серво/PWM-вихід · AUX</span>
+                ) : (
+                  <span className={`port ${a.uart ? '' : 'conflict'}`}>
+                    {a.uart ? a.uart.name : 'НЕМАЄ ВІЛЬНОГО UART'}
+                  </span>
+                )}
               </header>
 
-              {a.uart && (
+              {a.wires.length > 0 && (
                 <div className="wires">
                   {a.wires.map((w, i) => (
                     <div className={`wire ${w.kind}`} key={i}>
@@ -189,7 +246,7 @@ export default function WiringPage() {
           {selected.length > 0 && (
             <p className="source">
               Джерело профілю плати:{' '}
-              <a href={board.source_url} target="_blank" rel="noopener noreferrer">
+              <a href={safeHref(board.source_url)} target="_blank" rel="noopener noreferrer">
                 офіційний мануал
               </a>
               . Відповідальність за фінальну перевірку — на техніку.
@@ -202,7 +259,9 @@ export default function WiringPage() {
 
       <footer className="colophon">
         <span>плат у базі: {BOARDS.length}</span>
-        <span>компонентів: {RECEIVERS.length + VTXS.length + GPSES.length}</span>
+        <span>
+          компонентів: {RECEIVERS.length + VTXS.length + GPSES.length + ESCS.length + RELEASES.length}
+        </span>
         <span>дані: офіційні мануали виробників</span>
       </footer>
     </main>

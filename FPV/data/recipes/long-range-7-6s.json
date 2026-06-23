@@ -1,0 +1,26 @@
+{
+  "$comment": "DRAFT — далекобій 7\" 6S. Ключове: НИЗЬКИЙ KV (високий KV на 7\" палить мотори). Звірено з Oscar Liang / UAVMODEL (2026).",
+  "id": "long-range-7-6s",
+  "role": "Далекобій 7\" (6S)",
+  "summary": "Ефективний 7-дюймовий борт на велику дальність, з GPS.",
+  "frame": "7 дюймів",
+  "cells": "6S",
+  "firmware": "Betaflight",
+  "fc_hint": "F7 / H7 + GPS",
+  "bom": [
+    { "part": "Мотори", "spec": "2806/2807, ~1300–1400 KV (НЕ високий KV!)" },
+    { "part": "ESC", "spec": "4in1 50–60A, 6S, DShot600" },
+    { "part": "Пропи", "spec": "7\" дво-/три-лопатеві" },
+    { "part": "VTX", "spec": "цифра (дальній лінк) або аналог 1.2 ГГц" },
+    { "part": "Приймач", "spec": "ELRS 915/868 МГц LR (краще пробиває, далекобій)" },
+    { "part": "GPS", "spec": "для GPS Rescue / RTH" },
+    { "part": "Акум", "spec": "6S 4000–6000 mAh (або Li-ion)" }
+  ],
+  "config_notes": [
+    "Низький KV ОБОВ'ЯЗКОВО — високий KV на 7\" перевантажує й палить мотори.",
+    "GPS Rescue/RTH для розвідки; для ударного — Drop.",
+    "ELRS 915/868 для дальності й завадостійкості."
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://oscarliang.com/table-prop-motor-lipo-weight/"
+}

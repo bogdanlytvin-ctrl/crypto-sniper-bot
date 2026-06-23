@@ -1,6 +1,8 @@
 // Shared data store using localStorage — used by both variations AND admin
 // Admin changes are reflected in the portfolio site in real time
 
+const STORAGE_KEY = "portfolio_v1";
+
 const DEFAULT_DATA = {
   // site content
   name: "Богдан",
@@ -115,7 +117,6 @@ const DEFAULT_DATA = {
   categories: [
     { id: "all", label: { ua: "Все", en: "All", ru: "Все" } },
     { id: "telegram", label: { ua: "Боти", en: "Bots", ru: "Боты" } },
-    { id: "landing", label: { ua: "Лендинги", en: "Landings", ru: "Лендинги" } },
     { id: "card", label: { ua: "Візитки", en: "Cards", ru: "Визитки" } },
     { id: "web", label: { ua: "Веб-додатки", en: "Web apps", ru: "Веб-приложения" } },
     { id: "automation", label: { ua: "Автоматизації", en: "Automations", ru: "Автоматизации" } },
@@ -143,21 +144,21 @@ const DEFAULT_DATA = {
   calculator: {
     uahRate: 40,
     types: [
-      { id: "bot",     label: { ua: "Telegram-бот",  en: "Telegram bot",   ru: "Telegram-бот"    }, base: 250, days: 4,  icon: "✈" },
-      { id: "landing", label: { ua: "Лендинг",        en: "Landing page",   ru: "Лендинг"          }, base: 350, days: 5,  icon: "▤" },
-      { id: "site",    label: { ua: "Сайт-візитка",   en: "Business site",  ru: "Сайт-визитка"    }, base: 500, days: 7,  icon: "▣" },
-      { id: "app",     label: { ua: "Веб-додаток",    en: "Web app",        ru: "Веб-приложение"  }, base: 900, days: 14, icon: "◈" },
-      { id: "auto",    label: { ua: "Автоматизація",  en: "Automation",     ru: "Автоматизация"   }, base: 300, days: 5,  icon: "⟳" },
+      { id: "bot",     label: { ua: "Telegram-бот",  en: "Telegram bot",   ru: "Telegram-бот"    }, base: 50,  days: 4,  icon: "✈" },
+      { id: "landing", label: { ua: "Лендинг",        en: "Landing page",   ru: "Лендинг"          }, base: 80,  days: 5,  icon: "▤" },
+      { id: "site",    label: { ua: "Сайт-візитка",   en: "Business site",  ru: "Сайт-визитка"    }, base: 100, days: 7,  icon: "▣" },
+      { id: "app",     label: { ua: "Веб-додаток",    en: "Web app",        ru: "Веб-приложение"  }, base: 200, days: 14, icon: "◈" },
+      { id: "auto",    label: { ua: "Автоматизація",  en: "Automation",     ru: "Автоматизация"   }, base: 40,  days: 5,  icon: "⟳" },
     ],
     features: [
-      { id: "admin",    price: 200, days: 3, label: { ua: "Адмінка",            en: "Admin panel",      ru: "Админка"           } },
-      { id: "i18n",     price: 120, days: 2, label: { ua: "Мультимовність",      en: "Multi-language",   ru: "Мультиязычность"   } },
-      { id: "payments", price: 250, days: 3, label: { ua: "Платежі",             en: "Payments",         ru: "Платежи"           } },
-      { id: "auth",     price: 150, days: 2, label: { ua: "Авторизація",         en: "Auth",             ru: "Авторизация"       } },
-      { id: "ai",       price: 300, days: 4, label: { ua: "AI / GPT-інтеграція", en: "AI / GPT",         ru: "AI / GPT"          } },
-      { id: "crm",      price: 180, days: 2, label: { ua: "CRM-інтеграція",      en: "CRM integration",  ru: "CRM-интеграция"    } },
-      { id: "design",   price: 220, days: 3, label: { ua: "Унікальний дизайн",   en: "Custom design",    ru: "Уникальный дизайн" } },
-      { id: "seo",      price: 100, days: 1, label: { ua: "SEO",                 en: "SEO",              ru: "SEO"               } },
+      { id: "admin",    price: 50,  days: 3, label: { ua: "Адмінка",            en: "Admin panel",      ru: "Админка"           } },
+      { id: "i18n",     price: 30,  days: 2, label: { ua: "Мультимовність",      en: "Multi-language",   ru: "Мультиязычность"   } },
+      { id: "payments", price: 80,  days: 3, label: { ua: "Платежі",             en: "Payments",         ru: "Платежи"           } },
+      { id: "auth",     price: 40,  days: 2, label: { ua: "Авторизація",         en: "Auth",             ru: "Авторизация"       } },
+      { id: "ai",       price: 80,  days: 4, label: { ua: "AI / GPT-інтеграція", en: "AI / GPT",         ru: "AI / GPT"          } },
+      { id: "crm",      price: 50,  days: 2, label: { ua: "CRM-інтеграція",      en: "CRM integration",  ru: "CRM-интеграция"    } },
+      { id: "design",   price: 60,  days: 3, label: { ua: "Унікальний дизайн",   en: "Custom design",    ru: "Уникальный дизайн" } },
+      { id: "seo",      price: 30,  days: 1, label: { ua: "SEO",                 en: "SEO",              ru: "SEO"               } },
     ],
     urgency: [
       { id: "normal", mult: 1,   label: { ua: "Звичайно",         en: "Normal",       ru: "Обычно"  } },
@@ -168,7 +169,7 @@ const DEFAULT_DATA = {
 
   // FAQ
   faq: [
-    { id: "f1", q: { ua: "Скільки триває розробка?", en: "How long does it take?", ru: "Сколько длится разработка?" }, a: { ua: "Бот або лендинг — 3–7 днів. Веб-додаток — 2–4 тижні. Все залежить від обсягу.", en: "Bot or landing — 3–7 days. Web app — 2–4 weeks. Depends on scope.", ru: "Бот или лендинг — 3–7 дней. Веб-приложение — 2–4 недели." } },
+    { id: "f1", q: { ua: "Скільки триває розробка?", en: "How long does it take?", ru: "Сколько длится разработка?" }, a: { ua: "Бот або лендинг — 3–7 днів. Веб-додаток — 2–4 тижні. Все залежить від обсягу.", en: "Bot or landing — 3–7 days. Web app — 2–4 weeks. Depends on scope.", ru: "Бот или лендинг — 3–7 дней. Веб-приложение — 2–4 недели. Всё зависит от объёма." } },
     { id: "f2", q: { ua: "Як відбувається оплата?", en: "How does payment work?", ru: "Как происходит оплата?" }, a: { ua: "50% передоплата, 50% після запуску. Картка, IBAN, USDT.", en: "50% upfront, 50% on delivery. Card, IBAN, USDT.", ru: "50% предоплата, 50% после запуска. Карта, IBAN, USDT." } },
     { id: "f3", q: { ua: "Що з підтримкою після запуску?", en: "What about post-launch support?", ru: "Что с поддержкой после запуска?" }, a: { ua: "30 днів безкоштовних правок у межах ТЗ. Далі — погодинно або підписка.", en: "30 days of free fixes within spec. After — hourly or subscription.", ru: "30 дней бесплатных правок в ТЗ. Далее — почасово или подписка." } },
     { id: "f4", q: { ua: "Ти досвідчений розробник?", en: "Are you an experienced developer?", ru: "Ты опытный разработчик?" }, a: { ua: "Чесно — на старті шляху. Самоучка, вивчаю Python і JavaScript, роблю перші реальні проекти. Саме тому ціни адекватні, а підхід — відповідальний.", en: "Honestly — just getting started. Self-taught, learning Python and JavaScript, doing first real projects. That's why prices are fair and approach is responsible.", ru: "Честно — в начале пути. Самоучка, изучаю Python и JavaScript, делаю первые реальные проекты. Именно поэтому цены адекватные, а подход — ответственный." } },
@@ -294,8 +295,6 @@ function deliverLead(leadId) {
     window.dispatchEvent(new CustomEvent("portfolio_store_update"));
   });
 }
-
-const STORAGE_KEY = "portfolio_v1";
 
 function deepMerge(a, b) {
   if (Array.isArray(a) || Array.isArray(b)) return b ?? a;

@@ -13,7 +13,98 @@ export interface MspIdentity {
   targetName: string; // "SPEEDYBEEF405V4" (best-effort)
 }
 
-const CMD = { API_VERSION: 1, FC_VARIANT: 2, FC_VERSION: 3, BOARD_INFO: 4 } as const;
+const CMD = { API_VERSION: 1, FC_VARIANT: 2, FC_VERSION: 3, BOARD_INFO: 4, STATUS_EX: 150 } as const;
+
+// --- Живий стан плати (MSP_STATUS_EX, cmd 150) ---
+// ЧЕСНА МЕЖА (див. вгорі): декодуємо лише те, що стабільне між версіями BF.
+// Сенсорний бітмаск завжди на офсеті 4..5 — це безпечно. Arming-прапори йдуть
+// після версійно-залежного блоку, але з явним префіксом довжини, тож читаються
+// послідовно; якщо офсет «попливе» — позначаємо ненадійним і не вгадуємо.
+export interface MspSensors {
+  gyro: boolean;
+  acc: boolean;
+  baro: boolean;
+  mag: boolean;
+  gps: boolean;
+  sonar: boolean;
+}
+
+export interface MspStatus {
+  sensors: MspSensors;
+  armingReady: boolean; // жоден прапор не блокує арм (за прочитаним)
+  armingFlagsRaw: number; // сире 32-бітне значення (для звірки)
+  armingReasons: string[]; // best-effort назви активних прапорів
+  armingReliable: boolean; // false → офсет/значення підозрілі, не довіряй назвам
+}
+
+function rdU16(b: Uint8Array, i: number): number {
+  return b[i] | (b[i + 1] << 8);
+}
+function rdU32(b: Uint8Array, i: number): number {
+  return (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0;
+}
+
+// Бітмаск сенсорів MSP (стабільний між версіями):
+// bit0 ACC, bit1 BARO, bit2 MAG, bit3 GPS, bit4 RANGEFINDER, bit5 GYRO.
+export function parseSensors(flags: number): MspSensors {
+  return {
+    acc: !!(flags & 1),
+    baro: !!(flags & 2),
+    mag: !!(flags & 4),
+    gps: !!(flags & 8),
+    sonar: !!(flags & 16),
+    gyro: !!(flags & 32),
+  };
+}
+
+// Назви прапорів заборони арму (порядок BF 4.2–4.5). Версійно-залежне → best-effort.
+const ARMING_FLAG_NAMES = [
+  'NO_GYRO', 'FAILSAFE', 'RX_FAILSAFE', 'BAD_RX_RECOVERY', 'BOXFAILSAFE',
+  'RUNAWAY_TAKEOFF', 'CRASH_DETECTED', 'THROTTLE', 'ANGLE', 'BOOT_GRACE_TIME',
+  'NOPREARM', 'LOAD', 'CALIBRATING', 'CLI', 'CMS_MENU', 'BST', 'MSP', 'PARALYZE',
+  'GPS', 'RESC', 'RPMFILTER', 'REBOOT_REQUIRED', 'DSHOT_BITBANG', 'ACC_CALIBRATION',
+  'MOTOR_PROTOCOL', 'ARM_SWITCH',
+] as const;
+
+// MSP_STATUS_EX payload (LE): cycleTime u16, i2cErr u16, sensors u16,
+// flightModeFlags u32, pidProfile u8, cpuLoad u16, pidProfileCount u8,
+// rateProfile u8, addModeBytesCount u8, [N add bytes], armingDisableCount u8,
+// armingDisableFlags u32. Якщо обчислений офсет вилазить за межі або count
+// неправдоподібний — повертаємо armingReliable:false (сенсори лишаються валідні).
+export function parseStatusEx(b: Uint8Array): MspStatus | null {
+  if (b.length < 6) return null;
+  const sensors = parseSensors(rdU16(b, 4));
+
+  let armingFlagsRaw = 0;
+  let reliable = false;
+  const addCountIdx = 15; // після cycleTime/i2c/sensors/mode(u32)/profile/load(u16)/profileCount/rateProfile
+  if (b.length > addCountIdx) {
+    const addCount = b[addCountIdx];
+    const armCountIdx = addCountIdx + 1 + addCount;
+    if (armCountIdx + 5 <= b.length) {
+      const armingDisableCount = b[armCountIdx];
+      if (armingDisableCount >= 1 && armingDisableCount <= 32) {
+        armingFlagsRaw = rdU32(b, armCountIdx + 1);
+        reliable = true;
+      }
+    }
+  }
+
+  const armingReasons: string[] = [];
+  if (reliable) {
+    for (let i = 0; i < 32; i++) {
+      if (armingFlagsRaw & (1 << i)) armingReasons.push(ARMING_FLAG_NAMES[i] ?? `BIT_${i}`);
+    }
+  }
+
+  return {
+    sensors,
+    armingReady: reliable && armingFlagsRaw === 0,
+    armingFlagsRaw,
+    armingReasons,
+    armingReliable: reliable,
+  };
+}
 
 export function webSerialSupported(): boolean {
   return typeof navigator !== 'undefined' && 'serial' in navigator;
@@ -35,9 +126,16 @@ export class MspClient {
     const port = await serial.requestPort();
     await port.open({ baudRate: 115200 });
     this.port = port;
-    this.writer = port.writable.getWriter();
-    this.reader = port.readable.getReader();
-    this.buf = [];
+    try {
+      // Якщо взяття writer/reader впаде на півдорозі — не лишаємо порт із залоченими
+      // потоками: прибираємо все і пробрасуємо помилку далі.
+      this.writer = port.writable.getWriter();
+      this.reader = port.readable.getReader();
+      this.buf = [];
+    } catch (e) {
+      await this.disconnect();
+      throw e;
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -188,6 +286,13 @@ export class MspClient {
     }
 
     return { apiVersion, fcVariant, fcVersion, boardIdentifier, targetName };
+  }
+
+  // Живий стан: які сенсори бачить плата + прапори заборони арму (best-effort).
+  // Окремий запит — не блокує readIdentity, якщо плата не відповість на 150.
+  async readStatus(): Promise<MspStatus | null> {
+    const payload = await this.request(CMD.STATUS_EX);
+    return parseStatusEx(payload);
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

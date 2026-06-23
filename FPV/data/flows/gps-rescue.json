@@ -1,0 +1,116 @@
+{
+  "$comment": "DRAFT-дерево. GPS Rescue / RTH (повернення додому) не спрацьовує або працює погано — критично для розвідки/далекобою. Окреме від «немає GPS-фіксу». Звірено з Betaflight GPS-Rescue / Oscar Liang. НЕ звірено живим ремонтом.",
+  "id": "gps-rescue",
+  "symptom": "GPS Rescue / RTH не працює як треба",
+  "summary": "Повернення додому: home ставиться на АРМ, не на фіксі. Йдемо передумова → тригер → поведінка.",
+  "applies_to": { "has": ["gps"] },
+  "entry": "precheck",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Rescue",
+  "nodes": {
+    "precheck": {
+      "type": "check",
+      "id": "precheck",
+      "instruction": "Чи був стабільний 3D-фікс і home-точка встановлені ДО арму?",
+      "method": "configurator",
+      "note": "Home ставиться на АРМ, а не на фіксі. Армиш без 3D-фіксу → home = 0,0, і борт «летить в Атлантику».",
+      "outcomes": [
+        { "label": "Армили без 3D-фіксу / мало супутників", "next": "c_home_zero" },
+        { "label": "Фікс і home були при армі", "next": "trigger" }
+      ]
+    },
+    "trigger": {
+      "type": "check",
+      "id": "trigger",
+      "instruction": "GPS Rescue взагалі ініціюється? (failsafe = GPS Rescue або режим на тумблері)",
+      "method": "configurator",
+      "note": "failsafe_procedure = GPS_RESCUE або режим GPS Rescue на перемикачі; Throttle Fallback = Hold.",
+      "outcomes": [
+        { "label": "Не ініціюється — failsafe не GPS Rescue / режим не призначено", "next": "c_config" },
+        { "label": "Ініціюється, але поводиться погано", "next": "behavior" }
+      ]
+    },
+    "behavior": {
+      "type": "check",
+      "id": "behavior",
+      "instruction": "Що саме не так під час повернення?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Летить НЕ туди / повз home (на 90° або 180°)", "next": "c_heading" },
+        { "label": "Смикається по рисканню (jerky yaw)", "next": "c_gps_rate" },
+        { "label": "Не знижується / б'ється або «унітазить» над home", "next": "c_params" }
+      ]
+    },
+
+    "c_home_zero": {
+      "type": "cause",
+      "id": "c_home_zero",
+      "cause": "Home = 0,0 — армили до 3D-фіксу",
+      "fix_steps": [
+        "Перед армом дочекайся стабільного 3D-фіксу (достатньо супутників, низький HDOP).",
+        "Не злітай без фіксу для місій з RTH — home фіксується саме на армі.",
+        "Перевір в OSD/конфігураторі, що home встановлено перед зльотом."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/setup-gps-rescue-mode-betaflight/",
+      "est_minutes": 5
+    },
+    "c_config": {
+      "type": "cause",
+      "id": "c_config",
+      "cause": "GPS Rescue не налаштовано (failsafe/режим)",
+      "fix_steps": [
+        "Вистав failsafe_procedure = GPS_RESCUE, або признач режим GPS Rescue на тумблер.",
+        "Throttle Channel Fallback = Hold (інакше Stage 1 глушить мотори).",
+        "Перевір, що GPS працює: Ports → GPS, Configuration → GPS UBLOX, є фікс."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Rescue",
+      "est_minutes": 15
+    },
+    "c_heading": {
+      "type": "cause",
+      "id": "c_heading",
+      "cause": "Неправильний курс повернення (магнітометр або GPS-heading)",
+      "fix_steps": [
+        "Без магнітометра курс береться з GPS-руху — марний нижче ~3 м/с і визначається 5–10 с; дай борту набрати швидкість.",
+        "З магнітометром і польотом на 90°/180° не туди — перекалібруй компас і перевір align; якщо некоректний — ВИМКНИ магнітометр і покладайся на GPS-курс.",
+        "Тестуй RTH на безпечній висоті у відкритому полі."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/setup-gps-rescue-mode-betaflight/",
+      "est_minutes": 20
+    },
+    "c_gps_rate": {
+      "type": "cause",
+      "id": "c_gps_rate",
+      "cause": "Смикання по рисканню — GPS оновлюється повільно",
+      "fix_steps": [
+        "Підніми частоту оновлення GPS до 5–10 Гц (повільний 1 Гц дає ривки).",
+        "Перевір якість фіксу (HDOP/к-сть супутників), антену й монтаж GPS подалі від силових проводів.",
+        "За потреби — якісніший GPS-модуль."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://oscarliang.com/setup-gps-rescue-mode-betaflight/",
+      "est_minutes": 15
+    },
+    "c_params": {
+      "type": "cause",
+      "id": "c_params",
+      "cause": "Погана посадка/зависання — параметри Rescue",
+      "fix_steps": [
+        "Налаштуй rescue altitude, ground speed і descent під свій борт.",
+        "Перевір sanity checks (відстань/час) — не мають хибно зривати rescue.",
+        "Доводь параметри поступово, тестуючи на безпечній висоті."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/GPS-Rescue",
+      "est_minutes": 25
+    }
+  }
+}

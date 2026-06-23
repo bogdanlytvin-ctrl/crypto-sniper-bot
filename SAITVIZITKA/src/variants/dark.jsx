@@ -588,10 +588,10 @@ function DarkSite() {
             <div onClick={(e) => e.stopPropagation()} className="bento" style={{ maxWidth: 720, width: "100%", maxHeight: "90vh", overflowY: "auto", background: T.cardSolid, padding: 0, animation: "bm-fade .25s ease" }}>
               {openProject.image
                 ? <div style={{ aspectRatio: "16/9", background: `url(${openProject.image}) center/cover no-repeat` }} />
-                : <div style={{ aspectRatio: "16/7", background: `linear-gradient(135deg, ${accent}22, transparent 70%), ${T.cardSolid}`, display: "grid", placeItems: "center", fontSize: 64, color: `${accent}55` }}>{openProject.title.charAt(0)}</div>}
+                : <div style={{ aspectRatio: "16/7", background: `linear-gradient(135deg, ${accent}22, transparent 70%), ${T.cardSolid}`, display: "grid", placeItems: "center", fontSize: 64, color: `${accent}55` }}>{openProject.title?.charAt(0)}</div>}
               <div style={{ padding: "36px 40px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div className="mono" style={{ fontSize: 12, color: accent, marginBottom: 14 }}>{openProject.year} · {openProject.cat.toUpperCase()}</div>
+                  <div className="mono" style={{ fontSize: 12, color: accent, marginBottom: 14 }}>{openProject.year} · {openProject.cat?.toUpperCase()}</div>
                   <button onClick={closeProj} style={{ background: T.card, border: `1px solid ${T.border}`, color: T.text2, width: 34, height: 34, borderRadius: 10, cursor: "pointer", fontSize: 16 }}>×</button>
                 </div>
                 <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 14 }}>{openProject.title}</div>

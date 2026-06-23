@@ -1,0 +1,76 @@
+{
+  "$comment": "DRAFT-дерево. Лінк є, але стіки не рухають бари або керують не тими каналами — channel map. Звірено з Oscar Liang channel map + Betaflight. НЕ звірено живим ремонтом.",
+  "id": "channel-map",
+  "symptom": "Стіки не рухають бари / неправильні канали",
+  "summary": "Приймач у лінку, але у вкладці Receiver реакція невірна або відсутня — найчастіше channel map (AETR/TAER).",
+  "applies_to": { "has": ["receiver"] },
+  "entry": "bars",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-20" },
+  "source_url": "https://oscarliang.com/channel-map/",
+  "nodes": {
+    "bars": {
+      "type": "check",
+      "id": "bars",
+      "instruction": "У вкладці Receiver бари реагують на стіки?",
+      "method": "configurator",
+      "note": "Передумова: RX прив'язаний (лінк є). Якщо барів зовсім немає й лінку немає — це інше дерево («немає лінку з пультом»).",
+      "outcomes": [
+        { "label": "Рухаються, але НЕ ті (throttle на roll тощо)", "next": "c_map_order" },
+        { "label": "Зовсім не рухаються (хоча лінк є)", "next": "link_confirm" }
+      ]
+    },
+    "link_confirm": {
+      "type": "check",
+      "id": "link_confirm",
+      "instruction": "Підтвердь: RX прив'язаний, Serial RX на правильному UART, Provider = CRSF?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Так, усе налаштовано — бари все одно мовчать", "next": "c_map_change" },
+        { "label": "Ні — Serial RX / протокол не виставлені", "next": "c_serial" }
+      ]
+    },
+
+    "c_map_order": {
+      "type": "cause",
+      "id": "c_map_order",
+      "cause": "Невірний порядок каналів (channel map)",
+      "fix_steps": [
+        "Receiver → Channel Map: вистав під свій пульт (AETR1234 / TAER1234 / RETA…).",
+        "Перевір, що T/A/E/R відповідають throttle/roll/pitch/yaw.",
+        "Save; перевір рух кожного стіка у Receiver."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/channel-map/",
+      "est_minutes": 5
+    },
+    "c_map_change": {
+      "type": "cause",
+      "id": "c_map_change",
+      "cause": "Channel map не збігається з виходом пульта",
+      "fix_steps": [
+        "Лінк і протокол ок, але бари мовчать — зміни Channel Map (AETR1234 ↔ TAER1234) і Save.",
+        "Звір порядок каналів у моделі пульта (mixer/outputs).",
+        "Перевір рух стіків у Receiver після зміни."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/channel-map/",
+      "est_minutes": 5
+    },
+    "c_serial": {
+      "type": "cause",
+      "id": "c_serial",
+      "cause": "Serial RX / протокол не налаштовані",
+      "fix_steps": [
+        "Ports: увімкни Serial RX на UART приймача; Receiver: Provider = CRSF (ELRS/Crossfire).",
+        "Save & Reboot.",
+        "Деталі біндингу/лінку — дерево «немає лінку з пультом»."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Rx-Setup",
+      "est_minutes": 10
+    }
+  }
+}

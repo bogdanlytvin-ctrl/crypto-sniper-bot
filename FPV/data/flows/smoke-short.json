@@ -1,0 +1,168 @@
+{
+  "$comment": "DRAFT-дерево. Дим / коротке замикання — польова тріаж після «magic smoke». БЕЗПЕКА: відключи батарею, не вмикай знову на LiPo, тестуй лише через smoke stopper / струмообмежене джерело. Звірено з GetFPV / Oscar Liang. НЕ звірено живим ремонтом.",
+  "id": "smoke-short",
+  "symptom": "Дим / коротке замикання",
+  "summary": "Перше — ВІДКЛЮЧИ батарею й не вмикай знову на LiPo. Шукаємо КЗ мультиметром і очима, перш ніж дати живлення.",
+  "entry": "source",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://www.getfpv.com/learn/fpv-essentials/fpv-drone-electrical-checks/",
+  "nodes": {
+    "source": {
+      "type": "check",
+      "id": "source",
+      "instruction": "Звідки дим/запах? (спершу — ВІДКЛЮЧИ батарею!)",
+      "method": "visual",
+      "note": "Magic smoke = десь КЗ. Повторне вмикання на повній LiPo добиває плату. Для тесту — ТІЛЬКИ smoke stopper / струмообмежене джерело, ніколи свіжа батарея.",
+      "outcomes": [
+        { "label": "Дим одразу при підключенні (можлива переплутана полярність)", "next": "polarity" },
+        { "label": "Видно обгорілий/здутий компонент", "next": "burnt_part" },
+        { "label": "Джерела не видно, але був дим/запах", "next": "short_meas" }
+      ]
+    },
+    "polarity": {
+      "type": "check",
+      "id": "polarity",
+      "instruction": "Перевір полярність живлення (XT60/роз'єм, розводка +/−)",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Полярність переплутана (роз'єм/пайка дзеркально)", "next": "c_reverse" },
+        { "label": "Полярність вірна", "next": "short_meas" }
+      ]
+    },
+    "short_meas": {
+      "type": "check",
+      "id": "short_meas",
+      "instruction": "Зміряй опір VBAT↔GND мультиметром (батарея ВІДКЛЮЧЕНА)",
+      "method": "multimeter",
+      "expected": "не близько 0 Ом (кΩ і вище)",
+      "pad_ref": { "kind": "literal", "label": "VBAT ↔ GND" },
+      "note": "Короткий писк і тиша = заряд конденсаторів, це НЕ КЗ. Стале ~0 Ом / безперервний писк = коротке.",
+      "outcomes": [
+        { "label": "Близько 0 Ом / безперервний писк — коротке", "next": "find_short" },
+        { "label": "Опір нормальний (після заряду cap)", "next": "c_no_short_other" }
+      ]
+    },
+    "find_short": {
+      "type": "check",
+      "id": "find_short",
+      "instruction": "Шукай джерело КЗ під лупою",
+      "method": "visual",
+      "note": "Найчастіше — мікроскопічний місток припою між сусідніми падами (візуально майже непомітний), стружка/волосина дроту, волога, або здутий/пробитий компонент.",
+      "outcomes": [
+        { "label": "Місток припою / стружка / волога", "next": "c_bridge" },
+        { "label": "Здутий/тріснутий компонент (cap / MOSFET / BEC)", "next": "c_component" },
+        { "label": "Нічого не видно — КЗ всередині ESC/FC", "next": "c_internal" }
+      ]
+    },
+    "burnt_part": {
+      "type": "check",
+      "id": "burnt_part",
+      "instruction": "Який вузол обгорів?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "BEC / регулятор живлення", "next": "c_bec_burn" },
+        { "label": "ESC / силовий MOSFET", "next": "c_esc_burn" },
+        { "label": "Інше / незрозуміло", "next": "c_component" }
+      ]
+    },
+
+    "c_reverse": {
+      "type": "cause",
+      "id": "c_reverse",
+      "cause": "Переплутана полярність живлення",
+      "fix_steps": [
+        "Виправ розводку роз'єму/пайки (+ і − на місця).",
+        "Оціни збитки: реверс зазвичай вбиває вхідний діод/конденсатор/BEC, інколи більше.",
+        "Перед повторним живленням — вимір VBAT↔GND і тест через smoke stopper."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/smoke-stopper/",
+      "est_minutes": 20
+    },
+    "c_bridge": {
+      "type": "cause",
+      "id": "c_bridge",
+      "cause": "Місток припою / стружка / волога — зовнішнє КЗ",
+      "fix_steps": [
+        "Прибери місток (перепай), видали стружку/волосину, промий ізопропілом і висуши.",
+        "Повтори вимір VBAT↔GND — КЗ має зникнути (опір виріс).",
+        "Перший запуск — через smoke stopper."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/multimeter-fpv/",
+      "est_minutes": 20
+    },
+    "c_component": {
+      "type": "cause",
+      "id": "c_component",
+      "cause": "Пробитий/здутий компонент (cap / MOSFET / BEC)",
+      "fix_steps": [
+        "Ідентифікуй обгорілий/здутий елемент; заміни.",
+        "Знайди ПЕРШОПРИЧИНУ (перенапруга, КЗ на навантаженні) — інакше згорить знову.",
+        "Після заміни — вимір опору й тест через smoke stopper."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://www.getfpv.com/learn/fpv-essentials/fpv-drone-electrical-checks/",
+      "est_minutes": 40
+    },
+    "c_internal": {
+      "type": "cause",
+      "id": "c_internal",
+      "cause": "Внутрішнє КЗ ESC/FC (не видно зовні)",
+      "fix_steps": [
+        "Локалізуй: відпаюй навантаження/вузли по черзі й міряй VBAT↔GND — де КЗ зникає, там винуватець.",
+        "Інколи новий ESC «з коробки» дає мертве КЗ, що садить усю шину живлення.",
+        "Якщо КЗ у самій платі/каскаді — заміна вузла."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://oscarliang.com/multimeter-fpv/",
+      "est_minutes": 45
+    },
+    "c_bec_burn": {
+      "type": "cause",
+      "id": "c_bec_burn",
+      "cause": "Згорів BEC / регулятор живлення",
+      "fix_steps": [
+        "Часта причина — перевантаження або КЗ на виході BEC (VTX/периферія).",
+        "Знайди навантаження-винуватця; тимчасово живи периферію від справного BEC.",
+        "Заміна BEC або плати; перевір струм споживання навантаження."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://www.getfpv.com/learn/fpv-essentials/fpv-drone-electrical-checks/",
+      "est_minutes": 40
+    },
+    "c_esc_burn": {
+      "type": "cause",
+      "id": "c_esc_burn",
+      "cause": "Згорів силовий каскад ESC (MOSFET/фаза)",
+      "fix_steps": [
+        "Часто від заклиненого мотора, десинхронізації або КЗ фази мотора.",
+        "Перевір мотор і фази (опір обмоток, відсутність КЗ на корпус).",
+        "Заміна ESC; перевір протокол/тайминги, demag/rampup."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://oscarliang.com/multimeter-fpv/",
+      "est_minutes": 45
+    },
+    "c_no_short_other": {
+      "type": "cause",
+      "id": "c_no_short_other",
+      "cause": "Сталого КЗ немає — разовий пробій/перегрів",
+      "fix_steps": [
+        "Огляд на сліди перегріву; перевір, чи дим не був від разового пробою, що вже відгорів.",
+        "Обережний перший запуск через smoke stopper, спостерігай за нагрівом.",
+        "Якщо повторюється під навантаженням — шукай слабкий вузол далі."
+      ],
+      "fix_action": "clean",
+      "confidence": "possible",
+      "source_url": "https://oscarliang.com/smoke-stopper/",
+      "est_minutes": 20
+    }
+  }
+}

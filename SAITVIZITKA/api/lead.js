@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     const contact = String(body.contact || "").slice(0, 200).trim();
     const msg = String(body.msg || "").slice(0, 2000).trim();
     if (!name || !contact) return res.status(400).json({ error: "name and contact required" });
-    const ts = Number(body.ts) || Date.now();
+    const ts = Date.now();
     const lead = { id: "l" + ts, name, contact, msg, ts, new: true, source: "site" };
 
     // Telegram via server env (no DB read needed); fall back to stored config only

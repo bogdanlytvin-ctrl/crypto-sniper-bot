@@ -12,6 +12,7 @@ function LightSite() {
   const [filter, setFilter] = React.useState("all");
   const [openFaq, setOpenFaq] = React.useState(null);
   const [openProject, setOpenProject] = React.useState(null);
+  const [openNote, setOpenNote] = React.useState(null);
   const [form, setForm] = React.useState({ name: "", contact: "", msg: "", sent: false });
   const [hover, setHover] = React.useState(null);
   const accent = data.accent;
@@ -84,7 +85,6 @@ function LightSite() {
               <a href="#contact" className="btn-primary" style={{ padding: "10px 18px", background: accent, color: "#1A1815", borderRadius: 100, fontSize: 13, fontWeight: 500 }}>
                 {lang === "ua" ? "Написати" : lang === "en" ? "Get in touch" : "Написать"} →
               </a>
-              <a href="admin.html" title="admin" style={{ color: "#7A7469", fontSize: 14 }}>⚿</a>
             </nav>
           </div>
         </header>
@@ -93,7 +93,7 @@ function LightSite() {
         <section style={{ padding: "100px 0 80px", position: "relative" }}>
           <div className="mono" style={{ fontSize: 12, color: "#7A7469", letterSpacing: "0.1em", marginBottom: 32, display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ width: 24, height: 1, background: accent }} />
-            {lang === "ua" ? "ПОРТФОЛІО · 2022 — СЬОГОДНІ" : lang === "en" ? "PORTFOLIO · 2022 — PRESENT" : "ПОРТФОЛИО · 2022 — СЕГОДНЯ"}
+            {lang === "ua" ? "ПОРТФОЛІО · 2024 — СЬОГОДНІ" : lang === "en" ? "PORTFOLIO · 2024 — PRESENT" : "ПОРТФОЛИО · 2024 — СЕГОДНЯ"}
           </div>
           <h1 className="serif" style={{ fontSize: "clamp(64px, 10vw, 156px)", lineHeight: 0.93, margin: 0, whiteSpace: "pre-line", letterSpacing: "-0.03em" }}>
             {t(data.heroTitle).split("\n").map((line, i) => (
@@ -326,7 +326,7 @@ function LightSite() {
           <LightSectionHead lang={lang} label={{ ua: "Блог", en: "Blog", ru: "Блог" }} sub={{ ua: "Короткі нотатки про розробку, процеси й інструменти.", en: "Short notes on development, process, and tools.", ru: "Короткие заметки о разработке, процессах и инструментах." }} accent={accent} />
           <div style={{ marginTop: 48, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
             {data.blog.map((b, i) => (
-              <a key={b.id} href="#" onClick={(e) => e.preventDefault()} style={{ display: "block", padding: 28, borderRadius: 16, background: "#EDE8E0", transition: "transform .3s" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+              <a key={b.id} href="#" onClick={(e) => { e.preventDefault(); setOpenNote(b); }} style={{ display: "block", padding: 28, borderRadius: 16, background: "#EDE8E0", transition: "transform .3s", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
                 <div className="mono" style={{ fontSize: 11, color: "#7A7469", letterSpacing: "0.1em" }}>{b.date} · {b.readMin} MIN</div>
                 <div className="serif" style={{ fontSize: 26, marginTop: 16, lineHeight: 1.15 }}>{t(b.title)}</div>
                 <div style={{ marginTop: 16, color: "#5C5750", fontSize: 14, lineHeight: 1.5 }}>{t(b.excerpt)}</div>
@@ -353,7 +353,7 @@ function LightSite() {
                 {[
                   { label: "Email", value: data.contacts.email, href: `mailto:${data.contacts.email}` },
                   { label: "Telegram", value: data.contacts.telegram, href: `https://t.me/${data.contacts.telegram.replace("@","")}` },
-                  { label: "WhatsApp", value: data.contacts.whatsapp, href: "#" },
+                  { label: "WhatsApp", value: data.contacts.whatsapp, href: `https://wa.me/${(data.contacts.whatsapp || "").replace(/\D/g, "")}` },
                   { label: lang === "ua" ? "Локація" : lang === "en" ? "Location" : "Локация", value: t(data.contacts.location), href: "#" },
                 ].map((c, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "14px 0", borderTop: "1px solid #1A181515", alignItems: "center" }}>
@@ -397,14 +397,26 @@ function LightSite() {
       </div>
 
       {/* PROJECT MODAL */}
+      {/* BLOG MODAL */}
+      {openNote && (
+        <div onClick={() => setOpenNote(null)} style={{ position: "fixed", inset: 0, background: "rgba(26,24,21,0.4)", backdropFilter: "blur(8px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680, width: "100%", background: "#F6F3EE", padding: 48, position: "relative", borderRadius: 20, maxHeight: "80vh", overflowY: "auto" }}>
+            <button onClick={() => setOpenNote(null)} style={{ position: "absolute", top: 20, right: 20, background: "#EDE8E0", border: "none", color: "#1A1815", width: 36, height: 36, borderRadius: 18, cursor: "pointer", fontSize: 18 }}>×</button>
+            <div className="mono" style={{ fontSize: 11, color: "#7A7469", marginBottom: 16, letterSpacing: "0.1em" }}>{openNote.date} · {openNote.readMin} MIN READ</div>
+            <div className="serif" style={{ fontSize: 48, lineHeight: 1, letterSpacing: "-0.02em", marginBottom: 24 }}>{t(openNote.title)}</div>
+            <div style={{ fontSize: 16, color: "#5C5750", lineHeight: 1.7 }}>{t(openNote.body || openNote.excerpt)}</div>
+          </div>
+        </div>
+      )}
+
       {openProject && (
         <div onClick={() => setOpenProject(null)} style={{ position: "fixed", inset: 0, background: "rgba(26,24,21,0.4)", backdropFilter: "blur(8px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720, width: "100%", background: "#F6F3EE", padding: 48, position: "relative", borderRadius: 20 }}>
             <button onClick={() => setOpenProject(null)} style={{ position: "absolute", top: 20, right: 20, background: "#EDE8E0", border: "none", color: "#1A1815", width: 36, height: 36, borderRadius: 18, cursor: "pointer", fontSize: 18 }}>×</button>
-            <div className="mono" style={{ fontSize: 11, color: accent, marginBottom: 12, letterSpacing: "0.1em" }}>{openProject.year} · {openProject.cat.toUpperCase()}</div>
+            <div className="mono" style={{ fontSize: 11, color: accent, marginBottom: 12, letterSpacing: "0.1em" }}>{openProject.year} · {openProject.cat?.toUpperCase()}</div>
             <div className="serif" style={{ fontSize: 72, lineHeight: 0.95, letterSpacing: "-0.03em", marginBottom: 16 }}>{openProject.title}</div>
-            <div style={{ fontSize: 18, color: "#5C5750", marginBottom: 24 }}>{typeof openProject.tag === "string" ? openProject.tag : openProject.tag[lang]}</div>
-            <div style={{ borderTop: "1px solid #1A181520", paddingTop: 24, fontSize: 16, lineHeight: 1.6, marginBottom: 24 }}>{typeof openProject.desc === "string" ? openProject.desc : openProject.desc[lang]}</div>
+            <div style={{ fontSize: 18, color: "#5C5750", marginBottom: 24 }}>{t(openProject.tag)}</div>
+            <div style={{ borderTop: "1px solid #1A181520", paddingTop: 24, fontSize: 16, lineHeight: 1.6, marginBottom: 24 }}>{t(openProject.desc)}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, borderTop: "1px solid #1A181520", paddingTop: 24 }}>
               <div>
                 <div className="mono" style={{ fontSize: 10, color: "#7A7469", marginBottom: 6, letterSpacing: "0.1em" }}>STACK</div>

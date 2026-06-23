@@ -1,0 +1,26 @@
+{
+  "$comment": "DRAFT — типовий AM32 4in1 (open-source 32-біт, сучасна заміна BLHeli_32). Bidir DShot/RPM + телеметрія по дроту TLM. Струм/банки звір на своєму ESC.",
+  "id": "generic-am32-4in1",
+  "type": "esc",
+  "brand": "Generic",
+  "model": "AM32 4in1",
+  "protocol": "DShot300/600 + bidir",
+  "firmware": "AM32",
+  "current_rating_a": 55,
+  "requirements": {
+    "connection": "stack_cable",
+    "voltage": ["3-6S"],
+    "has_telemetry": true
+  },
+  "wiring": [
+    { "component_pin": "M1–M4 (сигнал)", "connects_to": "FC виходи моторів M1–M4" },
+    { "component_pin": "VBAT (батарея/XT60)", "connects_to": "FC VBAT (ESC живить FC)" },
+    { "component_pin": "Curr", "connects_to": "FC датчик струму (Curr-пад)" },
+    { "component_pin": "TLM", "connects_to": "FC RX виділеного ESC-telem UART" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Motor protocol DShot600 + bidirectional DShot для RPM-фільтра; телеметрія ESC Sensor на ESC-telem UART. AM32 — активний open-source проект.",
+  "known_issues": [],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://oscarliang.com/am32-esc-firmware-an-open-source-alternative-to-blheli32/"
+}

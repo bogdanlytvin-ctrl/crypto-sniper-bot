@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — звірено з мануалом HDZero + оглядом Oscar Liang (2026-06-18): Freestyle V2 вхід 7–25В, UART MSP DisplayPort (115200/230400), soft-serial НЕ підтримується. УВАГА: HDZero до Freestyle Batch 2 НЕ тримають 6S — звір батч. Field-перевірка потрібна.",
+  "id": "hdzero-freestyle-v2",
+  "type": "vtx_digital",
+  "brand": "HDZero",
+  "model": "Freestyle V2",
+  "protocol": "MSP DisplayPort",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["9V", "7-25V"],
+    "current_draw_ma": 800,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "VCC (7–25V)", "connects_to": "9V BEC або VBAT (звір підтримку 6S за батчем)" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Peripherals: VTX (MSP + DisplayPort). Soft-serial не працює — потрібен апаратний UART. Baud 115200 або 230400.",
+  "known_issues": [
+    {
+      "issue": "HDZero до Freestyle Batch 2 не підтримують 6S VBAT",
+      "workaround": "Живи від 9V BEC, або звір батч VTX перед 6S"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://hd-zero.github.io/hdzero-vtx-docs/latest/vtx_user_manual/"
+}

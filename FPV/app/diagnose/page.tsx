@@ -3,13 +3,17 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BOARDS, FLOWS } from '@/lib/data';
+import { StatusLegend } from '../status-legend';
+import { FLOWS } from '@/lib/data';
+import { useStickyBoardId } from '@/lib/prefs';
+import { useAllBoards } from '@/lib/custom-boards';
 import { newRepair, saveRepair } from '@/lib/idb';
 import { effectiveStatus, flowKey, useVerifications } from '@/lib/verify';
 import {
   getNode,
   isCause,
   resolvePad,
+  safeHref,
   type CauseNode,
   type CheckMethod,
   type Confidence,
@@ -46,30 +50,32 @@ const flowStatus: Record<string, { text: string; cls: string }> = {
   field_tested: { text: 'перевірено в полі', cls: 'checked' },
 };
 
-// Пропускаємо у href лише http(s) — захист від javascript:/data: у даних.
-function safeHref(url: string): string {
-  return /^https?:\/\//i.test(url) ? url : '#';
-}
-
 // Що може бути на борту — для фільтра симптомів за applies_to.
 const CAPS: { key: string; label: string }[] = [
   { key: 'receiver', label: 'Приймач' },
   { key: 'vtx_digital', label: 'Цифровий VTX' },
   { key: 'vtx_analog', label: 'Аналоговий VTX' },
   { key: 'gps', label: 'GPS' },
+  { key: 'fiber', label: 'Оптоволокно' },
+  { key: 'release', label: 'Скид/реліз' },
 ];
 const ALL_CAPS = CAPS.map((c) => c.key);
 
 export default function DiagnosePage() {
   const router = useRouter();
   const { map: verifyMap } = useVerifications();
-  const [boardId, setBoardId] = useState(BOARDS[0].id);
+  const [boardId, setBoardId] = useStickyBoardId();
   const [caps, setCaps] = useState<string[]>(ALL_CAPS);
+  const [query, setQuery] = useState('');
   const [flowId, setFlowId] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [history, setHistory] = useState<PathStep[]>([]);
 
-  const board = useMemo(() => BOARDS.find((b) => b.id === boardId) ?? BOARDS[0], [boardId]);
+  const allBoards = useAllBoards();
+  const board = useMemo(
+    () => allBoards.find((b) => b.id === boardId) ?? allBoards[0],
+    [allBoards, boardId],
+  );
   const flow = useMemo(() => FLOWS.find((f) => f.id === flowId) ?? null, [flowId]);
 
   // Показуємо лише симптоми, релевантні до того, що на борту (applies_to).
@@ -82,6 +88,15 @@ export default function DiagnosePage() {
       }),
     [caps],
   );
+
+  // Додатковий текстовий пошук по симптомах (швидко знайти під тиском).
+  const shownFlows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return visibleFlows;
+    return visibleFlows.filter(
+      (f) => f.symptom.toLowerCase().includes(q) || (f.summary ?? '').toLowerCase().includes(q),
+    );
+  }, [visibleFlows, query]);
 
   function toggleCap(key: string) {
     setCaps((c) => (c.includes(key) ? c.filter((k) => k !== key) : [...c, key]));
@@ -104,18 +119,22 @@ export default function DiagnosePage() {
   }
 
   function goBack() {
-    setHistory((h) => {
-      if (!h.length) return h;
-      const prev = h[h.length - 1];
-      setCurrentId(prev.node.id);
-      return h.slice(0, -1);
-    });
+    if (!history.length) return;
+    setCurrentId(history[history.length - 1].node.id);
+    setHistory((h) => h.slice(0, -1));
   }
 
   function reset() {
     setFlowId(null);
     setCurrentId(null);
     setHistory([]);
+  }
+
+  // Зміна плати посеред дерева збила б прив'язку pad_ref до старого заліза —
+  // тому скидаємо проходження, щоб технік не міряв «9V» не на тій платі.
+  function changeBoard(id: string) {
+    setBoardId(id);
+    if (flowId) reset();
   }
 
   async function saveToJournal(cause: CauseNode) {
@@ -162,12 +181,15 @@ export default function DiagnosePage() {
         </p>
       </header>
 
+      <StatusLegend />
+
       <div className="field dx-board">
         <label htmlFor="board">Польотний контролер</label>
-        <select id="board" value={boardId} onChange={(e) => setBoardId(e.target.value)}>
-          {BOARDS.map((b) => (
+        <select id="board" value={boardId} onChange={(e) => changeBoard(e.target.value)}>
+          {allBoards.map((b) => (
             <option key={b.id} value={b.id}>
               {b.brand} {b.model} {b.revision}
+              {b.custom ? ' ★ власна' : ''}
             </option>
           ))}
         </select>
@@ -190,15 +212,30 @@ export default function DiagnosePage() {
         </div>
       )}
 
+      {/* Пошук по симптомах */}
+      {!flow && (
+        <div className="field dx-search">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="🔍 пошук симптому (напр. «відео», «арм», «GPS»)"
+            aria-label="Пошук симптому"
+          />
+        </div>
+      )}
+
       {/* Вибір симптому */}
       {!flow && (
         <section className="symptoms" aria-label="Симптоми">
-          {visibleFlows.length === 0 && (
+          {shownFlows.length === 0 && (
             <div className="empty">
-              За обраними компонентами симптомів немає. Увімкни більше пунктів «на борту».
+              {query.trim()
+                ? `За запитом «${query.trim()}» симптомів немає. Спробуй інакше або очисти пошук.`
+                : 'За обраними компонентами симптомів немає. Увімкни більше пунктів «на борту».'}
             </div>
           )}
-          {visibleFlows.map((f) => (
+          {shownFlows.map((f) => (
             <button key={f.id} className="symptom" onClick={() => startFlow(f.id)}>
               <span className="symptom-name">{f.symptom}</span>
               {f.summary && <span className="symptom-sum">{f.summary}</span>}

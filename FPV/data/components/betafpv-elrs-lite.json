@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — звірити з документацією BetaFPV. ELRS Lite RX (Lite/Nano) 2.4G, CRSF по UART (full duplex), живлення 5V. Дрібні пади — обережно при пайці. Field-перевірка потрібна.",
+  "id": "betafpv-elrs-lite",
+  "type": "receiver",
+  "brand": "BetaFPV",
+  "model": "ELRS Lite RX (2.4G)",
+  "protocol": "CRSF",
+  "requirements": {
+    "connection": "uart",
+    "needs_full_duplex": true,
+    "voltage": ["5V"],
+    "current_draw_ma": 60,
+    "needs_inversion": false
+  },
+  "wiring": [
+    { "component_pin": "TX", "connects_to": "FC RX-пад обраного UART" },
+    { "component_pin": "RX", "connects_to": "FC TX-пад обраного UART" },
+    { "component_pin": "5V", "connects_to": "5V BEC" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Ports → обраний UART → Serial RX; Receiver: Serial (CRSF). binding phrase = на пульті й RX однакова.",
+  "known_issues": [
+    {
+      "issue": "Дрібні пади — легко відірвати доріжку при пайці",
+      "workaround": "Фіксувати дроти краплею клею/UV-смоли, тонке жало"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://betafpv.com"
+}

@@ -8,7 +8,7 @@
   --inset: #0d1811;        /* втоплені поля (select, answer, padref) */
   --card-edge: #24402f;
   --silk: #e6ece5;         /* silkscreen white */
-  --silk-dim: #93a698;
+  --silk-dim: #a4b3a8;        /* підвищений контраст — читабельніше на сонці (WCAG AA+) */
   --silk-dim2: #b0bdb4;    /* приглушений, але читабельний на сонці */
   --copper: #c9863b;       /* мідь */
   --copper-soft: #8a6230;
@@ -35,9 +35,20 @@ body {
   font-family: var(--sans);
   line-height: 1.5;
   min-height: 100vh;
+  min-height: 100dvh; /* мобільні браузери з динамічною панеллю */
+  overflow-x: hidden; /* жоден токен/таблиця не дає горизонтального скролу */
+  -webkit-text-size-adjust: 100%; /* iOS не зумить текст у ландшафті */
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.wrap { max-width: 1060px; margin: 0 auto; padding: 28px 18px 80px; }
+/* Безпечні зони: відступи враховують «чубчик» і home-indicator (PWA standalone) */
+.wrap {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 28px max(18px, env(safe-area-inset-right)) calc(80px + env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+}
 
 /* ===== Шапка ===== */
 .masthead { margin-bottom: 26px; }
@@ -112,6 +123,26 @@ body {
 }
 .badge.draft { color: var(--warn); border-color: var(--warn); }
 .badge.checked { color: var(--ok); border-color: var(--ok); }
+
+/* Легенда статусів довіри (розкривна) */
+.status-legend {
+  border: 1px solid var(--card-edge); border-radius: 8px;
+  background: var(--card); padding: 0 14px; margin-bottom: 18px;
+}
+.status-legend summary {
+  cursor: pointer; padding: 11px 0; list-style: none;
+  font-family: var(--mono); font-size: 12px; color: var(--silk-dim);
+}
+.status-legend summary::-webkit-details-marker { display: none; }
+.status-legend summary::before { content: '▸ '; color: var(--copper); }
+.status-legend[open] summary::before { content: '▾ '; }
+.status-legend ul { list-style: none; display: flex; flex-direction: column; gap: 10px; padding: 0 0 10px; }
+.status-legend li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-size: 13px; line-height: 1.4; color: var(--silk-dim2);
+}
+.status-legend li b { color: var(--silk); }
+.status-legend p { font-size: 12px; color: var(--silk-dim); padding-bottom: 12px; }
 
 .assignment {
   background: var(--card);
@@ -226,6 +257,73 @@ footer.colophon {
 .hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
 @media (max-width: 520px) { .hub { grid-template-columns: 1fr; } }
 
+/* Групи інструментів на хабі */
+.hub-group { margin-bottom: 26px; }
+.hub-group-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--silk-dim); margin: 0 0 12px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--card-edge);
+}
+
+/* «Як це працює» — 3 нумеровані кроки */
+.how { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 26px; }
+@media (max-width: 640px) { .how { grid-template-columns: 1fr; } }
+.how li {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--card); border: 1px solid var(--card-edge); border-radius: 10px;
+  padding: 14px; font-size: 14px; line-height: 1.45; color: var(--silk-dim2);
+}
+.how-n {
+  flex: none; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--copper); color: var(--board);
+  font-family: var(--mono); font-weight: 700; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.how b { color: var(--silk); }
+
+/* Банер «почни тут» */
+.start-here {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 26px; padding: 14px 18px;
+  background: rgba(201, 134, 59, 0.08);
+  border: 1px solid var(--copper-soft); border-radius: 10px;
+  color: var(--silk); text-decoration: none; font-size: 15px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.start-here:hover { border-color: var(--copper); background: rgba(201, 134, 59, 0.13); }
+.start-here b { color: var(--copper); }
+.start-here > span:nth-child(2) { flex: 1; min-width: 200px; }
+.start-tag {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-weight: 700; color: var(--board); background: var(--copper);
+  border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+}
+.start-arrow { color: var(--copper); font-size: 20px; font-weight: 700; }
+
+/* Індикатор офлайну (показується лише коли немає мережі) */
+.offline-bar {
+  text-align: center; font-family: var(--mono); font-size: 12px;
+  color: var(--warn); background: rgba(224, 169, 62, 0.1);
+  border-bottom: 1px solid var(--warn);
+  padding: 6px max(12px, env(safe-area-inset-left));
+}
+
+/* Підказка офлайн/встановлення (одноразова) */
+.install-hint {
+  display: flex; align-items: center; gap: 12px;
+  max-width: 1060px; margin: 0 auto;
+  padding: 10px max(14px, env(safe-area-inset-left)) 10px max(14px, env(safe-area-inset-right));
+  font-size: 13px; color: var(--silk-dim);
+  background: var(--card); border-bottom: 1px solid var(--card-edge);
+}
+.install-hint span { flex: 1; }
+.install-hint b { color: var(--silk); }
+.install-hint button {
+  background: transparent; border: 1px solid var(--card-edge); border-radius: 6px;
+  color: var(--silk-dim); padding: 4px 10px; min-height: 34px; cursor: pointer; font-size: 13px;
+}
+.install-hint button:hover { color: var(--copper); border-color: var(--copper); }
+
 .tool {
   position: relative;
   display: flex;
@@ -267,6 +365,7 @@ footer.colophon {
 
 /* ===== Вибір плати в діагностиці ===== */
 .dx-board { max-width: 420px; margin-bottom: 22px; }
+.dx-search { max-width: 420px; margin-bottom: 18px; }
 
 /* ===== Фільтр «що на борту» ===== */
 .caps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 18px; }
@@ -437,7 +536,7 @@ footer.colophon {
 .dx-controls {
   display: flex; gap: 10px;
   position: sticky; bottom: 0;
-  padding: 12px 0;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
   background: linear-gradient(to top, var(--board) 70%, transparent);
 }
 .ghost {
@@ -524,6 +623,41 @@ footer.colophon {
 .jr-form .field { margin-bottom: 0; }
 .jr-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
+/* Редактор власних плат — динамічні рядки BEC/UART */
+.cb-block { margin-top: 4px; }
+.cb-block-head { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 8px; }
+.cb-block-head h4 {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--copper);
+}
+.cb-add { min-height: 0; padding: 5px 10px; font-size: 12px; }
+.cb-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.cb-row input, .cb-row select {
+  background: var(--inset); border: 1px solid var(--card-edge); border-radius: 6px;
+  color: var(--silk); font-family: var(--mono); font-size: 13px; padding: 8px 10px; min-width: 0; flex: 1;
+}
+.cb-row .cb-del { flex: 0 0 auto; min-height: 0; padding: 6px 10px; }
+@media (max-width: 560px) { .cb-row { flex-wrap: wrap; } }
+
+/* Сторінка довідки / баг-репорту */
+.help-block { margin: 20px 0; }
+.help-block > h2 {
+  font-family: var(--mono); font-size: 13px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--copper); margin-bottom: 10px;
+}
+.help-note { margin-top: 12px; color: var(--silk-dim); font-size: 14px; line-height: 1.55; }
+.ghost-link {
+  align-self: center; color: var(--silk-dim); font-size: 13px;
+  font-family: var(--mono); text-decoration: none;
+}
+.ghost-link:hover { color: var(--silk); }
+
+.help-link {
+  display: block; text-align: center; margin: -4px 0 18px;
+  color: var(--silk-dim); font-family: var(--mono); font-size: 13px; text-decoration: none;
+}
+.help-link:hover { color: var(--copper); }
+
 /* ===== Аналітика журналу ===== */
 .jr-analytics {
   background: var(--card); border: 1px solid var(--card-edge);
@@ -561,6 +695,7 @@ footer.colophon {
 .jr-status.open { color: var(--warn); border-color: var(--warn); }
 .jr-status.fixed { color: var(--ok); border-color: var(--ok); }
 .jr-status.scrapped { color: var(--wire-power); border-color: var(--wire-power); }
+.jr-status.storage { color: var(--silk-dim); border-color: var(--card-edge); }
 .jr-date { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--silk-dim); }
 .jr-board { font-family: var(--mono); font-size: 13px; color: var(--copper); margin-top: 6px; }
 .jr-diag { margin-top: 6px; font-size: 14px; }
@@ -630,6 +765,16 @@ footer.colophon {
 /* ===== Схема падів плати ===== */
 .pads-toggle { width: 100%; margin-top: 4px; }
 .padmap { margin-top: 22px; }
+.padmap-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px;
+}
+.padmap-link {
+  font-family: var(--mono); font-size: 13px; color: var(--copper); text-decoration: none;
+  border: 1px solid var(--copper-soft); border-radius: 6px; padding: 7px 12px;
+  min-height: 38px; display: inline-flex; align-items: center;
+}
+.padmap-link:hover { border-color: var(--copper); background: rgba(201, 134, 59, 0.08); }
 .padmap-board {
   background:
     radial-gradient(circle, rgba(26, 46, 33, 0.6) 1px, transparent 1px) 0 0 / 18px 18px,
@@ -664,6 +809,38 @@ footer.colophon {
 .pm-pad.i2c { color: var(--wire-i2c); border-color: var(--wire-i2c); width: auto; padding: 0 10px; }
 .pm-role { font-size: 12px; color: var(--silk-dim); }
 .padmap-note { margin-top: 12px; font-size: 12px; color: var(--silk-dim); }
+.padmap-note b { color: var(--warn); }
+
+/* Візуальна SVG-схема плати */
+.bd-svg { display: block; width: 100%; height: auto; max-width: 520px; margin: 0 auto 16px; }
+.bd-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 16px;
+  font-family: var(--mono); font-size: 11px;
+}
+.bd-leg { display: inline-flex; align-items: center; gap: 6px; color: var(--silk-dim); }
+.bd-leg::before {
+  content: ''; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid;
+}
+.bd-leg.signal::before { border-color: var(--wire-signal); }
+.bd-leg.power::before { border-color: var(--wire-power); }
+.bd-leg.ground::before { border-color: var(--wire-ground); }
+.bd-leg.i2c::before { border-color: var(--wire-i2c); }
+
+/* ===== Рецепти збірок ===== */
+.rc-list { display: flex; flex-direction: column; gap: 16px; }
+.rc-card {
+  background: var(--card); border: 1px solid var(--card-edge);
+  border-top: 3px solid var(--copper); border-radius: 12px; padding: 18px;
+}
+.rc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.rc-head h2 { font-family: var(--mono); font-size: 18px; }
+.rc-sum { color: var(--silk-dim); font-size: 14px; margin: 6px 0 12px; }
+.rc-meta {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 12px;
+  font-family: var(--mono); font-size: 12px; color: var(--silk-dim2);
+}
+.rc-notes { margin: 12px 0 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.rc-notes li { font-size: 13px; line-height: 1.45; color: var(--silk-dim2); }
 
 /* ===== Звірка даних ===== */
 .vf-bar {
@@ -766,3 +943,174 @@ footer.colophon {
 .cn-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .cn-links .ghost { padding: 8px 12px; min-height: 0; font-size: 13px; }
 .cn-hint { font-size: 12px; color: var(--silk-dim); margin-top: 8px; }
+
+/* Сенсори, які бачить плата */
+.cn-sensors { display: flex; flex-wrap: wrap; gap: 8px; }
+.sensor {
+  font-family: var(--mono); font-size: 13px; padding: 5px 11px;
+  border-radius: 999px; border: 1px solid;
+}
+.sensor.on { color: var(--ok); border-color: var(--ok); background: rgba(111, 191, 115, 0.08); }
+.sensor.off { color: var(--silk-dim); border-color: var(--card-edge); opacity: 0.6; }
+
+/* Прапори заборони арму */
+.cn-arm {
+  margin-top: 14px; padding: 12px 14px; border-radius: 8px; font-size: 14px;
+  border: 1px solid var(--warn); background: rgba(224, 169, 62, 0.07); color: var(--warn);
+}
+.cn-arm.ok { border-color: var(--ok); background: rgba(111, 191, 115, 0.07); color: var(--ok); }
+.arm-flags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.arm-flag {
+  font-family: var(--mono); font-size: 12px; padding: 3px 9px;
+  border-radius: 5px; border: 1px solid var(--warn); color: var(--warn);
+  background: var(--inset);
+}
+.cn-arm .cn-hint { color: var(--silk-dim); }
+.cn-arm code { font-family: var(--mono); background: var(--inset); padding: 1px 5px; border-radius: 4px; }
+
+/* ============================================================
+   АДАПТИВ ПІД РІЗНІ ПРИСТРОЇ
+   ============================================================ */
+
+/* Довгі моно-токени (назви падів, target, CLI, board-label) не рвуть верстку */
+.wire .pin, .wire .pad, .fw-target code, .cn-match code,
+.cn-grid dd, .jr-board, .padref-label { overflow-wrap: anywhere; }
+
+/* Довідник: дуже вузький екран — таблиця може горизонтально прокрутитись у своєму блоці,
+   а не ламати сторінку */
+.rf-block { overflow-x: auto; }
+
+/* Сенсорні пристрої: дрібні icon-кнопки доростають до зручної тап-зони (≥40px) */
+@media (pointer: coarse) {
+  .jr-io .ghost, .vf-io .ghost, .cn-links .ghost,
+  .jr-card-actions .ghost, .fw-copy, .dx-reset,
+  .install-hint button, .padmap-link { min-height: 44px; }
+}
+
+/* Малі телефони (≤400px): тісніше, без обрізань */
+@media (max-width: 400px) {
+  .masthead { margin-bottom: 20px; }
+  .answer { font-size: 15px; padding: 14px; }
+  .check-q { font-size: 17px; }
+  .cause-title { font-size: 20px; }
+
+  /* «Дріт» стає вертикальним: пін зверху, пад знизу — нічого не вилазить за екран */
+  .wire {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--card-edge);
+  }
+  .wire:last-child { border-bottom: none; }
+  .wire .lead { display: none; }
+  .wire .pin, .wire .pad { white-space: normal; justify-self: start; }
+
+  /* Блоки експорт/імпорт — на всю ширину, не тиснуться в кут */
+  .jr-io, .vf-io { margin-left: 0; flex: 1 1 100%; }
+}
+
+/* Телефон боком на низькому екрані: прибрати зайву вертикальну висоту */
+@media (max-height: 480px) and (orientation: landscape) {
+  .wrap { padding-top: 16px; }
+  .tool { min-height: 0; }
+}
+
+/* Дуже широкі монітори: трохи більше повітря, контент не «худне» по центру */
+@media (min-width: 1400px) {
+  .wrap { max-width: 1140px; }
+}
+
+/* ============================================================
+   ДРУК / PDF — карта пайки на папір для поля (offline)
+   ============================================================ */
+.print-only { display: none; }
+
+@media print {
+  /* Ховаємо все зайве — друкуємо лише план підключення */
+  .masthead,
+  .panel,
+  footer.colophon,
+  .padmap,
+  .wf-print,
+  .pads-toggle,
+  .install-hint,
+  .offline-bar,
+  .status-legend,
+  .cursor {
+    display: none !important;
+  }
+
+  /* Світлий аркуш, без важкого фону */
+  html,
+  body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #000 !important;
+  }
+  .wrap { max-width: 100%; padding: 0; }
+  .grid { display: block; }
+  .plan { gap: 8px; }
+
+  .print-only { display: block !important; }
+  .print-head {
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #000;
+    font-family: var(--mono);
+  }
+  .print-head strong { font-size: 15px; }
+  .print-head span { display: block; font-size: 11px; color: #333; margin-top: 2px; }
+
+  /* Картки — біле тло, сірі межі, не розриваються між сторінками */
+  .assignment,
+  .global-warn,
+  .warnbox {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #999 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    animation: none !important;
+  }
+  .assignment > header { border-bottom: 1px solid #ccc; }
+  .plan-head h2,
+  .assignment h3,
+  .assignment .port,
+  .wire .pin,
+  .wire .pad,
+  .fwnote b {
+    color: #000 !important;
+  }
+  .assignment .proto,
+  .fwnote,
+  .source {
+    color: #333 !important;
+  }
+  .badge {
+    color: #000 !important;
+    border-color: #999 !important;
+  }
+  .wire .pin,
+  .wire .pad {
+    background: #fff !important;
+    border-color: #999 !important;
+  }
+  .warnbox {
+    border-left: 3px solid #000 !important;
+    border-radius: 0;
+  }
+
+  /* Друкуємо URL джерела текстом — щоб папір був самодостатній */
+  .source a {
+    color: #000 !important;
+    text-decoration: none;
+  }
+  .source a::after {
+    content: ' — ' attr(href);
+    font-size: 10px;
+    color: #555;
+    word-break: break-all;
+  }
+
+  a { text-decoration: none; }
+}

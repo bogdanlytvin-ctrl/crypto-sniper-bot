@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { BOARDS } from '@/lib/data';
-import { MspClient, webSerialSupported, type MspIdentity } from '@/lib/msp';
+import { MspClient, webSerialSupported, type MspIdentity, type MspStatus } from '@/lib/msp';
 import type { Board } from '@/lib/engine';
 
 type Status = 'idle' | 'connecting' | 'connected' | 'error';
@@ -28,6 +28,7 @@ export default function ConnectPage() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [identity, setIdentity] = useState<MspIdentity | null>(null);
+  const [live, setLive] = useState<MspStatus | null>(null);
 
   const matched = identity ? matchBoard(identity) : null;
 
@@ -40,6 +41,13 @@ export default function ConnectPage() {
       await client.connect();
       const id = await client.readIdentity();
       setIdentity(id);
+      // Живий стан — окремо й best-effort: якщо плата не відповість на MSP_STATUS_EX,
+      // ідентифікація все одно лишається показаною.
+      try {
+        setLive(await client.readStatus());
+      } catch {
+        setLive(null);
+      }
       setStatus('connected');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Помилка підключення');
@@ -54,6 +62,7 @@ export default function ConnectPage() {
     clientRef.current = null;
     setStatus('idle');
     setIdentity(null);
+    setLive(null);
     setError('');
   }
 
@@ -148,9 +157,61 @@ export default function ConnectPage() {
             </article>
           )}
 
+          {live && (
+            <article className="cn-card">
+              <h2>Що бачить плата</h2>
+              <div className="cn-sensors">
+                {(
+                  [
+                    ['gyro', 'гіроскоп'],
+                    ['acc', 'акселерометр'],
+                    ['baro', 'барометр'],
+                    ['mag', 'компас'],
+                    ['gps', 'GPS'],
+                  ] as const
+                ).map(([k, label]) => (
+                  <span key={k} className={`sensor ${live.sensors[k] ? 'on' : 'off'}`}>
+                    {live.sensors[k] ? '✓' : '✕'} {label}
+                  </span>
+                ))}
+              </div>
+
+              {identity?.fcVariant === 'BTFL' ? (
+                live.armingReliable ? (
+                  live.armingReady ? (
+                    <div className="cn-arm ok">✓ Нічого не блокує арм (за прапорами на момент опитування)</div>
+                  ) : (
+                    <div className="cn-arm">
+                      <b>Блокують арм:</b>
+                      <div className="arm-flags">
+                        {live.armingReasons.map((r) => (
+                          <span key={r} className="arm-flag">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="cn-hint">
+                        best-effort — назви прапорів залежать від версії BF; фінально звір у CLI{' '}
+                        <code>status</code>.
+                      </span>
+                    </div>
+                  )
+                ) : (
+                  <div className="cn-hint">
+                    Прапори арму не вдалося надійно прочитати на цій версії — звір у CLI <code>status</code>.
+                  </div>
+                )
+              ) : (
+                <div className="cn-hint">
+                  Прапори арму декодуються лише для Betaflight. Сенсори показано для будь-якої прошивки.
+                </div>
+              )}
+            </article>
+          )}
+
           <p className="source">
-            Зараз читаємо лише ідентифікацію (variant / версія / target) — це парситься надійно.
-            Arming-прапори й зайняті порти — наступний крок, після звірки на залізі.
+            Читаємо ідентифікацію (variant / версія / target) і живий стан: сенсори (надійно) та
+            прапори заборони арму (best-effort для BF). Конфіг портів — наступний крок.
           </p>
         </section>
       )}

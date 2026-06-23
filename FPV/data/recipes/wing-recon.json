@@ -1,0 +1,26 @@
+{
+  "$comment": "DRAFT — крило/розвідка (fixed-wing). Крилові FC у базі ще немає — рецепт на рівні ролі. Звір під свій планер.",
+  "id": "wing-recon",
+  "role": "Крило / розвідка (fixed-wing)",
+  "summary": "Ефективний планер на велику дальність з GPS RTH (iNav).",
+  "frame": "крило / літак",
+  "cells": "4S / 6S",
+  "firmware": "iNav",
+  "fc_hint": "iNav-сумісний FC з GPS (напр. Matek Wing)",
+  "bom": [
+    { "part": "FC", "spec": "iNav-сумісний, з барометром і GPS" },
+    { "part": "Серво", "spec": "елерони / кермо висоти-напряму" },
+    { "part": "Мотор+ESC", "spec": "під тягу планера (pusher), 4S/6S" },
+    { "part": "VTX", "spec": "далекобійний (цифра або аналог 1.2 ГГц)" },
+    { "part": "Приймач", "spec": "ELRS 915/868 МГц LR" },
+    { "part": "GPS", "spec": "обов'язково — RTH/rescue" },
+    { "part": "Акум", "spec": "Li-ion для тривалого польоту" }
+  ],
+  "config_notes": [
+    "iNav: GPS RTH/rescue, навігаційні режими, fixed-wing mixer.",
+    "ELRS 915/868 — дальність і завадостійкість.",
+    "Li-ion дає більший час польоту за ту саму вагу, ніж LiPo."
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://github.com/iNavFlight/inav/wiki"
+}

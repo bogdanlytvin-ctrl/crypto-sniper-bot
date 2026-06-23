@@ -64,6 +64,12 @@ export interface DiagnosticFlow {
   source_url: string;
 }
 
+// Пропускаємо у href лише http(s) — захист від javascript:/data: у даних
+// (source_url приходить з JSON, а ці JSON можна імпортувати/підмінити).
+export function safeHref(url: string | undefined): string {
+  return url && /^https?:\/\//i.test(url) ? url : '#';
+}
+
 // --- pad_ref резолвер: прив'язка перевірки до конкретної плати (моат) ---
 export interface ResolvedPad {
   label: string; // "пад 9V"
@@ -120,5 +126,24 @@ export function validateFlow(flow: DiagnosticFlow): string[] {
       errors.push(`cause "${id}" без source_url`);
     }
   }
+
+  // Досяжність: вузли-«острівці», недосяжні від entry, — це мертва гілка дерева.
+  if (ids.has(flow.entry)) {
+    const reachable = new Set<string>();
+    const stack = [flow.entry];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (reachable.has(cur)) continue;
+      reachable.add(cur);
+      const n = flow.nodes[cur];
+      if (n?.type === 'check') {
+        for (const o of n.outcomes) if (ids.has(o.next)) stack.push(o.next);
+      }
+    }
+    for (const id of ids) {
+      if (!reachable.has(id)) errors.push(`вузол "${id}" недосяжний від entry`);
+    }
+  }
+
   return errors;
 }

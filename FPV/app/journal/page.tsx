@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BOARDS, FLOWS } from '@/lib/data';
+import { readBoardId } from '@/lib/prefs';
 import {
   deleteRepair,
   listRepairs,
@@ -32,6 +33,33 @@ function fmtDate(ms: number): string {
     month: '2-digit',
     year: 'numeric',
   });
+}
+
+// CSV для звітності (Excel-сумісно): роздільник «;» (стандарт укр. Excel),
+// екранування лапок/розділювачів/переносів, UTF-8 BOM для кирилиці.
+function csvCell(v: string | number | undefined): string {
+  const s = v == null ? '' : String(v);
+  return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function toCsv(recs: RepairRecord[]): string {
+  const head = ['Дата', 'Борт', 'Плата', 'Симптом', 'Причина', 'Запчастини', 'Хвилини', 'Статус', 'Нотатки'];
+  const rows = recs.map((r) =>
+    [
+      fmtDate(r.createdAt),
+      r.droneTag,
+      r.boardLabel,
+      r.symptomLabel ?? '',
+      r.causeLabel ?? '',
+      r.parts,
+      r.minutesSpent ?? '',
+      STATUS[r.status].label,
+      r.notes,
+    ]
+      .map(csvCell)
+      .join(';'),
+  );
+  const BOM = String.fromCharCode(0xfeff);
+  return BOM + [head.join(';'), ...rows].join('\r\n');
 }
 
 export default function JournalPage() {
@@ -108,7 +136,9 @@ export default function JournalPage() {
   }, [repairs]);
 
   function startNew() {
-    setEditing(newRepair({ boardId: BOARDS[0].id, boardLabel: boardLabelOf(BOARDS[0].id) }));
+    // Дефолт — поточна (спільна) плата техніка, а не просто перша у списку.
+    const id = readBoardId();
+    setEditing(newRepair({ boardId: id, boardLabel: boardLabelOf(id) }));
   }
 
   function boardLabelOf(id: string): string {
@@ -150,6 +180,21 @@ export default function JournalPage() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `ftos-journal-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportCsv() {
+    const data = await listRepairs();
+    if (data.length === 0) {
+      alert('Журнал порожній — нема чого експортувати.');
+      return;
+    }
+    const blob = new Blob([toCsv(data)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ftos-journal-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -343,7 +388,10 @@ export default function JournalPage() {
               </button>
             )}
             <button className="ghost" onClick={exportJournal}>
-              ↓ експорт
+              ↓ JSON
+            </button>
+            <button className="ghost" onClick={exportCsv} title="Експорт для звіту (Excel)">
+              ↓ CSV
             </button>
             <button className="ghost" onClick={() => fileInput.current?.click()}>
               ↑ імпорт

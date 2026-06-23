@@ -1,0 +1,157 @@
+{
+  "$comment": "DRAFT-дерево. Серво-реліз/скид вантажу на FC (Betaflight servo через AUX). БЕЗПЕКА — головне: реліз не має спрацьовувати на вмиканні, у failsafe чи без команди. Складено за Betaflight Servos/CHANNEL_FORWARDING. НЕ звірено живим ремонтом.",
+  "id": "drop-release",
+  "symptom": "Скид не працює (серво/реліз вантажу)",
+  "summary": "Тріаж серво-релізу. Спершу — безпека (самовільне спрацювання), далі живлення → канал/мапінг → кінцеві точки → механіка.",
+  "applies_to": { "has": ["release"] },
+  "entry": "behavior",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1",
+  "nodes": {
+    "behavior": {
+      "type": "check",
+      "id": "behavior",
+      "instruction": "Як саме поводиться реліз?",
+      "method": "visual",
+      "note": "Усі перевірки — БЕЗ бойового вантажу, на землі, з фіксацією борту. Реліз тестують у безпечному стані.",
+      "outcomes": [
+        { "label": "Спрацьовує САМ (на вмиканні / у failsafe / без команди)", "next": "c_safety_trigger" },
+        { "label": "Не реагує на перемикач узагалі", "next": "servo_power" },
+        { "label": "Реагує, але не до кінця відкриває/закриває", "next": "endpoints" },
+        { "label": "Серво дзижчить / гріється", "next": "c_servo_jitter" }
+      ]
+    },
+    "servo_power": {
+      "type": "check",
+      "id": "servo_power",
+      "instruction": "Чи живиться серво? Поміряй 5V на роз'ємі релізу.",
+      "method": "multimeter",
+      "expected": "≈5 В на + дроті серво",
+      "outcomes": [
+        { "label": "0 В на серво", "next": "c_servo_power" },
+        { "label": "Є 5 В, але серво мовчить", "next": "channel_map" }
+      ]
+    },
+    "channel_map": {
+      "type": "check",
+      "id": "channel_map",
+      "instruction": "Перемикач призначено на канал серво? (Servo tab / CHANNEL_FORWARDING, AUX)",
+      "method": "configurator",
+      "note": "Серво кріпиться до паду через resource SERVO; керування — AUX-каналом. Якщо мотори й серво на одному таймері — серво не працюватиме.",
+      "outcomes": [
+        { "label": "AUX/канал не призначено на серво", "next": "c_channel_map" },
+        { "label": "Призначено, серво все одно мовчить", "next": "c_servo_pad_timer" }
+      ]
+    },
+    "endpoints": {
+      "type": "check",
+      "id": "endpoints",
+      "instruction": "Кінцеві точки серво (min/max) виставлені під механізм релізу?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Хід замалий/завеликий — гак не звільняє", "next": "c_endpoints" },
+        { "label": "Хід достатній, але клинить механічно", "next": "c_mechanical" }
+      ]
+    },
+
+    "c_safety_trigger": {
+      "type": "cause",
+      "id": "c_safety_trigger",
+      "cause": "НЕБЕЗПЕКА: реліз спрацьовує без команди (вмикання / failsafe / плаваючий канал)",
+      "fix_steps": [
+        "Вистав безпечне (закрите) значення каналу серво у disarmed і у failsafe — реліз має лишатися ЗАКРИТИМ.",
+        "Перевір, що канал не «плаває» і не призначений на режим, активний при power-up.",
+        "Перевір failsafe-значення каналу на приймачі (щоб при втраті лінку реліз не відкривався).",
+        "Тестуй лише без бойового вантажу, на землі, з фіксацією — до повної певності."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Failsafe",
+      "est_minutes": 20
+    },
+    "c_servo_power": {
+      "type": "cause",
+      "id": "c_servo_power",
+      "cause": "Немає живлення серво (5V)",
+      "fix_steps": [
+        "Прозвони + і GND серво до паду/BEC; перепай холодне з'єднання.",
+        "Потужне серво став на окремий 5V BEC, щоб не просідав FC.",
+        "Повтори вимір під навантаженням (серво в русі)."
+      ],
+      "fix_action": "resolder",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1",
+      "est_minutes": 15
+    },
+    "c_channel_map": {
+      "type": "cause",
+      "id": "c_channel_map",
+      "cause": "Канал керування серво не призначено",
+      "fix_steps": [
+        "Betaflight: Servos tab — признач AUX-канал на потрібне серво (SERVO_TILT), або CHANNEL_FORWARDING (channel_forwarding_start).",
+        "Перевір, що перемикач пульта дає рух каналу в Receiver tab.",
+        "Save & Reboot, перевір рух серво перемикачем."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://github.com/betaflight/betaflight/wiki/CHANNEL_FORWARDING-for-3.1",
+      "est_minutes": 15
+    },
+    "c_servo_pad_timer": {
+      "type": "cause",
+      "id": "c_servo_pad_timer",
+      "cause": "Серво-пад не призначено або конфлікт таймера з моторами",
+      "fix_steps": [
+        "CLI: resource SERVO n <пін> на вільний пад (S5/LED/RSSI), якщо немає виділеного серво-виходу.",
+        "Перевір таймери: мотор і серво на одному TIM не працюють разом — обери інший пад.",
+        "Save; перевір рух серво."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1",
+      "est_minutes": 20
+    },
+    "c_endpoints": {
+      "type": "cause",
+      "id": "c_endpoints",
+      "cause": "Кінцеві точки серво не під механізм релізу",
+      "fix_steps": [
+        "Вистав min/max серво так, щоб гак повністю звільняв і надійно тримав.",
+        "Лиши запас ходу, але без упору в механічний обмежувач (серво не має «давити»).",
+        "Перевір повний цикл відкрити/закрити кілька разів."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1",
+      "est_minutes": 10
+    },
+    "c_servo_jitter": {
+      "type": "cause",
+      "id": "c_servo_jitter",
+      "cause": "Серво дзижчить/гріється — просідання живлення або затиск",
+      "fix_steps": [
+        "Перевір 5V під навантаженням — слабкий BEC дає просідання й дрож.",
+        "Окреме живлення серво від потужнішого BEC.",
+        "Перевір, чи серво не впирається в механіку (постійний струм = нагрів)."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1",
+      "est_minutes": 15
+    },
+    "c_mechanical": {
+      "type": "cause",
+      "id": "c_mechanical",
+      "cause": "Механічний затиск гака/защіпки релізу",
+      "fix_steps": [
+        "Почисти й змасти механізм; прибери задирки/нагар.",
+        "Відрегулюй люфт гака, щоб звільняв без зусилля.",
+        "Перевір повний цикл під вагою, близькою до бойової (тренувальний макет)."
+      ],
+      "fix_action": "clean",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1",
+      "est_minutes": 15
+    }
+  }
+}

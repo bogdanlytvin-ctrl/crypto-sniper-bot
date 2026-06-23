@@ -1,0 +1,27 @@
+{
+  "$comment": "DRAFT — електромагнітний реліз (утримує, поки подано струм; відпускає при знятті). Керується через перемикальний пад/MOSFET. БЕЗПЕКА: визнач безпечний стан при втраті живлення/failsafe.",
+  "id": "generic-electromagnet-release",
+  "type": "release",
+  "brand": "Generic",
+  "model": "Електромагнітний реліз",
+  "protocol": "перемикач / MOSFET",
+  "requirements": {
+    "connection": "servo",
+    "voltage": ["5V"],
+    "current_draw_ma": 500
+  },
+  "wiring": [
+    { "component_pin": "Керування", "connects_to": "FC перемикальний пад / зовнішній MOSFET (AUX)" },
+    { "component_pin": "+ (живлення)", "connects_to": "5V/VBAT за номіналом магніту (часто окремий BEC)" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Керування AUX через перемикальний вихід/MOSFET. УВАГА: магніт тримає, поки є струм — визнач, що безпечніше при failsafe/втраті живлення (тримати чи відпустити) під конкретну задачу.",
+  "known_issues": [
+    {
+      "issue": "Великий струм утримання — гріється, просаджує слабкий BEC",
+      "workaround": "Окремий BEC під магніт; контролюй нагрів; враховуй струм у бюджеті живлення"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://betaflight.com/docs/wiki/guides/current/Servos-And-SERVO_TILT-for-3-1"
+}

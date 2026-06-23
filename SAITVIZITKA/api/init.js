@@ -1,7 +1,8 @@
 import { getPool } from "./_db.js";
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (req.method !== "POST") return res.status(405).end();
+  if (req.headers["x-init-secret"] !== process.env.EDIT_PASSWORD) return res.status(401).end();
   const pool = getPool();
   try {
     await pool.query(`

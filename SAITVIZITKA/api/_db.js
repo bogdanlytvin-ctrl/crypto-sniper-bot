@@ -1,9 +1,6 @@
 import pg from "pg";
 const { Pool } = pg;
 
-// Disable SSL cert verification for Supabase self-signed chain
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 export function getPool() {
   const connStr =
     process.env.saitvizitka_kv_url_POSTGRES_URL_NON_POOLING ||

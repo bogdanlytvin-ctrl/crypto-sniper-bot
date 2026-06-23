@@ -1,0 +1,92 @@
+{
+  "$comment": "DRAFT-дерево. Квадрик перекидається на зльоті. БЕЗПЕКА: усі перевірки моторів — БЕЗ пропелерів. Звірено з Oscar Liang + UAVMODEL (motor direction). НЕ звірено живим ремонтом.",
+  "id": "flip-takeoff",
+  "symptom": "Перекидається на зльоті",
+  "summary": "Різке перекидання при газі — майже завжди напрямок/порядок моторів або пропи. Повільний завал — орієнтація/акс.",
+  "applies_to": {},
+  "entry": "when",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-20" },
+  "source_url": "https://oscarliang.com/quad-flip-over-issue-fix/",
+  "nodes": {
+    "when": {
+      "type": "check",
+      "id": "when",
+      "instruction": "Як саме перекидається? (ТЕСТУЙ БЕЗ ПРОПЕЛЕРІВ)",
+      "method": "visual",
+      "note": "Зніми пропелери перед перевіркою моторів. Різке перекидання = мотори/пропи; повільний завал = орієнтація плати/акс.",
+      "outcomes": [
+        { "label": "Різко перекидає одразу при газі", "next": "motor_dir" },
+        { "label": "Повільно завалюється в один бік", "next": "c_orientation" }
+      ]
+    },
+    "motor_dir": {
+      "type": "check",
+      "id": "motor_dir",
+      "instruction": "У Motors (БЕЗ ПРОПІВ): напрямок обертання, позиції моторів, орієнтація пропів",
+      "method": "configurator",
+      "note": "Якщо два мотори крутять в один бік — буде різке перекидання. Звір з props-in/out схемою.",
+      "outcomes": [
+        { "label": "Напрямок обертання невірний (не збігається з props-in/out)", "next": "c_motor_dir" },
+        { "label": "Порядок/позиції моторів переплутані", "next": "c_motor_order" },
+        { "label": "Пропи стоять не на тих моторах / догори ногами", "next": "c_props" }
+      ]
+    },
+
+    "c_motor_dir": {
+      "type": "cause",
+      "id": "c_motor_dir",
+      "cause": "Невірний напрямок обертання моторів",
+      "fix_steps": [
+        "Motors → майстер Motor Direction (крутить по черзі, реверсить ESC автоматично).",
+        "Або вручну: props-out — мотори 1&4 Normal, 2&3 Reversed (props-in — навпаки).",
+        "Перевір без пропів, що напрямки збігаються зі схемою."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/quad-flip-over-issue-fix/",
+      "est_minutes": 10
+    },
+    "c_motor_order": {
+      "type": "cause",
+      "id": "c_motor_order",
+      "cause": "Переплутаний порядок/розкладка моторів",
+      "fix_steps": [
+        "Motors → звір нумерацію зі схемою квадрокоптера.",
+        "Виправ через Motor Remap (BF 4.5+) або CLI `resource MOTOR`.",
+        "Перевір кожен мотор по черзі без пропів."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/guides/current/Motor-and-ESC-Setup",
+      "est_minutes": 10
+    },
+    "c_props": {
+      "type": "cause",
+      "id": "c_props",
+      "cause": "Пропи встановлені неправильно (позиції/догори)",
+      "fix_steps": [
+        "Постав CW/CCW пропи на правильні мотори за схемою props-in/out.",
+        "Перевір, що пропи не догори ногами (маркування/профіль вгору).",
+        "Звір напрямок обертання з типом пропів."
+      ],
+      "fix_action": "rewire",
+      "confidence": "likely",
+      "source_url": "https://oscarliang.com/quad-flip-over-issue-fix/",
+      "est_minutes": 5
+    },
+    "c_orientation": {
+      "type": "cause",
+      "id": "c_orientation",
+      "cause": "Невірна орієнтація плати / акселерометр (повільний завал)",
+      "fix_steps": [
+        "Повільний завал (не різке перекидання) — це орієнтація/акс, не мотори.",
+        "Перейди до дерева «не вирівнюється / гіро-акс»: board_align + калібрування акс.",
+        "Перевір, що 3D-модель у конфігураторі повторює рухи борту."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+      "est_minutes": 10
+    }
+  }
+}

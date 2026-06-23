@@ -1,0 +1,152 @@
+{
+  "$comment": "DRAFT-дерево. Дрон не вирівнюється / не калібрується акселерометр-гіро. Звірено з Betaflight (Configuration/Setup) + UAVMODEL. НЕ звірено живим ремонтом.",
+  "id": "gyro-calibration",
+  "symptom": "Не вирівнюється / не калібрується гіро-акс",
+  "summary": "Завалює в Angle/Horizon, не калібрується акс або дрейф гіро. Йдемо від симптому: калібрування → вирівнювання плати → вібрації.",
+  "applies_to": {},
+  "entry": "mode",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-20" },
+  "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+  "nodes": {
+    "mode": {
+      "type": "check",
+      "id": "mode",
+      "instruction": "Що саме не так?",
+      "method": "configurator",
+      "note": "Angle/Horizon спираються на акселерометр; acro — лише на гіро. Це звужує причину.",
+      "outcomes": [
+        { "label": "В Angle/Horizon не тримає рівень / завалюється", "next": "acc_cal" },
+        { "label": "Не вдається відкалібрувати акселерометр", "next": "acc_fail" },
+        { "label": "Не армиться через гіро / дрейф на зльоті", "next": "gyro_arm" },
+        { "label": "3D-модель у конфігураторі рухається не так, як борт", "next": "c_align" }
+      ]
+    },
+    "acc_cal": {
+      "type": "check",
+      "id": "acc_cal",
+      "instruction": "Калібрував акселерометр на РІВНІЙ поверхні? (Setup → Calibrate Accelerometer)",
+      "method": "configurator",
+      "note": "Калібрування дає «нульову» площину для Angle. Робити на підтверджено рівній поверхні.",
+      "outcomes": [
+        { "label": "Ні / робив на нерівному", "next": "c_acc_recal" },
+        { "label": "Так, рівно — все одно завалює", "next": "align_check" }
+      ]
+    },
+    "align_check": {
+      "type": "check",
+      "id": "align_check",
+      "instruction": "Плата встановлена рівно й прямо? board_align (yaw/roll/pitch) виставлено під монтаж?",
+      "method": "visual",
+      "outcomes": [
+        { "label": "Плата під кутом / yaw не виставлено (стрілка не вперед)", "next": "c_align" },
+        { "label": "Монтаж рівний, акс відкалібровано — все одно дрейф", "next": "c_gyro_noise" }
+      ]
+    },
+    "acc_fail": {
+      "type": "check",
+      "id": "acc_fail",
+      "instruction": "Калібрування акс не проходить. Чи потрібен тобі взагалі Angle/Horizon?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Літаю в acro — Angle/Horizon не потрібні", "next": "c_disable_acc" },
+        { "label": "Потрібен Angle — акс має працювати", "next": "c_acc_hw" }
+      ]
+    },
+    "gyro_arm": {
+      "type": "check",
+      "id": "gyro_arm",
+      "instruction": "Борт стояв НЕРУХОМО в момент арму? Чи є вібрації під газом?",
+      "method": "visual",
+      "note": "Гіро калібрується при армі — рух у цей момент дає дрейф/блок.",
+      "outcomes": [
+        { "label": "Рухався/тримали в руках при армі", "next": "c_gyro_arm_move" },
+        { "label": "Стояв нерухомо — все одно шум/дрейф", "next": "c_gyro_noise" }
+      ]
+    },
+
+    "c_acc_recal": {
+      "type": "cause",
+      "id": "c_acc_recal",
+      "cause": "Акселерометр не відкалібровано (або на нерівному)",
+      "fix_steps": [
+        "Постав борт на підтверджено рівну поверхню.",
+        "Setup → Calibrate Accelerometer.",
+        "Перевір у Angle: на рівному борт не повинен «тягнути» в бік."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+      "est_minutes": 5
+    },
+    "c_align": {
+      "type": "cause",
+      "id": "c_align",
+      "cause": "Невірне вирівнювання плати (board alignment / монтаж)",
+      "fix_steps": [
+        "Вистав board_align_yaw (напр. 90/180/270°), якщо плата повернута; roll/pitch — якщо під кутом.",
+        "Перевір, що 3D-модель у конфігураторі повторює рухи борту.",
+        "Після зміни align — перекалібруй акселерометр."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+      "est_minutes": 10
+    },
+    "c_disable_acc": {
+      "type": "cause",
+      "id": "c_disable_acc",
+      "cause": "Acro-режим: акселерометр можна вимкнути",
+      "fix_steps": [
+        "Configuration → вимкни feature Accelerometer (для acro він не потрібен).",
+        "Зникне залежність від калібрування акс і відповідні блоки арму.",
+        "Пам'ятай: без акс немає Angle/Horizon і self-level."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+      "est_minutes": 3
+    },
+    "c_acc_hw": {
+      "type": "cause",
+      "id": "c_acc_hw",
+      "cause": "Несправний/невизначений акселерометр (залізо)",
+      "fix_steps": [
+        "Перевір, що плата бачить ACC (інструмент «Опитати плату» → сенсори).",
+        "Спробуй перепрошити FC тим самим target; перевір гіро/ICM-чип.",
+        "Якщо ACC не визначається — ремонт/заміна плати."
+      ],
+      "fix_action": "replace",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+      "est_minutes": 30
+    },
+    "c_gyro_arm_move": {
+      "type": "cause",
+      "id": "c_gyro_arm_move",
+      "cause": "Рух у момент арму — збите калібрування гіро",
+      "fix_steps": [
+        "Армій лише коли борт стоїть нерухомо на землі.",
+        "Не тримай у руках і не армій на ходу.",
+        "Якщо дрейф лишився — перезавантаж і повтори на рівному."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/app/configuration-tab",
+      "est_minutes": 3
+    },
+    "c_gyro_noise": {
+      "type": "cause",
+      "id": "c_gyro_noise",
+      "cause": "Вібрації / шум гіро",
+      "fix_steps": [
+        "Збалансуй або заміни биті/незбалансовані пропели.",
+        "М'який монтаж FC (soft-mount, гумки), перевір кріплення рами й моторів.",
+        "Увімкни bidirectional DShot для RPM-фільтра; перевір рівень шуму гіро."
+      ],
+      "fix_action": "clean",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki",
+      "est_minutes": 25
+    }
+  }
+}

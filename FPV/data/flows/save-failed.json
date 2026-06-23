@@ -1,0 +1,100 @@
+{
+  "$comment": "DRAFT-дерево. Налаштування не зберігаються / «Save failed» у Betaflight. Звірено з Betaflight troubleshooting + репорти конфігуратора. НЕ звірено живим ремонтом.",
+  "id": "save-failed",
+  "symptom": "Не зберігає налаштування / Save failed",
+  "summary": "Save & Reboot падає або налаштування відкочуються. Спершу — помилка при збереженні чи тихе зникнення після reboot.",
+  "applies_to": {},
+  "entry": "save_symptom",
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-20" },
+  "source_url": "https://betaflight.com/docs/wiki/getting-started/troubleshooting",
+  "nodes": {
+    "save_symptom": {
+      "type": "check",
+      "id": "save_symptom",
+      "instruction": "Як саме проявляється?",
+      "method": "configurator",
+      "note": "Перед будь-якими діями зроби backup: CLI → diff all → збережи вивід.",
+      "outcomes": [
+        { "label": "«Save failed» / помилка при Save & Reboot", "next": "cli_check" },
+        { "label": "Каже збережено, але після реконекту зникає", "next": "persist_check" }
+      ]
+    },
+    "cli_check": {
+      "type": "check",
+      "id": "cli_check",
+      "instruction": "Відкрий CLI — який рядок дає помилку при збереженні?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Конкретна команда/налаштування відхиляється", "next": "c_bad_setting" },
+        { "label": "Помилка зв'язку/порту під час reboot", "next": "c_comm" }
+      ]
+    },
+    "persist_check": {
+      "type": "check",
+      "id": "persist_check",
+      "instruction": "Версії Betaflight і конфігуратора сумісні? Живлення стабільне при reboot?",
+      "method": "configurator",
+      "outcomes": [
+        { "label": "Несумісні версії BF ↔ конфігуратор / відома проблема моделі", "next": "c_version" },
+        { "label": "Версії ок — конфіг ніби б'ється", "next": "c_corrupt" }
+      ]
+    },
+
+    "c_bad_setting": {
+      "type": "cause",
+      "id": "c_bad_setting",
+      "cause": "Окрема команда/налаштування відхиляється при збереженні",
+      "fix_steps": [
+        "У CLI знайди рядок з помилкою (червоний/`###ERROR`).",
+        "Прибери/виправ цю команду (непідтримуване значення/ресурс на цій версії).",
+        "save — решта застосується."
+      ],
+      "fix_action": "configure",
+      "confidence": "likely",
+      "source_url": "https://betaflight.com/docs/wiki/getting-started/troubleshooting",
+      "est_minutes": 10
+    },
+    "c_comm": {
+      "type": "cause",
+      "id": "c_comm",
+      "cause": "Збій USB-зв'язку під час Save & Reboot",
+      "fix_steps": [
+        "Зміни USB-кабель/порт (краще data-кабель напряму, без хабів).",
+        "Перевстанови драйвер/спробуй іншу версію конфігуратора чи браузер.",
+        "Повтори save після стабільного підключення."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/getting-started/troubleshooting",
+      "est_minutes": 15
+    },
+    "c_version": {
+      "type": "cause",
+      "id": "c_version",
+      "cause": "Несумісність версій BF ↔ конфігуратор (відома проблема)",
+      "fix_steps": [
+        "Звір версію прошивки й конфігуратора — використовуй відповідні.",
+        "Спробуй іншу (стабільну) версію конфігуратора.",
+        "Перевір відомі issue для своєї моделі/MCU."
+      ],
+      "fix_action": "reflash",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/getting-started/troubleshooting",
+      "est_minutes": 20
+    },
+    "c_corrupt": {
+      "type": "cause",
+      "id": "c_corrupt",
+      "cause": "Пошкоджений конфіг",
+      "fix_steps": [
+        "Збережи backup, що є (diff all).",
+        "CLI → defaults (стирає конфіг!) → reboot.",
+        "Налаштуй заново або акуратно застосуй backup частинами."
+      ],
+      "fix_action": "configure",
+      "confidence": "possible",
+      "source_url": "https://betaflight.com/docs/wiki/getting-started/troubleshooting",
+      "est_minutes": 25
+    }
+  }
+}

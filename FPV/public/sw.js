@@ -2,10 +2,37 @@
 // Після першого відкриття застосунок працює без мережі: повертаємо з кешу,
 // у фоні оновлюємо. Дані-довідник (JSON) вшиті у бандл, тож кешуються разом з ним.
 
-const CACHE = 'ftos-runtime-v1';
+const CACHE = 'ftos-runtime-v3';
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+// App shell — усі маршрути precache-имо на install, щоб офлайн працював навіть
+// для сторінок, які технік ще не відкривав (HTML; JS-чанки далі ловить SWR нижче).
+const PRECACHE = [
+  '/',
+  '/diagnose',
+  '/wiring',
+  '/connect',
+  '/journal',
+  '/batteries',
+  '/firmware',
+  '/recipes',
+  '/boards',
+  '/checklist',
+  '/verify',
+  '/reference',
+  '/help',
+  '/manifest.webmanifest',
+  '/icon.svg',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      // Кожен маршрут окремо: один збій не валить увесь precache.
+      await Promise.allSettled(PRECACHE.map((u) => cache.add(u)));
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener('activate', (event) => {

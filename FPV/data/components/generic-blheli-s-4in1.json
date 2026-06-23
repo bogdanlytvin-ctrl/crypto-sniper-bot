@@ -1,0 +1,30 @@
+{
+  "$comment": "DRAFT — типовий BLHeli_S 4in1 (бюджетний). КЛЮЧОВЕ: BLHeli_S сам по собі БЕЗ телеметрії (немає дроту TLM). RPM-фільтр лише через Bluejay (bidir DShot). Конкретний струм/банки звір на своєму ESC.",
+  "id": "generic-blheli-s-4in1",
+  "type": "esc",
+  "brand": "Generic",
+  "model": "BLHeli_S 4in1",
+  "protocol": "DShot300/600",
+  "firmware": "BLHeli_S",
+  "current_rating_a": 45,
+  "requirements": {
+    "connection": "stack_cable",
+    "voltage": ["3-6S"],
+    "has_telemetry": false
+  },
+  "wiring": [
+    { "component_pin": "M1–M4 (сигнал)", "connects_to": "FC виходи моторів M1–M4" },
+    { "component_pin": "VBAT (батарея/XT60)", "connects_to": "FC VBAT (ESC живить FC)" },
+    { "component_pin": "Curr", "connects_to": "FC датчик струму (Curr-пад)" },
+    { "component_pin": "GND", "connects_to": "GND" }
+  ],
+  "firmware_notes": "Betaflight: Motor protocol DShot600 (або 300). Телеметрії немає; для RPM-фільтра прошити Bluejay (bidirectional DShot).",
+  "known_issues": [
+    {
+      "issue": "BLHeli_S не дає телеметрії V/струм/темп/RPM — у конфігураторі вкладка ESC Telemetry порожня",
+      "workaround": "Прошити Bluejay (RPM по bidir DShot) або взяти BLHeli_32/AM32"
+    }
+  ],
+  "verified": { "status": "draft", "checked_by": "", "date": "2026-06-18" },
+  "source_url": "https://oscarliang.com/esc-firmware/"
+}

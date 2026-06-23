@@ -7,7 +7,6 @@ function AdminApp() {
   const [data, update] = useStore();
   const isRemote = !!(window.PortfolioDB && window.PortfolioDB.mode === "remote");
   const [authed, setAuthed] = React.useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "yes");
-  const [email, setEmail] = React.useState((window.PORTFOLIO_CONFIG && window.PORTFOLIO_CONFIG.ADMIN_EMAIL) || "");
   const [pass, setPass] = React.useState("");
   const [err, setErr] = React.useState("");
   const [busy, setBusy] = React.useState(false);
