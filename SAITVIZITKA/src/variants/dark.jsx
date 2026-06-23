@@ -607,6 +607,11 @@ function DarkSite() {
                     <div className="mono" style={{ fontSize: 13, color: accent }}>{openProject.metric}</div>
                   </div>
                 </div>
+                {openProject.url && (
+                  <a href={openProject.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 20, padding: "12px 22px", background: accent, color: "#0E0E10", borderRadius: 10, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
+                    {tr("Відкрити проект", "View project", "Открыть проект")} ↗
+                  </a>
+                )}
               </div>
             </div>
           </div>

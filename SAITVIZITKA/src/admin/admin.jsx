@@ -431,7 +431,10 @@ function PortfolioTab({ data, update, lang, setLang, notify }) {
                   <Input label="Рік" value={p.year} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).year = v; })} />
                   <Input label="Метрика" value={p.metric} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).metric = v; })} />
                 </div>
-                <Input label="Стек" value={p.stack} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).stack = v; })} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Input label="Стек" value={p.stack} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).stack = v; })} />
+                  <Input label="URL (посилання на сайт/бот)" value={p.url || ""} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).url = v; })} placeholder="https://..." />
+                </div>
                 <TriField label="Тег (короткий опис)" lang={lang} value={p.tag} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).tag = v; })} />
                 <TriField label="Опис" lang={lang} value={p.desc} onChange={(v) => up(d => { d.projects.find(x => x.id === p.id).desc = v; })} textarea />
                 <ImageUpload value={p.image || ""} onChange={(url) => up(d => { d.projects.find(x => x.id === p.id).image = url; })} accent={data.accent} label="Обкладинка проекту" aspect="16/10" />

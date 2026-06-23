@@ -415,6 +415,11 @@ function LightSite() {
                 <div className="mono" style={{ fontSize: 13, color: accent }}>{openProject.metric}</div>
               </div>
             </div>
+            {openProject.url && (
+              <a href={openProject.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 24, padding: "13px 24px", background: "#1A1815", color: "#F6F3EE", borderRadius: 100, fontSize: 14, fontWeight: 500, textDecoration: "none" }}>
+                {lang === "ua" ? "Відкрити проект" : lang === "en" ? "View project" : "Открыть проект"} ↗
+              </a>
+            )}
           </div>
         </div>
       )}
