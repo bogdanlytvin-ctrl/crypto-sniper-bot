@@ -121,15 +121,10 @@ function LightSite() {
 
           {/* stats strip */}
           <div style={{ marginTop: 80, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 40, paddingTop: 40, borderTop: "1px solid #1A181515" }}>
-            {[
-              { n: "40+", l: { ua: "Завершених проектів", en: "Delivered projects", ru: "Завершённых проектов" } },
-              { n: "7 дн", l: { ua: "Середній строк", en: "Average timeline", ru: "Средний срок" } },
-              { n: "98%", l: { ua: "Клієнти повертаються", en: "Clients come back", ru: "Клиенты возвращаются" } },
-              { n: "4 yr", l: { ua: "Досвіду", en: "Experience", ru: "Опыта" } },
-            ].map((s, i) => (
+            {(data.stats || []).map((s, i) => (
               <div key={i}>
                 <div className="serif" style={{ fontSize: 56, lineHeight: 1, letterSpacing: "-0.02em" }}>{s.n}</div>
-                <div style={{ marginTop: 8, fontSize: 13, color: "#7A7469" }}>{t(s.l)}</div>
+                <div style={{ marginTop: 8, fontSize: 13, color: "#7A7469" }}>{typeof s.label === "object" ? (s.label[lang] || s.label.ua) : s.label}</div>
               </div>
             ))}
           </div>
@@ -160,7 +155,7 @@ function LightSite() {
 
         {/* WORK */}
         <section id="work" style={{ padding: "120px 0" }}>
-          <LightSectionHead lang={lang} label={{ ua: "Вибрані роботи", en: "Selected work", ru: "Избранные работы" }} sub={{ ua: "Сім проектів, які найкраще показують, що я вмію.", en: "Seven projects that best show what I do.", ru: "Семь проектов, которые лучше всего показывают, что я умею." }} accent={accent} />
+          <LightSectionHead lang={lang} label={{ ua: "Вибрані роботи", en: "Selected work", ru: "Избранные работы" }} sub={{ ua: "Проекти, які показують, що я вмію.", en: "Projects that show what I can do.", ru: "Проекты, которые показывают, что я умею." }} accent={accent} />
           <div style={{ display: "flex", gap: 8, marginTop: 48, flexWrap: "wrap" }}>
             {data.categories.map((c) => (
               <button key={c.id} onClick={() => setFilter(c.id)} className="chip" style={{ padding: "10px 16px", background: filter === c.id ? "#1A1815" : "transparent", color: filter === c.id ? "#F6F3EE" : "#1A1815", border: `1px solid ${filter === c.id ? "#1A1815" : "#1A181530"}`, borderRadius: 100, fontFamily: "inherit", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>

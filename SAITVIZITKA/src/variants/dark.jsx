@@ -322,23 +322,20 @@ function DarkSite() {
               {/* side stat cards */}
               <div className="hero-side grid" style={{ gridTemplateRows: "auto auto auto", gap: 16 }}>
                 <div className="bento lift" style={{ padding: "26px 28px" }}>
-                  <div className="h-display" style={{ fontSize: 46, color: accent }}>40+</div>
-                  <div style={{ color: T.text2, fontSize: 14, marginTop: 4 }}>{tr("реалізованих проєктів", "projects delivered", "реализованных проектов")}</div>
+                  <div className="h-display" style={{ fontSize: 46, color: accent }}>2024</div>
+                  <div style={{ color: T.text2, fontSize: 14, marginTop: 4 }}>{tr("рік старту в IT", "year I started", "год старта в IT")}</div>
                 </div>
                 <div className="bento lift" style={{ padding: "26px 28px" }}>
-                  <div className="h-display" style={{ fontSize: 46 }}>~7<span style={{ fontSize: 22, color: T.text2 }}>{tr("дн", "d", "дн")}</span></div>
-                  <div style={{ color: T.text2, fontSize: 14, marginTop: 4 }}>{tr("середній термін запуску", "average time to launch", "средний срок запуска")}</div>
+                  <div className="h-display" style={{ fontSize: 46 }}>1+<span style={{ fontSize: 22, color: T.text2 }}>{tr("рік", "yr", "год")}</span></div>
+                  <div style={{ color: T.text2, fontSize: 14, marginTop: 4 }}>{tr("самонавчання", "self-learning", "самообучения")}</div>
                 </div>
-                <a href="https://learn.microsoft.com/en-us/users/38035639/" target="_blank" rel="noopener noreferrer" className="bento lift glow" style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "grid", placeItems: "center", background: "rgba(255,255,255,0.05)" }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24"><rect x="1" y="1" width="10.5" height="10.5" fill="#f25022" /><rect x="12.5" y="1" width="10.5" height="10.5" fill="#7fba00" /><rect x="1" y="12.5" width="10.5" height="10.5" fill="#00a4ef" /><rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#ffb900" /></svg>
-                  </div>
+                <div className="bento lift glow" style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "grid", placeItems: "center", background: "rgba(255,255,255,0.05)", fontSize: 22 }}>🚀</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>Microsoft Learn</div>
-                    <div className="mono" style={{ fontSize: 11, color: accent, marginTop: 2 }}>AI Certified ✓</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{tr("Відкритий до замовлень", "Open for projects", "Открыт к заказам")}</div>
+                    <div className="mono" style={{ fontSize: 11, color: accent, marginTop: 2 }}>available ✓</div>
                   </div>
-                  <span style={{ color: T.text3 }}>↗</span>
-                </a>
+                </div>
               </div>
             </div>
 
@@ -521,9 +518,9 @@ function DarkSite() {
                   </div>
                   <pre className="mono" style={{ margin: 0, padding: "18px 20px", fontSize: 13, lineHeight: 1.75, color: T.text2, overflowX: "auto" }}>
 <span style={{ color: "#c678dd" }}>const</span> <span style={{ color: T.text }}>dev</span> <span style={{ color: "#56b6c2" }}>=</span> {"{"}
-{"\n  "}<span style={{ color: accent }}>role</span>: <span style={{ color: "#98c379" }}>"Full-Stack Developer"</span>,
-{"\n  "}<span style={{ color: accent }}>focus</span>: [<span style={{ color: "#98c379" }}>"bots"</span>, <span style={{ color: "#98c379" }}>"web"</span>, <span style={{ color: "#98c379" }}>"automation"</span>],
-{"\n  "}<span style={{ color: accent }}>stack</span>: [<span style={{ color: "#98c379" }}>"Python"</span>, <span style={{ color: "#98c379" }}>"TS"</span>, <span style={{ color: "#98c379" }}>"React"</span>, <span style={{ color: "#98c379" }}>"Next.js"</span>],
+{"\n  "}<span style={{ color: accent }}>role</span>: <span style={{ color: "#98c379" }}>"Self-taught Developer"</span>,
+{"\n  "}<span style={{ color: accent }}>focus</span>: [<span style={{ color: "#98c379" }}>"bots"</span>, <span style={{ color: "#98c379" }}>"sites"</span>, <span style={{ color: "#98c379" }}>"automation"</span>],
+{"\n  "}<span style={{ color: accent }}>stack</span>: [<span style={{ color: "#98c379" }}>"Python"</span>, <span style={{ color: "#98c379" }}>"JS"</span>, <span style={{ color: "#98c379" }}>"aiogram"</span>, <span style={{ color: "#98c379" }}>"React"</span>],
 {"\n  "}<span style={{ color: accent }}>available</span>: <span style={{ color: "#d19a66" }}>true</span>,
 {"\n"}{"}"}
                   </pre>
