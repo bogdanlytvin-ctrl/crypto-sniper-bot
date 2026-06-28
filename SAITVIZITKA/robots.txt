@@ -3,5 +3,19 @@ Allow: /
 Disallow: /admin
 Disallow: /admin.html
 Disallow: /Scripts/config.js
+Disallow: /api/
 
-Sitemap: https://saitvizitka.vercel.app/sitemap.xml
+# AI crawlers — welcome
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /Images/
+
+Sitemap: https://saitvizitka-v2.vercel.app/sitemap.xml

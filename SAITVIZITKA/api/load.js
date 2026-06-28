@@ -12,9 +12,10 @@ export default async function handler(req, res) {
       `SELECT data FROM site_content WHERE id = 'main' LIMIT 1`
     );
     const raw = result.rows[0]?.data || null;
-    // Never expose server-side secrets to the public site.
+    // Strip server-side secrets AND leads (PII) from the public response.
+    // Leads are returned only to authenticated admins via /api/auth.
     if (raw && typeof raw === "object") {
-      const { telegram, adminPassHash, ...safe } = raw;
+      const { telegram, adminPassHash, leads, ...safe } = raw;
       return res.status(200).json({ data: safe });
     }
     return res.status(200).json({ data: raw });

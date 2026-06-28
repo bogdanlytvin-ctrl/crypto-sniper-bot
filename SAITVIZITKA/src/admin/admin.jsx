@@ -27,7 +27,11 @@ function AdminApp() {
       if (res && res.ok) {
         sessionStorage.setItem("pf_admin_pass", pass);
         sessionStorage.setItem(ADMIN_SESSION_KEY, "yes");
-        if (res.telegram) update(d => { d.telegram = res.telegram; return d; });
+        update(d => {
+          if (res.telegram) d.telegram = res.telegram;
+          if (res.leads) d.leads = res.leads;
+          return d;
+        });
         setAuthed(true);
       } else {
         setErr("Невірний пароль"); setBusy(false); return;

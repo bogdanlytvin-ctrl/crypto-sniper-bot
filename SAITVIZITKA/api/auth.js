@@ -12,7 +12,9 @@ function safeEqual(a, b) {
 // fields the admin needs to manage (telegram config). The password lives in the
 // EDIT_PASSWORD env var and is never sent to the public browser.
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin || "";
+  const allowed = ["https://saitvizitka-v2.vercel.app", "http://localhost:3000", "http://localhost:5173"];
+  if (allowed.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -24,19 +26,21 @@ export default async function handler(req, res) {
     if (!body || !safeEqual(body.password, PASS)) return res.status(401).json({ ok: false });
 
     let telegram = null;
+    let leads = null;
     try {
       let pool;
       try {
         pool = getPool();
         const r = await pool.query(`SELECT data FROM site_content WHERE id = 'main' LIMIT 1`);
         telegram = r.rows[0]?.data?.telegram || null;
+        leads = r.rows[0]?.data?.leads || null;
       } finally {
         if (pool) await pool.end();
       }
     } catch (dbErr) {
-      // DB unavailable — auth still succeeds, telegram config just won't be pre-filled
+      // DB unavailable — auth still succeeds, protected fields just won't be pre-filled
     }
-    return res.status(200).json({ ok: true, telegram });
+    return res.status(200).json({ ok: true, telegram, leads });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

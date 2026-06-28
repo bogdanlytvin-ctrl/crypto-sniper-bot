@@ -9,21 +9,28 @@
 <meta name="author" content="Bohdan">
 <meta name="theme-color" content="#0B0B0C">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Bohdan — Telegram-боти, лендинги, сайти">
-<meta property="og:description" content="Самоучка-розробник. Перші реальні проекти. Стек: python · js · n8n. Ціни від 2000 грн.">
+<meta property="og:url" content="https://saitvizitka-v2.vercel.app/">
+<meta property="og:site_name" content="Bohdan — Web Developer">
+<meta property="og:title" content="Bohdan — Telegram-боти, лендинги, сайти-візитки">
+<meta property="og:description" content="Фрілансер-розробник з України. Telegram-боти від $50, лендинги від $80, автоматизація від $40. Python · JS · n8n. Гарантія 30 днів.">
 <meta property="og:image" content="https://saitvizitka-v2.vercel.app/Images/og-cover.svg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:locale" content="uk_UA">
+<meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Bohdan — Telegram-боти, лендинги, сайти">
-<meta name="twitter:description" content="Самоучка-розробник. Перші реальні проекти. Python · JS · n8n.">
+<meta name="twitter:site" content="@LytvinB">
+<meta name="twitter:creator" content="@LytvinB">
+<meta name="twitter:title" content="Bohdan — Telegram-боти, лендинги, сайти-візитки">
+<meta name="twitter:description" content="Фрілансер-розробник: Telegram-боти від $50, лендинги від $80. Python · JS · n8n.">
 <meta name="twitter:image" content="https://saitvizitka-v2.vercel.app/Images/og-cover.svg">
 <link rel="icon" type="image/svg+xml" href="Images/favicon.svg">
 <link rel="apple-touch-icon" href="Images/favicon.svg">
-<link rel="canonical" href="/">
-<link rel="alternate" hreflang="uk" href="/">
-<link rel="alternate" hreflang="en" href="/?lang=en">
-<link rel="alternate" hreflang="ru" href="/?lang=ru">
-<link rel="alternate" hreflang="x-default" href="/">
+<link rel="canonical" href="https://saitvizitka-v2.vercel.app/">
+<link rel="alternate" hreflang="uk"        href="https://saitvizitka-v2.vercel.app/">
+<link rel="alternate" hreflang="en"        href="https://saitvizitka-v2.vercel.app/?lang=en">
+<link rel="alternate" hreflang="ru"        href="https://saitvizitka-v2.vercel.app/?lang=ru">
+<link rel="alternate" hreflang="x-default" href="https://saitvizitka-v2.vercel.app/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="format-detection" content="telephone=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,39 +42,124 @@
   "@graph": [
     {
       "@type": "Person",
-      "@id": "#bohdan",
-      "name": "Bohdan",
-      "jobTitle": "Web Developer",
-      "description": "Самоучка-розробник. Telegram-боти, лендинги, сайти-візитки, веб-додатки, автоматизація.",
-      "url": "/",
-      "knowsAbout": ["Telegram Bots", "Web Development", "Landing Pages", "Automation", "n8n", "Python", "JavaScript"]
+      "@id": "https://saitvizitka-v2.vercel.app/#bohdan",
+      "name": "Bohdan Lytvin",
+      "alternateName": "Богдан Литвин",
+      "jobTitle": "Freelance Web Developer",
+      "description": "Фрілансер-розробник з України. Telegram-боти (aiogram/Python), лендинги, сайти-візитки, веб-додатки, автоматизація n8n.",
+      "url": "https://saitvizitka-v2.vercel.app/",
+      "email": "b.litvin2023@gmail.com",
+      "knowsAbout": ["Telegram Bots", "Web Development", "Landing Pages", "Automation", "n8n", "Python", "JavaScript", "React", "Next.js", "aiogram", "PostgreSQL"],
+      "sameAs": [
+        "https://t.me/LytvinB",
+        "https://github.com/bogdanlytvin-ctrl"
+      ],
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "UA"
+      }
     },
     {
       "@type": "ProfessionalService",
-      "name": "Bohdan — Web Development",
-      "image": "/og-cover.svg",
-      "priceRange": "₴₴",
-      "description": "Telegram-боти, лендинги, сайти-візитки, веб-додатки, автоматизація. Старт від 2000 грн.",
-      "areaServed": "UA",
-      "provider": { "@id": "#bohdan" },
+      "@id": "https://saitvizitka-v2.vercel.app/#service",
+      "name": "Bohdan — Freelance Web Development",
+      "url": "https://saitvizitka-v2.vercel.app/",
+      "image": "https://saitvizitka-v2.vercel.app/Images/og-cover.svg",
+      "priceRange": "$40–$200+",
+      "description": "Telegram-боти, лендинги, сайти-візитки, веб-додатки та автоматизація. Старт від $40. Гарантія 30 днів.",
+      "areaServed": { "@type": "Country", "name": "Ukraine" },
+      "provider": { "@id": "https://saitvizitka-v2.vercel.app/#bohdan" },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer service",
+        "email": "b.litvin2023@gmail.com",
+        "url": "https://t.me/LytvinB",
+        "availableLanguage": ["Ukrainian", "Russian", "English"]
+      },
       "hasOfferCatalog": {
         "@type": "OfferCatalog",
-        "name": "Послуги",
+        "name": "Послуги веб-розробника",
         "itemListElement": [
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Telegram-бот" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Лендинг" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Сайт-візитка" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Веб-додаток" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Автоматизація n8n" } }
+          {
+            "@type": "Offer",
+            "itemOffered": { "@type": "Service", "name": "Telegram-бот", "description": "Прийом заявок, FAQ, нагадування, сценарії. aiogram + Python." },
+            "priceSpecification": { "@type": "PriceSpecification", "price": "50", "priceCurrency": "USD", "minPrice": "50" }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": { "@type": "Service", "name": "Лендинг", "description": "Односторінковий сайт з формою заявки." },
+            "priceSpecification": { "@type": "PriceSpecification", "price": "80", "priceCurrency": "USD", "minPrice": "80" }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": { "@type": "Service", "name": "Сайт-візитка", "description": "Особиста або бізнес-сторінка: портфоліо, контакти, послуги." },
+            "priceSpecification": { "@type": "PriceSpecification", "price": "100", "priceCurrency": "USD", "minPrice": "100" }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": { "@type": "Service", "name": "Автоматизація n8n", "description": "Інтеграції через n8n або API: форма → Telegram, таблиця → бот." },
+            "priceSpecification": { "@type": "PriceSpecification", "price": "40", "priceCurrency": "USD", "minPrice": "40" }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": { "@type": "Service", "name": "Веб-додаток", "description": "Custom рішення: Next.js, TypeScript, PostgreSQL, Vercel." },
+            "priceSpecification": { "@type": "PriceSpecification", "price": "200", "priceCurrency": "USD", "minPrice": "200" }
+          }
         ]
       }
     },
     {
       "@type": "WebSite",
-      "url": "/",
-      "name": "Bohdan Portfolio",
+      "@id": "https://saitvizitka-v2.vercel.app/#website",
+      "url": "https://saitvizitka-v2.vercel.app/",
+      "name": "Bohdan — Web Developer Portfolio",
       "inLanguage": ["uk", "en", "ru"],
-      "publisher": { "@id": "#bohdan" }
+      "publisher": { "@id": "https://saitvizitka-v2.vercel.app/#bohdan" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Скільки триває розробка?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Бот або лендинг — 3–7 днів. Веб-додаток — 2–4 тижні. Все залежить від обсягу."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Як відбувається оплата?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "50% передоплата, 50% після запуску. Картка, IBAN, USDT."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Що з підтримкою після запуску?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "30 днів безкоштовних правок у межах ТЗ. Далі — погодинно або підписка."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Чи є гарантія на роботу?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Так — виправлю всі баги після здачі. Не зникаю після оплати."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Яка мінімальна ціна на розробку?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Мінімальна ціна — $40 за просту автоматизацію або $50 за Telegram-бота. Точна ціна після уточнення ТЗ."
+          }
+        }
+      ]
     }
   ]
 }
@@ -76,7 +168,6 @@
   html, body { margin: 0; padding: 0; background: #0B0B0C; color: #E8E6E1; font-family: "Inter", system-ui, sans-serif; }
   * { box-sizing: border-box; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="Scripts/config.js"></script>
 <script src="src/db.js"></script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
@@ -86,6 +177,25 @@
 </head>
 <body>
 <div id="root"></div>
+<noscript>
+  <main style="max-width:860px;margin:0 auto;padding:40px 20px;font-family:sans-serif;color:#e8e6e1;background:#0b0b0c">
+    <h1>Богдан — Telegram-боти, лендинги, сайти-візитки</h1>
+    <p>Фрілансер-розробник з України. Telegram-боти від $50, лендинги від $80, сайти-візитки від $100, автоматизація від $40. Гарантія 30 днів після здачі.</p>
+    <h2>Послуги</h2>
+    <ul>
+      <li><strong>Telegram-боти</strong> від $50 — прийом заявок, FAQ, сценарії (Python + aiogram)</li>
+      <li><strong>Лендинги</strong> від $80 — односторінковий сайт для продукту або послуги</li>
+      <li><strong>Сайти-візитки</strong> від $100 — портфоліо, контакти, про бізнес</li>
+      <li><strong>Автоматизація</strong> від $40 — n8n, API-інтеграції</li>
+    </ul>
+    <h2>Часті питання</h2>
+    <details><summary>Скільки триває розробка?</summary><p>Бот або лендинг — 3–7 днів. Веб-додаток — 2–4 тижні.</p></details>
+    <details><summary>Як відбувається оплата?</summary><p>50% передоплата, 50% після запуску. Картка, IBAN, USDT.</p></details>
+    <details><summary>Чи є гарантія?</summary><p>Так — 30 днів безкоштовних правок після здачі.</p></details>
+    <h2>Контакти</h2>
+    <p>Telegram: <a href="https://t.me/LytvinB">@LytvinB</a> · Email: <a href="mailto:b.litvin2023@gmail.com">b.litvin2023@gmail.com</a></p>
+  </main>
+</noscript>
 
 <script type="text/babel" src="src/store.jsx"></script>
 <script type="text/babel" src="src/variants/price-calculator.jsx"></script>
