@@ -25,12 +25,13 @@ export default async function handler(req, res) {
 
     let telegram = null;
     try {
-      const pool = getPool();
+      let pool;
       try {
+        pool = getPool();
         const r = await pool.query(`SELECT data FROM site_content WHERE id = 'main' LIMIT 1`);
         telegram = r.rows[0]?.data?.telegram || null;
       } finally {
-        await pool.end();
+        if (pool) await pool.end();
       }
     } catch (dbErr) {
       // DB unavailable — auth still succeeds, telegram config just won't be pre-filled

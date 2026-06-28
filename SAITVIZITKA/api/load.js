@@ -5,8 +5,9 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const pool = getPool();
+  let pool;
   try {
+    pool = getPool();
     const result = await pool.query(
       `SELECT data FROM site_content WHERE id = 'main' LIMIT 1`
     );
@@ -20,6 +21,6 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   } finally {
-    await pool.end();
+    if (pool) await pool.end();
   }
 }

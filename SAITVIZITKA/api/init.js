@@ -3,8 +3,9 @@ import { getPool } from "./_db.js";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   if (req.headers["x-init-secret"] !== process.env.EDIT_PASSWORD) return res.status(401).end();
-  const pool = getPool();
+  let pool;
   try {
+    pool = getPool();
     await pool.query(`
       CREATE TABLE IF NOT EXISTS site_content (
         id TEXT PRIMARY KEY,
@@ -28,6 +29,6 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   } finally {
-    await pool.end();
+    if (pool) await pool.end();
   }
 }

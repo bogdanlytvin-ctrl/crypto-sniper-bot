@@ -20,9 +20,10 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  const pool = getPool();
+  let pool;
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    pool = getPool();
     await pool.query(
       `INSERT INTO site_content (id, data, updated_at)
        VALUES ('main', $1::jsonb, now())
@@ -33,6 +34,6 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   } finally {
-    await pool.end();
+    if (pool) await pool.end();
   }
 }

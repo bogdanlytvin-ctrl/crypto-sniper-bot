@@ -37,8 +37,9 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).end();
 
-  const pool = getPool();
+  let pool;
   try {
+    pool = getPool();
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const name = String(body.name || "").slice(0, 200).trim();
     const contact = String(body.contact || "").slice(0, 200).trim();
@@ -75,6 +76,6 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   } finally {
-    await pool.end();
+    if (pool) await pool.end();
   }
 }
